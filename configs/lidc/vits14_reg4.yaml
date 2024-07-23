@@ -1,0 +1,23 @@
+train:
+  batch_size_per_gpu: 32
+  dataset_path: LidcIdri:root=./datasets/lidc/LIDC_IDRI:extra=./datasets/lidc/extra:split=TRAIN
+  centering: centering
+  OFFICIAL_EPOCH_LENGTH: 5000
+student:
+  arch: vit_small
+  patch_size: 14
+  channels: 1
+  drop_path_rate: 0
+  num_register_tokens: 4
+  interpolate_antialias: true
+  interpolate_offset: 0.0
+optim:
+  epochs: 100
+  weight_decay: 0.04
+  weight_decay_end: 0.2
+  base_lr: 1.0e-04  # learning rate for a batch size of 256
+  warmup_epochs: 10
+  min_lr: 1.0e-06
+crops:
+  local_crops_size: 98
+  rgb_mode: false
