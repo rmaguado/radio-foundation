@@ -55,7 +55,7 @@ For python-based LazyConfig, use "path.key=value".
         help="Output directory to save logs and checkpoints",
     )
     # ADDED THIS LINE. to launch with torch distributed
-    #parser.add_argument("--local-rank", default=0, type=int, help="Variable for distributed computing.") 
+    #parser.add_argument("--local-rank", required=False, type=int, help="Variable for distributed computing.") 
 
     return parser
 
@@ -166,7 +166,7 @@ def do_train(cfg, model, resume=False):
 
     # setup data preprocessing
 
-    img_size = cfg.crops.global_crops_size
+    img_size = cfg.augmentations.crops.global_crops_size
     patch_size = cfg.student.patch_size
     n_tokens = (img_size // patch_size) ** 2
     mask_generator = MaskingGenerator(
@@ -174,14 +174,7 @@ def do_train(cfg, model, resume=False):
         max_num_patches=0.5 * img_size // patch_size * img_size // patch_size,
     )
 
-    data_transform = DataAugmentationDINO(
-        cfg.crops.global_crops_scale,
-        cfg.crops.local_crops_scale,
-        cfg.crops.local_crops_number,
-        global_crops_size=cfg.crops.global_crops_size,
-        local_crops_size=cfg.crops.local_crops_size,
-        rgb_mode=cfg.crops.rgb_mode
-    )
+    data_transform = DataAugmentationDINO(cfg.augmentations)
 
     collate_fn = partial(
         collate_data_and_cast,
@@ -243,10 +236,9 @@ def do_train(cfg, model, resume=False):
         apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
 
         # compute losses
-
+        
         optimizer.zero_grad(set_to_none=True)
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
-
         # clip gradients
 
         if fp16_scaler is not None:

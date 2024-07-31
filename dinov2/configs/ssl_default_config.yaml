@@ -105,16 +105,41 @@ optim:
   layerwise_decay: 0.9
   adamw_beta1: 0.9
   adamw_beta2: 0.999
-crops:
-  global_crops_scale:
-  - 0.32
-  - 1.0
-  local_crops_number: 8
-  local_crops_scale:
-  - 0.05
-  - 0.32
-  global_crops_size: 224
-  local_crops_size: 96
-  rgb_mode: true
+augmentations:
+    crops:
+      global_crops_scale:
+      - 0.32
+      - 1.0
+      local_crops_number: 8
+      local_crops_scale:
+      - 0.05
+      - 0.32
+      global_crops_size: 224
+      local_crops_size: 96
+    norm:
+        mean:
+        - 0.485
+        - 0.456
+        - 0.406
+        std:
+        - 0.229
+        - 0.224
+        - 0.225
+    global_1:
+    - crop
+    - colorjitter_0.8_0.4_0.4_0.4_0.4
+    - grayscale_0.2
+    - blur_1
+    global_2:
+    - crop
+    - colorjitter_0.8_0.4_0.4_0.4_0.4
+    - grayscale_0.2
+    - blur_0.1
+    - solarize_0.2_128_256
+    local:
+    - crop
+    - colorjitter_0.8_0.4_0.4_0.4_0.4
+    - grayscale_0.2
+    - blur_0.5
 evaluation:
   eval_period_iterations: 12500

@@ -132,7 +132,7 @@ class SSLMetaArch(nn.Module):
     def forward_backward(self, images, teacher_temp):
         n_global_crops = 2
         assert n_global_crops == 2
-        n_local_crops = self.cfg.crops.local_crops_number
+        n_local_crops = self.cfg.augmentations.crops.local_crops_number
 
         global_crops = images["collated_global_crops"].cuda(non_blocking=True)
         local_crops = images["collated_local_crops"].cuda(non_blocking=True)

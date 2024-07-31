@@ -30,9 +30,9 @@ try:
         from xformers.ops import fmha, scaled_index_add, index_select_cat
 
         XFORMERS_AVAILABLE = True
-        warnings.warn("xFormers is available (Block)")
+        #warnings.warn("xFormers is available (Block)")
     else:
-        warnings.warn("xFormers is disabled (Block)")
+        #warnings.warn("xFormers is disabled (Block)")
         raise ImportError
 except ImportError:
     XFORMERS_AVAILABLE = False

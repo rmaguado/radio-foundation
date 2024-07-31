@@ -11,7 +11,8 @@ from typing import Callable, List, Optional, Tuple, Union, Any
 
 from PIL import Image
 import numpy as np
-import pydicom
+import json
+import h5py
 
 from .extended import ExtendedVisionDataset
 
@@ -28,26 +29,14 @@ class _Split(Enum):
     def length(self) -> int:
         # slices
         split_lengths = {
-            _Split.TRAIN: 193_615,
-            _Split.VAL: 24_331,
-            _Split.TEST: 26_012,
+            _Split.TRAIN: 195_178,
+            _Split.VAL: 24_454,
+            _Split.TEST: 24_326,
         }
         return split_lengths[self]
 
-    def get_dirname(self, volume_id: Optional[str] = None) -> str:
-        return self.value if volume_id is None else os.path.join(self.value, volume_id)
-
-    def get_image_relpath(self, slice_index: int, figures: int, acquisition_number: int, volume_id: str) -> str:
-        dirname = self.get_dirname(volume_id)
-        basename = f"{acquisition_number}-{str(slice_index).rjust(figures, '0')}.dcm"
-        return os.path.join(dirname, basename)
-
-    def parse_image_relpath(self, image_relpath: str) -> Tuple[str, int]:
-        dirname, filename = os.path.split(image_relpath)
-        volume_id = os.path.split(dirname)[-1]
-        basename, _ = os.path.splitext(filename)
-        slice_index = int(basename.split("-")[-1])
-        return volume_id, slice_index
+    def get_image_relpath(self, image_id: str) -> str:
+        return os.path.join(self.value, image_id)
 
 
 class LidcIdri(ExtendedVisionDataset):
@@ -63,14 +52,14 @@ class LidcIdri(ExtendedVisionDataset):
         transforms: Optional[Callable] = None,
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
+        enable_targets: bool = False
     ) -> None:
         super().__init__(root, transforms, transform, target_transform)
         self._extra_root = extra
         self._split = split
+        self.enable_targets = enable_targets
 
         self._entries = None
-        self._class_ids = None
-        self._class_names = None
 
     @property
     def split(self) -> "LidcIdri.Split":
@@ -101,42 +90,32 @@ class LidcIdri(ExtendedVisionDataset):
     def get_image_data(self, index: int) -> np.ndarray:
         entries = self._get_entries()
         series_id = entries[index]["series_id"]
-        acquisition_number = entries[index]["acquisition_number"]
-        figures = entries[index]["figures"]
         slice_index = entries[index]["slice_index"]
 
-        image_relpath = self.split.get_image_relpath(slice_index, figures, acquisition_number, series_id)
-        image_full_path = os.path.join(self.root, image_relpath)
-        dicom_data = pydicom.dcmread(image_full_path)
+        image_full_path = os.path.join(self.root, self.split.value, series_id, 'image.npy')
         
-        image_data = dicom_data.pixel_array
-        rescale_slope = dicom_data.RescaleSlope
-        rescale_intercept = dicom_data.RescaleIntercept
+        image_mmap = np.load(image_full_path, mmap_mode="r")
+        loaded_image = image_mmap[slice_index].astype(np.float32)
 
-        hu_array = image_data * rescale_slope + rescale_intercept
-
-        windowed_hu = np.clip(hu_array, -1024, 3071)
-
-        rescaled = (windowed_hu + 1024) / 4095
-        
-        image = Image.fromarray(rescaled, 'L')
-
-        return image
+        return Image.fromarray(loaded_image, 'F')
 
     def get_target(self, index: int) -> Optional[Target]:
         entries = self._get_entries()
         
-        # create volume with zeros
-        
-        # iterate over all nodues, add them to the volume
-        
-        # take a slice
+        series_id = entries[index]["series_id"]
+        slice_index = entries[index]["slice_index"]
 
-        return None
+        mask_full_path = os.path.join(self.root, self.split.value, series_id, 'mask.h5')
+        
+        with h5py.File(mask_full_path, 'r') as f:
+            data = f["data"]
+            loaded_mask = data[slice_index]
+
+        return Image.fromarray(loaded_mask)
 
     def get_targets(self) -> Optional[np.ndarray]:
         entries = self._get_entries()
-        return None # [self.get_target(i) for i in range(len(entries))]
+        return [self.get_target(i) for i in range(len(entries))]
 
     def __len__(self) -> int:
         entries = self._get_entries()
@@ -148,7 +127,11 @@ class LidcIdri(ExtendedVisionDataset):
             image = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
-        target = None # self.get_target(index)
+            
+        if self.enable_targets:
+            target = self.get_target(index)
+        else:
+            target = None
 
         if self.transforms is not None:
             image, target = self.transforms(image, target)
@@ -157,17 +140,17 @@ class LidcIdri(ExtendedVisionDataset):
 
     def _dump_entries(self) -> None:
         split = self.split
+        
+        base_dir = os.path.join(self.root, split.value)
 
         series_dirs = [
-            d for d in os.listdir(os.path.join(self.root, split.value)) \
+            d for d in os.listdir(base_dir) \
             if os.path.isdir(os.path.join(self.root, split.value, d))
         ]
 
         dtype = np.dtype(
             [
                 ("series_id", "U256"),
-                ("acquisition_number", "uint8"),
-                ("figures", "uint8"),
                 ("slice_index", "uint16"),
             ]
         )
@@ -175,19 +158,12 @@ class LidcIdri(ExtendedVisionDataset):
         
         abs_slice_index = 0
         for series_id in series_dirs:
-            slice_files = [
-                f for f in os.listdir(os.path.join(self.root, split.value, series_id)) \
-                if f.endswith('.dcm')
-            ]
-            for slice_file in slice_files:
-                slice_labels = os.path.splitext(slice_file)[0].split('_')[-1].split("-")
-                acquisition_number = int(slice_labels[0])
-                figures = len(slice_labels[1])
-                slice_index = int(slice_labels[1])
+            with open(os.path.join(base_dir, series_id, "metadata.json"), 'r') as f:
+                metadata = json.load(f)
+            num_slices = metadata["shape"][0]
+            for slice_index in range(num_slices):
                 entries_array[abs_slice_index] = (
                     series_id,
-                    acquisition_number,
-                    figures,
                     slice_index
                 )
                 abs_slice_index += 1

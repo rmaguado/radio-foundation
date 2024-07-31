@@ -1,23 +1,48 @@
 train:
-  batch_size_per_gpu: 32
-  dataset_path: LidcIdri:root=./datasets/lidc/LIDC_IDRI:extra=./datasets/lidc/extra:split=TRAIN
-  centering: centering
-  OFFICIAL_EPOCH_LENGTH: 5000
+    batch_size_per_gpu: 64
+    dataset_path: LidcIdri:root=./datasets/lidc/LIDC_IDRI:extra=./datasets/lidc/extra:split=TRAIN
+    centering: centering
+    OFFICIAL_EPOCH_LENGTH: 1000
 student:
-  arch: vit_small
-  patch_size: 14
-  channels: 1
-  drop_path_rate: 0
-  num_register_tokens: 4
-  interpolate_antialias: true
-  interpolate_offset: 0.0
+    arch: vit_small
+    patch_size: 14
+    channels: 1
+    drop_path_rate: 0
+    num_register_tokens: 4
+    interpolate_antialias: true
+    interpolate_offset: 0.0
 optim:
-  epochs: 100
-  weight_decay: 0.04
-  weight_decay_end: 0.2
-  base_lr: 1.0e-04  # learning rate for a batch size of 256
-  warmup_epochs: 10
-  min_lr: 1.0e-06
-crops:
-  local_crops_size: 98
-  rgb_mode: false
+    epochs: 200
+    weight_decay: 0.04
+    weight_decay_end: 0.2
+    base_lr: 0.003
+    warmup_epochs: 10
+    min_lr: 1.0e-06
+    adamw_beta1: 0.9
+    adamw_beta2: 0.999
+dino:
+    koleo_loss_weight: 0.075
+augmentations:
+    crops:
+        local_crops_size: 98
+    norm:
+        mean: 0.124
+        std: 0.121
+    global_1:
+    - rotation_0.8_90
+    - crop
+    - contrast_0.8_0.4
+    - brightness_0.8_0.4
+    - blur_1
+    global_2:
+    - crop
+    - contrast_0.8_0.4
+    - brightness_0.8_0.4
+    - solarize_0.2_0.5_1
+    - noise_0.5_0.02_1
+    - blur_0.1
+    local:
+    - crop
+    - contrast_0.8_0.4
+    - brightness_0.8_0.4
+    - blur_0.5
