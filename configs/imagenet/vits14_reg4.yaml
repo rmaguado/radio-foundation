@@ -1,4 +1,5 @@
 train:
+    grad_accum_steps: 2
     batch_size_per_gpu: 64
     dataset_path: ImageNet:root=./datasets/imagenet/ILSVRC2012:extra=./datasets/imagenet/extra:split=TRAIN
     centering: "centering"

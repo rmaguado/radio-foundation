@@ -214,6 +214,9 @@ def do_train(cfg, model, resume=False):
     metrics_file = os.path.join(cfg.train.output_dir, "training_metrics.json")
     metric_logger = MetricLogger(delimiter="  ", output_file=metrics_file)
     header = "Training"
+    
+    # Gradient accumulation counter here
+    grad_accum_counter = 0
 
     for data in metric_logger.log_every(
         data_loader,
@@ -236,27 +239,29 @@ def do_train(cfg, model, resume=False):
         apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
 
         # compute losses
+        if grad_accum_counter % cfg.train.grad_accum_steps == 0:
+            optimizer.zero_grad(set_to_none=True)
         
-        optimizer.zero_grad(set_to_none=True)
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
         # clip gradients
 
-        if fp16_scaler is not None:
-            if cfg.optim.clip_grad:
-                fp16_scaler.unscale_(optimizer)
-                for v in model.student.values():
-                    v.clip_grad_norm_(cfg.optim.clip_grad)
-            fp16_scaler.step(optimizer)
-            fp16_scaler.update()
-        else:
-            if cfg.optim.clip_grad:
-                for v in model.student.values():
-                    v.clip_grad_norm_(cfg.optim.clip_grad)
-            optimizer.step()
+        if grad_accum_counter % cfg.train.grad_accum_steps == 0:
+            if fp16_scaler is not None:
+                if cfg.optim.clip_grad:
+                    fp16_scaler.unscale_(optimizer)
+                    for v in model.student.values():
+                        v.clip_grad_norm_(cfg.optim.clip_grad)
+                fp16_scaler.step(optimizer)
+                fp16_scaler.update()
+            else:
+                if cfg.optim.clip_grad:
+                    for v in model.student.values():
+                        v.clip_grad_norm_(cfg.optim.clip_grad)
+                optimizer.step()
 
-        # perform teacher EMA update
+            # perform teacher EMA update
 
-        model.update_teacher(mom)
+            model.update_teacher(mom)
 
         # logging
 
