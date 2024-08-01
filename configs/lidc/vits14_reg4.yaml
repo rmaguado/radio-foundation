@@ -1,8 +1,9 @@
 train:
+    grad_accum_steps: 8
     batch_size_per_gpu: 64
     dataset_path: LidcIdri:root=./datasets/lidc/LIDC_IDRI:extra=./datasets/lidc/extra:split=TRAIN
     centering: centering
-    OFFICIAL_EPOCH_LENGTH: 1000
+    OFFICIAL_EPOCH_LENGTH: 8000
 student:
     arch: vit_small
     patch_size: 14
@@ -21,7 +22,7 @@ optim:
     adamw_beta1: 0.9
     adamw_beta2: 0.999
 dino:
-    koleo_loss_weight: 0.075
+    koleo_loss_weight: 0.1
 augmentations:
     crops:
         local_crops_size: 98

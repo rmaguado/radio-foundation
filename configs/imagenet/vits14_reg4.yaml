@@ -1,9 +1,9 @@
 train:
-    grad_accum_steps: 2
+    grad_accum_steps: 8
     batch_size_per_gpu: 64
     dataset_path: ImageNet:root=./datasets/imagenet/ILSVRC2012:extra=./datasets/imagenet/extra:split=TRAIN
     centering: "centering"
-    OFFICIAL_EPOCH_LENGTH: 5000
+    OFFICIAL_EPOCH_LENGTH: 8000
 student:
     arch: vit_small
     patch_size: 14
@@ -12,7 +12,7 @@ student:
     interpolate_antialias: true
     interpolate_offset: 0.0
 optim:
-    epochs: 200
+    epochs: 100
     weight_decay: 0.04
     weight_decay_end: 0.2
     base_lr: 0.003
