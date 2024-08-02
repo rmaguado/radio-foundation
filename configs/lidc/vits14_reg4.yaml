@@ -19,6 +19,7 @@ optim:
     weight_decay_end: 0.2
     base_lr: 0.003
     warmup_epochs: 10
+    freeze_last_layer_epochs: 3
     min_lr: 1.0e-06
     adamw_beta1: 0.9
     adamw_beta2: 0.999
