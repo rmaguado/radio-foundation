@@ -229,17 +229,17 @@ def do_train(cfg, model, resume=False):
         if iteration > max_iter:
             return
 
-        # apply schedules
-
-        lr = lr_schedule[iteration]
-        wd = wd_schedule[iteration]
-        mom = momentum_schedule[iteration]
-        teacher_temp = teacher_temp_schedule[iteration]
-        last_layer_lr = last_layer_lr_schedule[iteration]
-        apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
-
-        # compute losses
+        
         if grad_accum_counter % cfg.train.grad_accum_steps == 0:
+            # apply schedules
+            lr = lr_schedule[iteration]
+            wd = wd_schedule[iteration]
+            mom = momentum_schedule[iteration]
+            teacher_temp = teacher_temp_schedule[iteration]
+            last_layer_lr = last_layer_lr_schedule[iteration]
+            apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
+
+            # compute losses
             optimizer.zero_grad(set_to_none=True)
         
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
