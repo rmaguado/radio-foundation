@@ -9,18 +9,6 @@ import SimpleITK as sitk
 from sklearn.model_selection import train_test_split
 
 
-def create_directories(root_dir, subsets=['train', 'test', 'val']):
-    for subset in subsets:
-        os.makedirs(os.path.join(root_dir, subset), exist_ok=True)
-
-
-def get_patient_ids():
-    scans = pl.query(pl.Scan).all()
-    patient_ids = set(scan.patient_id for scan in scans)
-    
-    return list(patient_ids)
-
-
 def process_scan(scan, patient_id):
     dicom_dir = scan.get_path_to_dicom_files()
     reader = sitk.ImageSeriesReader()
@@ -89,18 +77,13 @@ def process_patient(patient_id, target_dir):
 
 def main():
     target_dir = "./LIDC_IDRI"
-    create_directories(target_dir)
+    os.makedirs(target_dir, exist_ok=True)
+    
+    source_dir = "/home/rmaguado/rdt/DeepRDT/manifest-1722177583547/NSCLC Radiogenomics"
+    patients = [x for x in os.listdir(source_dir) if os.path.isdir(os.path.join(source_dir, x))]
 
-    patients = get_patient_ids()
-    train_patients, test_patients = train_test_split(patients, test_size=1/10, random_state=42)
-    train_patients, val_patients = train_test_split(train_patients, test_size=1/9, random_state=42)
-
-    for patient_id in tqdm(val_patients):
-        process_patient(patient_id, os.path.join(target_dir, "val"))
-    for patient_id in tqdm(train_patients):
-        process_patient(patient_id, os.path.join(target_dir, "train"))
-    for patient_id in tqdm(test_patients):
-        process_patient(patient_id, os.path.join(target_dir, "test"))
+    for patient_id in tqdm(patients):
+        process_patient(patient_id, target_dir)
 
 if __name__ == "__main__":
     main()
