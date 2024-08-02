@@ -220,7 +220,7 @@ def do_train(cfg, model, resume=False):
 
     for data in metric_logger.log_every(
         data_loader,
-        10,
+        cfg.train.print_freq,
         header,
         max_iter,
         start_iter,
