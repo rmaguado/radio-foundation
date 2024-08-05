@@ -21,13 +21,13 @@ logger = logging.getLogger("dinov2")
 _Target = int
 
 
-class LidcIdri(ExtendedVisionDataset):
+class NSCLC_Radiomics(ExtendedVisionDataset):
     Target = Union[_Target]
 
     def __init__(
         self,
         *,
-        split: "LidcIdri.Split",
+        split: str,
         root: str,
         extra: str,
         transforms: Optional[Callable] = None,
@@ -38,17 +38,6 @@ class LidcIdri(ExtendedVisionDataset):
         super().__init__(
             split, root, extra, transforms, transform, target_transform, enable_targets
         )
-
+        
     def get_target(self, index: int) -> Optional[Target]:
-        entries = self._get_entries()
-        
-        series_id = entries[index]["series_id"]
-        slice_index = entries[index]["slice_index"]
-
-        mask_full_path = os.path.join(self.root, series_id, 'mask.h5')
-        
-        with h5py.File(mask_full_path, 'r') as f:
-            data = f["data"]
-            loaded_mask = data[slice_index]
-
-        return Image.fromarray(loaded_mask)
+        raise NotImplementedError

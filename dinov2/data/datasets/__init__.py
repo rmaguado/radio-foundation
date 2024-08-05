@@ -5,4 +5,6 @@
 
 from .image_net import ImageNet
 from .lidc_idri import LidcIdri
-from .image_net_22k import ImageNet22k
+from .nsclc_radiomics import NSCLC_Radiomics
+from .ct_dataset import CTDataset
+from .ct_collection import CTCollection
