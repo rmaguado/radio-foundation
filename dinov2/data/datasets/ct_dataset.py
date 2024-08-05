@@ -21,7 +21,7 @@ logger = logging.getLogger("dinov2")
 _Target = int
 
 
-class CTDataset(ExtendedVisionDataset):
+class CtDataset(ExtendedVisionDataset):
     Target = Union[_Target]
 
     def __init__(

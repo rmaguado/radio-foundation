@@ -14,14 +14,14 @@ import numpy as np
 import json
 import h5py
 
-from .extended import ExtendedVisionDataset
+from .ct_dataset import CtDataset
 
 
 logger = logging.getLogger("dinov2")
 _Target = int
 
 
-class LidcIdri(ExtendedVisionDataset):
+class LidcIdri(CtDataset):
     Target = Union[_Target]
 
     def __init__(

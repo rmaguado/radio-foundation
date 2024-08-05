@@ -21,7 +21,7 @@ logger = logging.getLogger("dinov2")
 _Target = int
 
 
-class NsclcRadiomics(CtDataset):
+class CtCollection(CtDataset):
     Target = Union[_Target]
 
     def __init__(
@@ -38,6 +38,21 @@ class NsclcRadiomics(CtDataset):
         super().__init__(
             split, root, extra, transforms, transform, target_transform, enable_targets
         )
+
+
+    def get_image_data(self, index: int) -> np.ndarray:
+        entries = self._get_entries()
+        dataset = entries[index]["dataset"]
+        series_id = entries[index]["series_id"]
+        slice_index = entries[index]["slice_index"]
         
+        image_full_path = os.path.join(self.root, dataset, data, series_id, 'image.h5')
+        
+        with h5py.File(image_full_path, 'r') as f:
+            data = f["data"]
+            image = data[slice_index].astype(np.float32)
+            
+        return Image.fromarray(image, 'F')
+
     def get_target(self, index: int) -> Optional[Target]:
         raise NotImplementedError

@@ -10,7 +10,7 @@ from typing import Any, Callable, List, Optional, TypeVar
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import ImageNet, LidcIdri, CTDataset
+from .datasets import ImageNet, LidcIdri, NsclcRadiomics, CtDataset, CtCollection
 from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 
 
@@ -58,8 +58,12 @@ def _parse_dataset_str(dataset_str: str):
             kwargs["split"] = ImageNet.Split[kwargs["split"]]
     elif name == "LidcIdri":
         class_ = LidcIdri
-    elif name == 'CTDataset':
-        class_ = CTDataset
+    elif name == "NsclcRadiomics":
+        class_ = NsclcRadiomics
+    elif name == 'CtDataset':
+        class_ = CtDataset
+    elif name == "CtCollection":
+        class_ = CtCollection
     else:
         raise ValueError(f'Unsupported dataset "{name}"')
 
