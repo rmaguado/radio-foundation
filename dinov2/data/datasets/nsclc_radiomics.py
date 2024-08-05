@@ -36,7 +36,13 @@ class NsclcRadiomics(CtDataset):
         enable_targets: bool = False
     ) -> None:
         super().__init__(
-            split, root, extra, transforms, transform, target_transform, enable_targets
+            split=split,
+            root=root,
+            extra=extra,
+            transforms=transforms,
+            transform=transform,
+            target_transform=target_transform,
+            enable_targets=enable_targets
         )
         
     def get_target(self, index: int) -> Optional[Target]:
