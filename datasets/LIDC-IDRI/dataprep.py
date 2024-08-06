@@ -78,7 +78,7 @@ def save_data(series_target_dir, clip_hu, segmentation_mask, metadata):
 
 
 def main():
-    target_dir = "./data"
+    target_dir = "./datasets/LIDC-IDRI/data"
 
     patients = get_patient_ids()
     
