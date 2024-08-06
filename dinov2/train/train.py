@@ -228,7 +228,6 @@ def do_train(cfg, model, resume=False):
         current_batch_size = data["collated_global_crops"].shape[0] / 2
         if iteration > max_iter:
             return
-
         
         if grad_accum_counter % cfg.train.grad_accum_steps == 0:
             # apply schedules
@@ -243,8 +242,8 @@ def do_train(cfg, model, resume=False):
             optimizer.zero_grad(set_to_none=True)
         
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
+        
         # clip gradients
-
         if grad_accum_counter % cfg.train.grad_accum_steps == 0:
             if fp16_scaler is not None:
                 if cfg.optim.clip_grad:
@@ -262,6 +261,8 @@ def do_train(cfg, model, resume=False):
             # perform teacher EMA update
 
             model.update_teacher(mom)
+            
+        grad_accum_counter += 1
 
         # logging
 
