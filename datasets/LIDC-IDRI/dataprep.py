@@ -6,7 +6,7 @@ from tqdm import tqdm
 import pylidc as pl
 from pylidc.utils import consensus
 import SimpleITK as sitk
-from sklearn.model_selection import train_test_split
+
 
 np.int = int
 np.bool = bool

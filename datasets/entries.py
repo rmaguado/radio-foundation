@@ -25,8 +25,8 @@ def create_subsets(data, proportions):
     return subsets
 
 def main(dataset_name):
-    base_dir = os.path.join(dataset_name, "data")
-    target_path = os.path.join(dataset_name, "extra")
+    base_dir = os.path.join("datasets", dataset_name, "data")
+    target_path = os.path.join("datasets", dataset_name, "extra")
     os.makedirs(target_path, exist_ok=True)
     
     series_ids = [
