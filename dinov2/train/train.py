@@ -238,13 +238,12 @@ def do_train(cfg, model, resume=False):
             last_layer_lr = last_layer_lr_schedule[iteration]
             apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
 
-            # compute losses
             optimizer.zero_grad(set_to_none=True)
         
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
         
         # clip gradients
-        if grad_accum_counter % cfg.train.grad_accum_steps == 0:
+        if (grad_accum_counter + 1) % cfg.train.grad_accum_steps == 0:
             if fp16_scaler is not None:
                 if cfg.optim.clip_grad:
                     fp16_scaler.unscale_(optimizer)
