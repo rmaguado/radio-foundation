@@ -209,14 +209,12 @@ def do_train(cfg, model, resume=False):
     # training loop
 
     iteration = start_iter
+    grad_accum_counter = 0
 
     logger.info("Starting training from iteration {}".format(start_iter))
     metrics_file = os.path.join(cfg.train.output_dir, "training_metrics.json")
     metric_logger = MetricLogger(delimiter="  ", output_file=metrics_file)
     header = "Training"
-    
-    # Gradient accumulation counter here
-    grad_accum_counter = 0
 
     for data in metric_logger.log_every(
         data_loader,
@@ -242,7 +240,7 @@ def do_train(cfg, model, resume=False):
         
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
         
-        # clip gradients
+        # clip gradients and perform optimizer step after accumulation steps
         if (grad_accum_counter + 1) % cfg.train.grad_accum_steps == 0:
             if fp16_scaler is not None:
                 if cfg.optim.clip_grad:
