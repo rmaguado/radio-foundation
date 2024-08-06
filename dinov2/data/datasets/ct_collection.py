@@ -52,7 +52,7 @@ class CtCollection(CtDataset):
         series_id = entries[index]["series_id"]
         slice_index = entries[index]["slice_index"]
         
-        image_full_path = os.path.join(self.root, dataset, data, series_id, 'image.h5')
+        image_full_path = os.path.join(self.root, dataset, "data", series_id, "image.h5")
         
         with h5py.File(image_full_path, 'r') as f:
             data = f["data"]
