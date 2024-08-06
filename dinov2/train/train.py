@@ -258,38 +258,35 @@ def do_train(cfg, model, resume=False):
                 optimizer.step()
 
             # perform teacher EMA update
-
             model.update_teacher(mom)
-            
+
+            # logging
+            if distributed.get_global_size() > 1:
+                for v in loss_dict.values():
+                    torch.distributed.all_reduce(v)
+            loss_dict_reduced = {k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()}
+
+            if math.isnan(sum(loss_dict_reduced.values())):
+                logger.info("NaN detected")
+                raise AssertionError
+            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+
+            metric_logger.update(lr=lr)
+            metric_logger.update(wd=wd)
+            metric_logger.update(mom=mom)
+            metric_logger.update(last_layer_lr=last_layer_lr)
+            metric_logger.update(current_batch_size=current_batch_size)
+            metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
+
+            # checkpointing and testing
+            if cfg.evaluation.eval_period_iterations > 0 and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0:
+                do_test(cfg, model, f"training_{iteration}")
+                torch.cuda.synchronize()
+            periodic_checkpointer.step(iteration)
+
+            iteration += 1
         grad_accum_counter += 1
-
-        # logging
-
-        if distributed.get_global_size() > 1:
-            for v in loss_dict.values():
-                torch.distributed.all_reduce(v)
-        loss_dict_reduced = {k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()}
-
-        if math.isnan(sum(loss_dict_reduced.values())):
-            logger.info("NaN detected")
-            raise AssertionError
-        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-
-        metric_logger.update(lr=lr)
-        metric_logger.update(wd=wd)
-        metric_logger.update(mom=mom)
-        metric_logger.update(last_layer_lr=last_layer_lr)
-        metric_logger.update(current_batch_size=current_batch_size)
-        metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
-
-        # checkpointing and testing
-
-        if cfg.evaluation.eval_period_iterations > 0 and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0:
-            do_test(cfg, model, f"training_{iteration}")
-            torch.cuda.synchronize()
-        periodic_checkpointer.step(iteration)
-
-        iteration = iteration + 1
+        
     metric_logger.synchronize_between_processes()
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 

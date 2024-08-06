@@ -4,7 +4,7 @@ train:
     batch_size_full: 2048
     dataset_path: CtCollection:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
     centering: centering
-    OFFICIAL_EPOCH_LENGTH: 8000
+    OFFICIAL_EPOCH_LENGTH: 1000
 student:
     arch: vit_small
     patch_size: 14
