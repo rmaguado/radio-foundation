@@ -151,7 +151,6 @@ def do_train(cfg, model, resume=False):
 
     # checkpointer
     checkpointer = FSDPCheckpointer(model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True)
-
     start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get("iteration", -1) + 1
 
     OFFICIAL_EPOCH_LENGTH = cfg.train.OFFICIAL_EPOCH_LENGTH
@@ -207,7 +206,6 @@ def do_train(cfg, model, resume=False):
     )
 
     # training loop
-
     iteration = start_iter
     grad_accum_counter = 0
 
@@ -238,7 +236,11 @@ def do_train(cfg, model, resume=False):
 
             optimizer.zero_grad(set_to_none=True)
         
-        loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
+        try:
+            loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
+        except Exception as e:
+            logger.error(f"Error in forward_backward pass: {e}")
+            raise
         
         # clip gradients and perform optimizer step after accumulation steps
         if (grad_accum_counter + 1) % cfg.train.grad_accum_steps == 0:
@@ -246,13 +248,15 @@ def do_train(cfg, model, resume=False):
                 if cfg.optim.clip_grad:
                     fp16_scaler.unscale_(optimizer)
                     for v in model.student.values():
-                        v.clip_grad_norm_(cfg.optim.clip_grad)
+                        grad_norm = torch.nn.utils.clip_grad_norm_(v.parameters(), cfg.optim.clip_grad)
+                        logger.debug(f"Grad norm after clipping: {grad_norm}")
                 fp16_scaler.step(optimizer)
                 fp16_scaler.update()
             else:
                 if cfg.optim.clip_grad:
                     for v in model.student.values():
-                        v.clip_grad_norm_(cfg.optim.clip_grad)
+                        grad_norm = torch.nn.utils.clip_grad_norm_(v.parameters(), cfg.optim.clip_grad)
+                        logger.debug(f"Grad norm after clipping: {grad_norm}")
                 optimizer.step()
 
             # perform teacher EMA update
@@ -265,7 +269,8 @@ def do_train(cfg, model, resume=False):
             loss_dict_reduced = {k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()}
 
             if math.isnan(sum(loss_dict_reduced.values())):
-                logger.info("NaN detected")
+                logger.error(f"NaN detected in loss at iteration {iteration}")
+                logger.debug(f"Loss dict: {loss_dict_reduced}")
                 raise AssertionError
             losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
@@ -275,6 +280,8 @@ def do_train(cfg, model, resume=False):
             metric_logger.update(last_layer_lr=last_layer_lr)
             metric_logger.update(current_batch_size=current_batch_size)
             metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
+            
+            logger.debug(f"Iteration {iteration}: Losses reduced: {loss_dict_reduced}")
 
             # checkpointing and testing
             if cfg.evaluation.eval_period_iterations > 0 and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0:
