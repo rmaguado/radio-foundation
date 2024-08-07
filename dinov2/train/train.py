@@ -132,7 +132,13 @@ def do_test(cfg, model, iteration):
         teacher_ckp_path = os.path.join(eval_dir, "teacher_checkpoint.pth")
         torch.save({"teacher": new_state_dict}, teacher_ckp_path)
 
+def check_nan_params(params):
+    grads = [p.grad for p in params if p.grad is not None]
+    return any([torch.isnan(grad).any() for grad in grads])
 
+def log_tensor_stats(tensor, name):
+    logger.debug(f"{name} - mean: {tensor.mean().item()}, std: {tensor.std().item()}, min: {tensor.min().item()}, max: {tensor.max().item()}")
+        
 def do_train(cfg, model, resume=False):
     model.train()
     inputs_dtype = torch.half
@@ -158,7 +164,7 @@ def do_train(cfg, model, resume=False):
 
     periodic_checkpointer = PeriodicCheckpointer(
         checkpointer,
-        period=3 * OFFICIAL_EPOCH_LENGTH,
+        period=cfg.train.saveckp_freq * OFFICIAL_EPOCH_LENGTH,
         max_iter=max_iter,
         max_to_keep=3,
     )
@@ -225,6 +231,8 @@ def do_train(cfg, model, resume=False):
         if iteration > max_iter:
             return
         
+        log_tensor_stats(data["collated_global_crops"], "Collated Global Crops")
+        
         if grad_accum_counter % cfg.train.grad_accum_steps == 0:
             # apply schedules
             lr = lr_schedule[iteration]
@@ -239,8 +247,8 @@ def do_train(cfg, model, resume=False):
         try:
             loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
         except Exception as e:
-            logger.error(f"Error in forward_backward pass: {e}")
-            continue
+            logger.error(f"Error in forward_backward pass at iteration {iteration}: {e}")
+            raise
         
         # clip gradients and perform optimizer step after accumulation steps
         if (grad_accum_counter + 1) % cfg.train.grad_accum_steps == 0:
@@ -251,9 +259,12 @@ def do_train(cfg, model, resume=False):
                         grad_norm = torch.nn.utils.clip_grad_norm_(v.parameters(), cfg.optim.clip_grad)
                         logger.debug(f"Grad norm after clipping: {grad_norm}")
                         
-                if any(torch.isnan(p.grad).any() for p in model.student.parameters()):
-                    logger.error(f"NaN detected in gradients at iteration {iteration}. Skipping optimizer step.")
-                    continue
+                        if check_nan_params(v.parameters()):
+                            logger.error(f"NaN detected in gradients at iteration {iteration}. Skipping optimizer step.")
+                            iteration += 1
+                            grad_accum_counter += 1
+                            
+                            continue
                     
                 fp16_scaler.step(optimizer)
                 fp16_scaler.update()
@@ -263,9 +274,12 @@ def do_train(cfg, model, resume=False):
                         grad_norm = torch.nn.utils.clip_grad_norm_(v.parameters(), cfg.optim.clip_grad)
                         logger.debug(f"Grad norm after clipping: {grad_norm}")
                         
-                if any(torch.isnan(p.grad).any() for p in model.parameters()):
-                    logger.error(f"NaN detected in gradients at iteration {iteration}. Skipping optimizer step.")
-                    continue
+                        if check_nan_params(v.parameters()):
+                            logger.error(f"NaN detected in gradients at iteration {iteration}. Skipping optimizer step.")
+                            iteration += 1
+                            grad_accum_counter += 1
+                            
+                            continue
                 
                 optimizer.step()
 
