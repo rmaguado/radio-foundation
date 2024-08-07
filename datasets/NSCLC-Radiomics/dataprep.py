@@ -62,8 +62,8 @@ class NsclcRadiomics(CtDataset):
 
 def main():
     Dataprep = NsclcRadiomics(
-        "dataset": "datasets/NSCLC-Radiomics",
-        "target_path": "datasets/NSCLC-Radiomics/data",
+        dataset="datasets/NSCLC-Radiomics",
+        target_path="datasets/NSCLC-Radiomics/data",
     )
     Dataprep.prepare_dataset()
 

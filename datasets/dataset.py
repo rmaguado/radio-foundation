@@ -5,9 +5,8 @@ import numpy as np
 from tqdm import tqdm
 import SimpleITK as sitk
 from tqdm import tqdm
-from abc import ABC, abstractmethod
 
-class CtDataset(ABC):
+class CtDataset:
     def __init__(
         self,
         dataset: str,
@@ -29,19 +28,17 @@ class CtDataset(ABC):
         
         assert self.clip_window > 0
         
-    @abstractmethod
     def get_patient_ids(self) -> list:
         """
         Should return a list of patient identifiers used to find scans of that patient.
         """
-        pass
+        raise NotImplementedError
     
-    @abstractmethod
     def get_patient_series_paths(self, patient_id: str) -> list:
         """
         Should return a list of paths to the DICOM series of a patient.
         """
-        pass
+        raise NotImplementedError
         
     def get_image(self, path_to_series):
         reader = sitk.ImageSeriesReader()
