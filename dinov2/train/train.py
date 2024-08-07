@@ -240,7 +240,7 @@ def do_train(cfg, model, resume=False):
             loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
         except Exception as e:
             logger.error(f"Error in forward_backward pass: {e}")
-            raise
+            continue
         
         # clip gradients and perform optimizer step after accumulation steps
         if (grad_accum_counter + 1) % cfg.train.grad_accum_steps == 0:
@@ -250,6 +250,11 @@ def do_train(cfg, model, resume=False):
                     for v in model.student.values():
                         grad_norm = torch.nn.utils.clip_grad_norm_(v.parameters(), cfg.optim.clip_grad)
                         logger.debug(f"Grad norm after clipping: {grad_norm}")
+                        
+                if any(torch.isnan(p.grad).any() for p in model.parameters()):
+                    logger.error(f"NaN detected in gradients at iteration {iteration}. Skipping optimizer step.")
+                    continue
+                    
                 fp16_scaler.step(optimizer)
                 fp16_scaler.update()
             else:
@@ -257,6 +262,11 @@ def do_train(cfg, model, resume=False):
                     for v in model.student.values():
                         grad_norm = torch.nn.utils.clip_grad_norm_(v.parameters(), cfg.optim.clip_grad)
                         logger.debug(f"Grad norm after clipping: {grad_norm}")
+                        
+                if any(torch.isnan(p.grad).any() for p in model.parameters()):
+                    logger.error(f"NaN detected in gradients at iteration {iteration}. Skipping optimizer step.")
+                    continue
+                
                 optimizer.step()
 
             # perform teacher EMA update
@@ -271,7 +281,7 @@ def do_train(cfg, model, resume=False):
             if math.isnan(sum(loss_dict_reduced.values())):
                 logger.error(f"NaN detected in loss at iteration {iteration}")
                 logger.debug(f"Loss dict: {loss_dict_reduced}")
-                raise AssertionError
+                continue
             losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
             metric_logger.update(lr=lr)

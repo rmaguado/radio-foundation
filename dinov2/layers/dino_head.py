@@ -25,7 +25,7 @@ class DINOHead(nn.Module):
         self.mlp = _build_mlp(nlayers, in_dim, bottleneck_dim, hidden_dim=hidden_dim, use_bn=use_bn, bias=mlp_bias)
         self.apply(self._init_weights)
         self.last_layer = weight_norm(nn.Linear(bottleneck_dim, out_dim, bias=False))
-        self.last_layer.weight_g.data.fill_(1)
+        self.last_layer.weight.original0.data.fill_(1)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
