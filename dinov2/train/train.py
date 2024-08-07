@@ -251,7 +251,7 @@ def do_train(cfg, model, resume=False):
                         grad_norm = torch.nn.utils.clip_grad_norm_(v.parameters(), cfg.optim.clip_grad)
                         logger.debug(f"Grad norm after clipping: {grad_norm}")
                         
-                if any(torch.isnan(p.grad).any() for p in model.parameters()):
+                if any(torch.isnan(p.grad).any() for p in model.student.parameters()):
                     logger.error(f"NaN detected in gradients at iteration {iteration}. Skipping optimizer step.")
                     continue
                     
