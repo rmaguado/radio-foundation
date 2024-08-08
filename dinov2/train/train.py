@@ -54,9 +54,6 @@ For python-based LazyConfig, use "path.key=value".
         type=str,
         help="Output directory to save logs and checkpoints",
     )
-    # ADDED THIS LINE. to launch with torch distributed
-    #parser.add_argument("--local-rank", required=False, type=int, help="Variable for distributed computing.") 
-
     return parser
 
 
@@ -168,7 +165,8 @@ def do_train(cfg, model, resume=False):
     start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get("iteration", -1) + 1
 
     OFFICIAL_EPOCH_LENGTH = cfg.train.OFFICIAL_EPOCH_LENGTH
-    max_iter = cfg.optim.epochs * OFFICIAL_EPOCH_LENGTH * cfg.train.grad_accum_steps
+    GRAD_ACCUM_STEPS = cfg.train.grad_accum_steps
+    max_iter = cfg.optim.epochs * OFFICIAL_EPOCH_LENGTH * GRAD_ACCUM_STEPS
 
     periodic_checkpointer = PeriodicCheckpointer(
         checkpointer,
@@ -221,7 +219,7 @@ def do_train(cfg, model, resume=False):
 
     # training loop
     iteration = start_iter
-    train_step = start_iter // cfg.train.grad_accum_steps
+    train_step = start_iter // GRAD_ACCUM_STEPS
     grad_accum_counter = 0
 
     logger.info("Starting training from iteration {}".format(start_iter))
@@ -240,7 +238,7 @@ def do_train(cfg, model, resume=False):
         if iteration > max_iter:
             return
         
-        if grad_accum_counter % cfg.train.grad_accum_steps == 0:
+        if grad_accum_counter % GRAD_ACCUM_STEPS == 0:
             # apply schedules
             lr = lr_schedule[train_step]
             wd = wd_schedule[train_step]
@@ -259,7 +257,7 @@ def do_train(cfg, model, resume=False):
             log_data_stats(data)
             
         # clip gradients and perform optimizer step after accumulation steps
-        if (grad_accum_counter + 1) % cfg.train.grad_accum_steps == 0:
+        if (grad_accum_counter + 1) % GRAD_ACCUM_STEPS == 0:
             # Clip gradients
             if cfg.optim.clip_grad:
                 if fp16_scaler is not None:
@@ -276,26 +274,28 @@ def do_train(cfg, model, resume=False):
             
             # perform teacher EMA update
             model.update_teacher(mom)
+            
+
+            # logging
+            if distributed.get_global_size() > 1:
+                for v in loss_dict.values():
+                    torch.distributed.all_reduce(v)
+            loss_dict_reduced = {k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()}
+
+            if math.isnan(sum(loss_dict_reduced.values())):
+                logger.error(f"NaN detected in loss at iteration {iteration}")
+                logger.debug(f"Loss dict: {loss_dict_reduced}")
+
+            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+
+            metric_logger.update(lr=lr)
+            metric_logger.update(wd=wd)
+            metric_logger.update(mom=mom)
+            metric_logger.update(last_layer_lr=last_layer_lr)
+            metric_logger.update(current_batch_size=current_batch_size)
+            metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
+            
             train_step += 1
-
-        # logging
-        if distributed.get_global_size() > 1:
-            for v in loss_dict.values():
-                torch.distributed.all_reduce(v)
-        loss_dict_reduced = {k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()}
-
-        if math.isnan(sum(loss_dict_reduced.values())):
-            logger.error(f"NaN detected in loss at iteration {iteration}")
-            logger.debug(f"Loss dict: {loss_dict_reduced}")
-
-        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-
-        metric_logger.update(lr=lr)
-        metric_logger.update(wd=wd)
-        metric_logger.update(mom=mom)
-        metric_logger.update(last_layer_lr=last_layer_lr)
-        metric_logger.update(current_batch_size=current_batch_size)
-        metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
 
         # checkpointing and testing
         if cfg.evaluation.eval_period_iterations > 0 and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0:
