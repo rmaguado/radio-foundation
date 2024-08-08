@@ -5,6 +5,7 @@ train:
     dataset_path: LidcIdri:root=./datasets/LIDC-IDRI/data:extra=./datasets/LIDC-IDRI/extra:split=TRAIN
     centering: centering
     OFFICIAL_EPOCH_LENGTH: 1000
+    print_freq: 40
 student:
     arch: vit_small
     patch_size: 14

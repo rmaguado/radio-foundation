@@ -5,6 +5,7 @@ train:
     dataset_path: CtCollection:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
     centering: centering
     OFFICIAL_EPOCH_LENGTH: 1000
+    print_freq: 40
 student:
     arch: vit_small
     patch_size: 14
