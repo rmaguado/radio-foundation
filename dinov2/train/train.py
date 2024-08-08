@@ -129,16 +129,6 @@ def do_test(cfg, model, iteration):
         teacher_ckp_path = os.path.join(eval_dir, "teacher_checkpoint.pth")
         torch.save({"teacher": new_state_dict}, teacher_ckp_path)
 
-def check_nan_params(named_params, label, iteration):
-    for name, p in named_params:
-        if torch.isnan(p).any():
-            logger.error(f"label: {label}. iteration: {iteration}. NaN detected in parameters ({name}).")
-
-def check_nan_grads(named_params, label, iteration):
-    for name, p in named_params:
-        if p.grad is not None and torch.isnan(p.grad).any():
-            logger.error(f"label: {label}. iteration: {iteration}. NaN detected in gradients ({name}).")
-
 def log_data_stats(data):
     log_data = ["collated_global_crops", "collated_local_crops"]
     for name in log_data:
@@ -250,18 +240,21 @@ def do_train(cfg, model, resume=False):
             optimizer.zero_grad(set_to_none=True)
         
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
-        
-        if math.isnan(sum(loss_dict.values())):
-            logger.error(f"NaN detected in loss at iteration {iteration}")
-            logger.debug(f"Loss dict: {loss_dict}")
-            log_data_stats(data)
             
         # clip gradients and perform optimizer step after accumulation steps
         if (grad_accum_counter + 1) % GRAD_ACCUM_STEPS == 0:
+            
+            # Unscale gradients
+            if fp16_scaler is not None:
+                fp16_scaler.unscale_(optimizer)
+
+            for group in optimizer.param_groups:
+                for param in group['params']:
+                    if param.grad is not None:
+                        param.grad.data.div_(GRAD_ACCUM_STEPS)
+            
             # Clip gradients
             if cfg.optim.clip_grad:
-                if fp16_scaler is not None:
-                    fp16_scaler.unscale_(optimizer)
                 for v in model.student.values():
                     grad_norm = torch.nn.utils.clip_grad_norm_(v.parameters(), cfg.optim.clip_grad)
             
@@ -283,8 +276,9 @@ def do_train(cfg, model, resume=False):
             loss_dict_reduced = {k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()}
 
             if math.isnan(sum(loss_dict_reduced.values())):
-                logger.error(f"NaN detected in loss at iteration {iteration}")
-                logger.debug(f"Loss dict: {loss_dict_reduced}")
+                logger.error(f"NaN detected in reduced loss at iteration {iteration}")
+                logger.debug(f"Reduced loss dict: {loss_dict_reduced}")
+                raise AssertionError
 
             losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
