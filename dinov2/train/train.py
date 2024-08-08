@@ -129,11 +129,6 @@ def do_test(cfg, model, iteration):
         teacher_ckp_path = os.path.join(eval_dir, "teacher_checkpoint.pth")
         torch.save({"teacher": new_state_dict}, teacher_ckp_path)
 
-def log_data_stats(data):
-    log_data = ["collated_global_crops", "collated_local_crops"]
-    for name in log_data:
-        logger.debug(f"{name} | mean: {data[name].mean().item()}, std: {data[name].std().item()}")
-        
 def do_train(cfg, model, resume=False):
     model.train()
     inputs_dtype = torch.half
@@ -160,7 +155,7 @@ def do_train(cfg, model, resume=False):
 
     periodic_checkpointer = PeriodicCheckpointer(
         checkpointer,
-        period=cfg.train.saveckp_freq * OFFICIAL_EPOCH_LENGTH,
+        period=cfg.train.saveckp_freq * OFFICIAL_EPOCH_LENGTH * GRAD_ACCUM_STEPS,
         max_iter=max_iter,
         max_to_keep=3,
     )
@@ -256,7 +251,7 @@ def do_train(cfg, model, resume=False):
             # Clip gradients
             if cfg.optim.clip_grad:
                 for v in model.student.values():
-                    grad_norm = torch.nn.utils.clip_grad_norm_(v.parameters(), cfg.optim.clip_grad)
+                    v.clip_grad_norm_(cfg.optim.clip_grad)
             
             # Update optimizer
             if fp16_scaler is not None:
@@ -277,7 +272,7 @@ def do_train(cfg, model, resume=False):
 
             if math.isnan(sum(loss_dict_reduced.values())):
                 logger.error(f"NaN detected in reduced loss at iteration {iteration}")
-                logger.debug(f"Reduced loss dict: {loss_dict_reduced}")
+                logger.info(f"Reduced loss dict: {loss_dict_reduced}")
                 raise AssertionError
 
             losses_reduced = sum(loss for loss in loss_dict_reduced.values())
@@ -290,7 +285,7 @@ def do_train(cfg, model, resume=False):
             metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
             
             train_step += 1
-
+            
         # checkpointing and testing
         if cfg.evaluation.eval_period_iterations > 0 and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0:
             do_test(cfg, model, f"training_{iteration}")
