@@ -14,13 +14,15 @@ student:
     num_register_tokens: 4
     interpolate_antialias: true
     interpolate_offset: 0.0
+evaluation:
+  eval_period_iterations: 10000
 optim:
     epochs: 100
     weight_decay: 0.04
     weight_decay_end: 0.2
     base_lr: 0.003
     warmup_epochs: 10
-    freeze_last_layer_epochs: 3
+    freeze_last_layer_epochs: 1
     min_lr: 1.0e-06
     adamw_beta1: 0.9
     adamw_beta2: 0.999
