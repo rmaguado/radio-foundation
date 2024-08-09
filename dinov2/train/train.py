@@ -119,12 +119,17 @@ def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
 
 
 def do_test(cfg, model, iteration):
-    new_state_dict = model.teacher.state_dict()
+    torch.cuda.synchronize()
+    
+    new_state_dict = {k: v.cpu() for k, v in model.teacher.state_dict().items()}
 
     if distributed.is_main_process():
         iterstring = str(iteration)
         eval_dir = os.path.join(cfg.train.output_dir, "eval", iterstring)
         os.makedirs(eval_dir, exist_ok=True)
+        
+        torch.cuda.empty_cache()
+        
         # save teacher checkpoint
         teacher_ckp_path = os.path.join(eval_dir, "teacher_checkpoint.pth")
         torch.save({"teacher": new_state_dict}, teacher_ckp_path)
