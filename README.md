@@ -65,4 +65,7 @@ Below is an example command for training without a Slurm system:
 
 ## TODO
 
+- implement more datasets and benchmarks
 - fix FutureWarning from xFormers
+- implement use multiple slices at once
+- training ViT-l and ViT-g
