@@ -2,7 +2,14 @@
 
 This repository is an adaptation of the DINOv2 framework tailored specifically for training a foundation model in the radiology domain. 
 
-## Key Updates
+### TODO
+
+- implement more datasets and benchmarks
+- fix FutureWarning from xFormers
+- implement use multiple slices at once
+- training ViT-l and ViT-g
+
+## Overview
 
 ### 1. **PyTorch 2.4 Compatibility**
 The original DINOv2 codebase has been patched to be compatible with PyTorch 2.4.
@@ -62,10 +69,3 @@ Below is an example command for training without a Slurm system:
 ```bash
 ./scripts/train/lidc.sh --devices 0,1,2,3 --config-file "./configs/lidc/vits14_reg4.yaml" --output-dir ./runs/lidc_test_rescale
 ```
-
-## TODO
-
-- implement more datasets and benchmarks
-- fix FutureWarning from xFormers
-- implement use multiple slices at once
-- training ViT-l and ViT-g
