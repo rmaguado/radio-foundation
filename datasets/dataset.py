@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm
 import SimpleITK as sitk
 from tqdm import tqdm
+from abc import ABC, abstractmethod
 
 class CtDataset:
     def __init__(
@@ -25,6 +26,10 @@ class CtDataset:
         self.clip_window = self.clip_max - self.clip_min
         
         self.chunk_size = chunk_size
+        
+        self.total_voxels = 0
+        self.sum_voxels = 0.0
+        self.sum_squares_voxels = 0.0
         
         assert self.clip_window > 0
         
@@ -57,7 +62,39 @@ class CtDataset:
         image_array = sitk.GetArrayViewFromImage(resampled_image)
         clipped_hu_array = self.clip_hu(image_array)
         
+        self.update_statistics(clipped_hu_array)
+        
         return clipped_hu_array, resampled_spacing
+    
+    def update_statistics(self, image_array):
+        """
+        Update the running sum and sum of squares of voxel intensities.
+        """
+        self.total_voxels += image_array.size
+        self.sum_voxels += np.sum(image_array)
+        self.sum_squares_voxels += np.sum(np.square(image_array))
+        
+    def finalize_statistics(self):
+        """
+        Calculate and return the final mean and standard deviation.
+        """
+        mean = self.sum_voxels / self.total_voxels
+        variance = (self.sum_squares_voxels / self.total_voxels) - (mean ** 2)
+        std_dev = np.sqrt(variance)
+        return mean, std_dev
+    
+    def save_global_metadata(self):
+        """
+        Save the global mean and standard deviation to the target path.
+        """
+        mean, std_dev = self.finalize_statistics()
+        global_metadata = {
+            "mean": mean,
+            "std_dev": std_dev,
+            "total_voxels": self.total_voxels
+        }
+        with open(os.path.join(self.target_path, "metadata.json"), 'w') as f:
+            json.dump(global_metadata, f, indent=4)
     
     def get_spacing(self, image):
         spacing = image.GetSpacing()
@@ -136,3 +173,4 @@ class CtDataset:
                 self.save_metadata(metadata, series_save_path, "metadata.json")
                 series_number += 1
 
+        self.save_global_metadata()
