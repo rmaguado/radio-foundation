@@ -5,14 +5,13 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 ### TODO
 
 - implement more datasets and benchmarks
-- fix FutureWarning from xFormers
 - implement use multiple slices at once
 - training ViT-l and ViT-g
 
 ## Overview
 
 ### 1. **PyTorch 2.4 Compatibility**
-The original DINOv2 codebase has been patched to be compatible with PyTorch 2.4.
+The original DINOv2 codebase has been patched to be compatible with PyTorch 2.4. See this repo for source (https://github.com/zinccat/dinov2-patch).
 
 ### 2. **Gradient Accumulation**
 Implemented gradient accumulation to enable training with larger batch sizes on limited GPU memory. 
@@ -57,7 +56,7 @@ Check dinov2/data/transforms.py to check the parameter usage.
 The project is currently only geared to processing CT scans. To prepare a dataset for training, follow these steps:
 
 1. **Resample scans and generate h5 files**
-   
+
 2. **Generate entry files**
 
 3. **Create a dataset child object**
@@ -67,5 +66,5 @@ The project is currently only geared to processing CT scans. To prepare a datase
 Below is an example command for training without a Slurm system:
 
 ```bash
-./scripts/train/lidc.sh --devices 0,1,2,3 --config-file "./configs/lidc/vits14_reg4.yaml" --output-dir ./runs/lidc_test_rescale
+./scripts/train.sh --devices 0,1,2,3 --config "lidc_idri/vits14_reg4.yaml" --output lidc_test
 ```
