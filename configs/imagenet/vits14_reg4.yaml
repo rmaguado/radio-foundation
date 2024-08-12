@@ -5,6 +5,9 @@ train:
     dataset_path: ImageNet:root=./datasets/imagenet/ILSVRC2012:extra=./datasets/imagenet/extra:split=TRAIN
     centering: "centering"
     OFFICIAL_EPOCH_LENGTH: 1000
+    saveckp_iterations: 5000
+evaluation:
+    eval_period_iterations: 10000
 student:
     arch: vit_small
     patch_size: 14

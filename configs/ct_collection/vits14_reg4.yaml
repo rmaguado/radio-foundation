@@ -6,6 +6,9 @@ train:
     centering: centering
     OFFICIAL_EPOCH_LENGTH: 1000
     print_freq: 40
+    saveckp_iterations: 5000
+evaluation:
+    eval_period_iterations: 10000
 student:
     arch: vit_small
     patch_size: 14
@@ -14,8 +17,6 @@ student:
     num_register_tokens: 4
     interpolate_antialias: true
     interpolate_offset: 0.0
-evaluation:
-  eval_period_iterations: 10000
 optim:
     epochs: 100
     weight_decay: 0.04

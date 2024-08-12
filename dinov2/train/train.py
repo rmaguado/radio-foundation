@@ -160,7 +160,7 @@ def do_train(cfg, model, resume=False):
 
     periodic_checkpointer = PeriodicCheckpointer(
         checkpointer,
-        period=cfg.train.saveckp_freq * OFFICIAL_EPOCH_LENGTH * GRAD_ACCUM_STEPS,
+        period=cfg.train.saveckp_iterations,
         max_iter=max_iter,
         max_to_keep=3,
     )

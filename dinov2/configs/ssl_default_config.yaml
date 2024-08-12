@@ -64,7 +64,7 @@ train:
     batch_size_full: 1024
     dataset_path: ImageNet:split=TRAIN
     output_dir: .
-    saveckp_freq: 20
+    saveckp_iterations: 5000
     print_freq: 10
     seed: 0
     num_workers: 10
