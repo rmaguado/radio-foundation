@@ -146,8 +146,7 @@ def main():
         "z_spacing": 2.0,
         "clip_min": -1024,
         "clip_max": 3072,
-        "chunk_size": (1, 512, 512),
-        "seed": 42
+        "chunk_size": (1, 512, 512)
     }
     
     dataprep = LidcIdri(config)

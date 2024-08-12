@@ -32,7 +32,6 @@ class DatasetBase(ABC):
     def prepare_dataset(self):
         assert hasattr(self, 'get_patient_ids'), "The method 'get_patient_ids' must be implemented."
         assert hasattr(self, 'get_patient_series_paths'), "The method 'get_patient_series_paths' must be implemented."
-        assert hasattr(self, 'process_series'), "The method 'process_series' must be implemented."
         
         patient_ids = self.get_patient_ids()
         assert isinstance(patient_ids, list) and all(isinstance(pid, str) for pid in patient_ids), "Patient IDs must be a list of strings."

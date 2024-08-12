@@ -4,28 +4,24 @@ import pandas as pd
 import numpy as np
 import pydicom
 
-from datasets import CtDataset
+from datasets import DatasetBase, SeriesProcessorBase
 
 
-class NsclcRadiomics(CtDataset):
-    _sex_keys = {
-        'female': 'F',
-        'male': 'M'
-    }
-    _datapath = "/home/rmaguado/rdt/DeepRDT/manifest-1722177583547/NSCLC-Radiomics"
-    _dataframe = pd.read_csv("/home/rmaguado/ruben/radio-foundation/datasets/NSCLC-Radiomics/NSCLC-Radiomics-Lung1.clinical-version3-Oct-2019.csv")
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class NsclcRadiomics(DatasetBase):
+    def __init__(self, config):
+        super().__init__(config)
+        
+        self.datapath = config["datapath"]
+        self.df = pd.read_csv(config["dfpath"])
         
     def get_patient_ids(self):
         return [
-            x for x in os.listdir(NsclcRadiomics._datapath) \
-            if os.path.isdir(os.path.join(NsclcRadiomics._datapath, x))
+            x for x in os.listdir(self.datapath) \
+            if os.path.isdir(os.path.join(self.datapath, x))
         ]
         
     def get_patient_series_paths(self, patient_id):
-        patient_folder_path = os.path.join(NsclcRadiomics._datapath, patient_id)
+        patient_folder_path = os.path.join(self.datapath, patient_id)
         patient_series_paths = set()
         for dirpath, dirnames, filenames in os.walk(patient_folder_path):
             for filename in filenames:
@@ -42,17 +38,17 @@ class NsclcRadiomics(CtDataset):
 
     def extend_metadata(self, metadata):
         patient_id = metadata["patient_id"]
-        patient_row = NsclcRadiomics._dataframe[NsclcRadiomics._dataframe["PatientID"] == patient_id].iloc[0]
-        try:
-            age = int(patient_row['age'])
-        except Exception as e:
-            age = 'NA'
-        sex_value = patient_row['gender']
-        if sex_value in NsclcRadiomics._sex_keys.keys():
-            sex = NsclcRadiomics._sex_keys[sex_value]
-        else:
-            sex = 'NA'
-        survival_time = int(patient_row['Survival.time'])
+        patient_row = self.df[self.df["PatientID"] == patient_id].iloc[0]
+        
+        age = patient_row['age']
+        age = round(float(age)) if age != "NA" else age
+
+        sex = {
+            'female': 'F',
+            'male': 'M'
+        }[patient_row['gender']]
+        
+        survival_time = patient_row['Survival.time']
 
         metadata["other"] = {
             'sex': sex,
@@ -61,11 +57,19 @@ class NsclcRadiomics(CtDataset):
         }
 
 def main():
-    Dataprep = NsclcRadiomics(
-        dataset="datasets/NSCLC-Radiomics",
-        target_path="datasets/NSCLC-Radiomics/data",
-    )
-    Dataprep.prepare_dataset()
+    config = {
+        "dataset": "NSCLC-Radiomics",
+        "datapath": "/home/rmaguado/rdt/DeepRDT/manifest-1722177583547/NSCLC-Radiomics",
+        "dfpath": "/home/rmaguado/ruben/radio-foundation/datasets/NSCLC-Radiomics/NSCLC-Radiomics-Lung1.clinical-version3-Oct-2019.csv",
+        "target_path": "datasets/NSCLC-Radiomics/data",
+        "z_spacing": 2.0,
+        "clip_min": -1024,
+        "clip_max": 3072,
+        "chunk_size": (1, 512, 512)
+    }
+    
+    dataprep = NsclcRadiomics(config)
+    dataprep.prepare_dataset()
 
 if __name__ == "__main__":
     main()
