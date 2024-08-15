@@ -1,1 +1,2 @@
-from .NsclcRadiomics import NsclcRadiomicsEvalSex
+from .nsclc_radiomics import NsclcRadiomicsEvalSex
+from .lidc_idri import LidcIdriNodules
