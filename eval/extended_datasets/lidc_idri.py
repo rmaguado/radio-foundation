@@ -1,7 +1,6 @@
 import os
-import json
-import torch
 import h5py
+from PIL import Image
 
 from dinov2.data.datasets import LidcIdri
 
