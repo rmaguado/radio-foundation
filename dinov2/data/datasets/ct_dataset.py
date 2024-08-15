@@ -5,7 +5,7 @@
 
 import logging
 import os
-from typing import Callable, List, Optional, Tuple, Any
+from typing import Callable, Optional, Tuple, Any
 
 from PIL import Image
 import numpy as np
@@ -56,7 +56,7 @@ class CtDataset(ExtendedVisionDataset):
             
         return Image.fromarray(image, 'F')
 
-    def get_target(self, index: int) -> Optional[Target]:
+    def get_target(self, index: int) -> Optional[Any]:
         raise NotImplementedError
 
     def get_targets(self) -> Optional[np.ndarray]:

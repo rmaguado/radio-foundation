@@ -4,7 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import logging
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 
 from .ct_dataset import CtDataset
 
@@ -34,5 +34,5 @@ class NsclcRadiomics(CtDataset):
             enable_targets=enable_targets
         )
         
-    def get_target(self, index: int):
+    def get_target(self, index: int) -> Optional[Any]:
         raise NotImplementedError

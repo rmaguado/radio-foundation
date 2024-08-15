@@ -5,7 +5,7 @@
 
 import logging
 import os
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 
 from PIL import Image
 import numpy as np
@@ -54,5 +54,5 @@ class CtCollection(CtDataset):
             
         return Image.fromarray(image, 'F')
 
-    def get_target(self, index: int) -> Optional[Target]:
+    def get_target(self, index: int) -> Optional[Any]:
         raise NotImplementedError
