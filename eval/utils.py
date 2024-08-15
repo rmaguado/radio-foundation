@@ -14,7 +14,7 @@ from dinov2.eval.utils import ModelWithIntermediateLayers
 from dinov2.utils.utils import load_pretrained_weights
 
 
-class EvalTransform:
+class ImageTransform:
     def __init__(self, img_size, mean, std):
         self.img_size = img_size
         self.normalize = transforms.Normalize(mean=mean, std=std)
@@ -29,10 +29,55 @@ class EvalTransform:
         return self.normalize(
             torch.from_numpy(np_resized)
         )
+    
+class ImageTargetTransform:
+    def __init__(self, img_size, mean, std):
+        self.img_size = img_size
+        self.normalize = transforms.Normalize(mean=mean, std=std)
+
+    def __call__(self, image, target):
+        image_resized = np.expand_dims(
+            np.array(
+                image.resize((self.img_size, self.img_size))
+            ).astype(np.float32),
+            axis=0
+        )
+        target_resized = np.expand_dims(
+            np.array(
+                target.resize((self.img_size, self.img_size))
+            ).astype(np.float32),
+            axis=0
+        )
+        return self.normalize(
+            torch.from_numpy(image_resized)
+        ), torch.from_numpy(target_resized)
 
 
+def binary_mask_to_patch_labels(mask: torch.Tensor, patch_size: int) -> torch.Tensor:
+    """
+    Convert binary masks to patch-level labels.
+    
+    Parameters:
+    - mask (torch.Tensor): Input binary mask of shape (batch_size, 1, img_size, img_size)
+    - patch_size (int): Size of the patch (both width and height)
+    
+    Returns:
+    - patch_labels (torch.Tensor): Patch-level labels of shape (batch_size, num_patches, num_patches)
+    """
+    batch_size, _, img_size, _ = mask.shape
+    assert img_size % patch_size == 0, "Image size must be divisible by patch size"
+    
+    num_patches = img_size // patch_size
+    
+    patches = mask.unfold(2, patch_size, patch_size).unfold(3, patch_size, patch_size)
+    patches = patches.contiguous().view(batch_size, 1, num_patches, num_patches, -1)
+    
+    patch_labels = (patches.max(dim=-1)[0] > 0).long()
+    
+    return patch_labels.view(batch_size, -1)
+
+    
 class LinearClassifier(nn.Module):
-    USE_N_BLOCKS = 4
     def __init__(self, embed_dim, hidden_dim, num_labels):
         super().__init__()
         
@@ -42,14 +87,20 @@ class LinearClassifier(nn.Module):
             nn.Linear(hidden_dim, num_labels)
         )
 
-    def forward(self, x_tokens_list):
-        intermediate_output = x_tokens_list[-LinearClassifier.USE_N_BLOCKS:]
-        output = torch.cat([class_token for _, class_token in intermediate_output], dim=-1)
-        return self.mlp(output)
+    def forward(self, x):
+        return self.mlp(x)
 
 
 class DinoClassifier(nn.Module):
-    def __init__(self, feature_model, embed_dim, hidden_dim, num_labels, device):
+    USE_N_BLOCKS = 4
+    def __init__(
+        self,
+        feature_model,
+        embed_dim=384*4,
+        hidden_dim=2048,
+        num_labels=2,
+        device=torch.device("cpu")
+    ):
         super().__init__()
         
         self.feature_model = feature_model
@@ -57,9 +108,35 @@ class DinoClassifier(nn.Module):
             embed_dim, hidden_dim, num_labels
         ).to(device)
         
-    def forward(self, x):
-        features = self.feature_model(x)
-        return self.classifier(features)
+    def forward(self, image):
+        x_tokens_list = self.feature_model(image)
+        intermediate_output = x_tokens_list[-DinoClassifier.USE_N_BLOCKS:]
+        class_tokens = torch.cat([class_token for _, class_token in intermediate_output], dim=-1)
+        return self.classifier(class_tokens)
+    
+
+class DinoSegmentation(nn.Module):
+    USE_N_BLOCKS = 4
+    def __init__(
+        self,
+        feature_model,
+        embed_dim=384*4,
+        hidden_dim=2048,
+        num_labels=2, 
+        device=torch.device("cpu")
+    ):
+        super().__init__()
+        
+        self.feature_model = feature_model
+        self.classifier = LinearClassifier(
+            embed_dim, hidden_dim, num_labels
+        ).to(device)
+        
+    def forward(self, image):
+        x_tokens_list = self.feature_model(image)
+        intermediate_output = x_tokens_list[-DinoSegmentation.USE_N_BLOCKS:]
+        patch_tokens = torch.cat([patch_token for patch_token, _ in features], dim=-1)
+        return self.classifier(patch_tokens)
 
     
 def get_config(path_to_run):
