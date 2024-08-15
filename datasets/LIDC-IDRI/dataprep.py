@@ -35,11 +35,20 @@ class SeriesProcessor(SeriesProcessorBase):
         resample.SetOutputOrigin(image.GetOrigin())
         resampled_image = resample.Execute(image)
         
+        resample.SetSize(desired_size)
+        resample.SetOutputSpacing(desired_spacing)
+        
         resampled_spacing = [desired_spacing[2], desired_spacing[0], desired_spacing[1]]
         
         if mask is not None:
+            mask_image = sitk.GetImageFromArray(mask.astype(np.uint8))
+            mask_image.SetSpacing(image.GetSpacing())
+            mask_image.SetDirection(image.GetDirection())
+            mask_image.SetOrigin(image.GetOrigin())
+            
             resample.SetInterpolator(sitk.sitkNearestNeighbor)
-            resampled_mask = resample.Execute(sitk.GetImageFromArray(mask.astype(np.int8)))
+            resampled_mask = resample.Execute(mask_image)
+            
             resampled_mask_array = sitk.GetArrayFromImage(resampled_mask).astype(bool)
             return resampled_image, resampled_mask_array, resampled_spacing
         
@@ -76,8 +85,7 @@ class SeriesProcessor(SeriesProcessorBase):
                 "resampled": None
             },
             "other": {
-                "nodules": [],
-                "has_nodule": len(nods) > 0
+                "nodules_count": len(nods)
             }
         }
         
@@ -88,14 +96,6 @@ class SeriesProcessor(SeriesProcessorBase):
             bbox = (bbox[2], bbox[0], bbox[1])
 
             segmentation_mask[bbox] = cmask
-
-            nodule_info = {"nodule_id": nodule_id}
-            nodule_info["bbox"] = {
-                "slice_range": [int(bbox[0].start), int(bbox[0].stop)],
-                "row_range": [int(bbox[1].start), int(bbox[1].stop)],
-                "column_range": [int(bbox[2].start), int(bbox[2].stop)]
-            }
-            metadata["other"]["nodules"].append(nodule_info)
         
         image_array, resampled_mask, resampled_spacing = self.preprocess_image(image, segmentation_mask)
         
@@ -142,7 +142,7 @@ class LidcIdri(DatasetBase):
 def main():
     config = {
         "dataset": "LIDC-IDRI",
-        "target_path": "datasets/LIDC-IDRI/data",
+        "target_path": "datasets/LIDC-IDRI/data_regenmask",
         "z_spacing": 2.0,
         "clip_min": -1024,
         "clip_max": 3072,
