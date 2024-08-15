@@ -144,7 +144,7 @@ class LidcIdri(DatasetBase):
 def main():
     config = {
         "dataset": "LIDC-IDRI",
-        "target_path": "datasets/LIDC-IDRI/data_regenmask",
+        "target_path": "datasets/LIDC-IDRI/data",
         "z_spacing": 2.0,
         "clip_min": -1024,
         "clip_max": 3072,
