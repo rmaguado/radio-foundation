@@ -15,26 +15,23 @@ class NsclcRadiomics(DatasetBase):
         self.df = pd.read_csv(config["dfpath"])
         
     def get_patient_ids(self):
-        return [
+        patient_ids = [
             x for x in os.listdir(self.datapath) \
             if os.path.isdir(os.path.join(self.datapath, x))
         ]
-        
-    def get_patient_series_paths(self, patient_id):
-        patient_folder_path = os.path.join(self.datapath, patient_id)
-        patient_series_paths = set()
-        for dirpath, dirnames, filenames in os.walk(patient_folder_path):
-            for filename in filenames:
-                # check that .dcm files exist in path
-                if fnmatch.fnmatch(filename, '*.dcm'):
-                    dcm = pydicom.dcmread(os.path.join(dirpath, filename))
-                    # check that dicom are CTs
-                    if dcm.Modality == "CT":
-                        patient_series_paths.add(dirpath)
-                    break
-        patient_series_paths = list(patient_series_paths)
-        return patient_series_paths
-
+        patient_ids_series = []
+        for patient_id in patient_ids:
+            patient_folder_path = os.path.join(self.datapath, patient_id)
+            patient_series_paths = set()
+            for dirpath, dirnames, filenames in os.walk(patient_folder_path):
+                for filename in filenames:
+                    if fnmatch.fnmatch(filename, '*.dcm'):
+                        dcm = pydicom.dcmread(os.path.join(dirpath, filename))
+                        if dcm.Modality == "CT":
+                            patient_series_paths.add((patient_id, dirpath))
+                        break
+            patient_ids_series += list(patient_series_paths)
+        return patient_ids_series
 
     def extend_metadata(self, metadata):
         patient_id = metadata["patient_id"]

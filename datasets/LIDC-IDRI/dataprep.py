@@ -111,12 +111,15 @@ class LidcIdri(DatasetBase):
         
     def get_patient_ids(self):
         scans = pl.query(pl.Scan).all()
-        patient_ids = set(scan.patient_id for scan in scans)
-        return list(patient_ids)
+        patient_ids = list(set(scan.patient_id for scan in scans))
+        patient_ids.sort()
         
-    def get_patient_series_paths(self, patient_id):
-        scans = pl.query(pl.Scan).filter(pl.Scan.patient_id == patient_id).all()
-        return [(scan.get_path_to_dicom_files(), scan) for scan in scans]
+        patient_ids_series = []
+        for patient_id in patient_ids:
+            scans = pl.query(pl.Scan).filter(pl.Scan.patient_id == patient_id).all()
+            patient_ids_series += [(patient_id, scan.get_path_to_dicom_files(), scan) for scan in scans]
+        
+        return patient_ids_series
     
     def extend_metadata(self, metadata):
         pass
@@ -125,17 +128,16 @@ class LidcIdri(DatasetBase):
         patient_ids = self.get_patient_ids()
         
         series_number = 0
-        for patient_id in tqdm(patient_ids):
-            for (series_path, scan) in self.get_patient_series_paths(patient_id):
-                series_id = f"series_{series_number:04d}"
-                processor = SeriesProcessor(self.config, self.statistics)
-                image_array, mask_array, metadata = processor.process_series(scan, series_path, series_id, patient_id)
-                
-                series_save_path = os.path.join(self.target_path, series_id)
-                processor.save_array(image_array, series_save_path, "image.h5")
-                processor.save_array(mask_array, series_save_path, "mask.h5")
-                processor.save_metadata(metadata, series_save_path, "metadata.json")
-                series_number += 1
+        for patient_id, series_path, scan in tqdm(patient_ids):
+            series_id = f"series_{series_number:04d}"
+            processor = SeriesProcessor(self.config, self.statistics)
+            image_array, mask_array, metadata = processor.process_series(scan, series_path, series_id, patient_id)
+
+            series_save_path = os.path.join(self.target_path, series_id)
+            processor.save_array(image_array, series_save_path, "image.h5")
+            processor.save_array(mask_array, series_save_path, "mask.h5")
+            processor.save_metadata(metadata, series_save_path, "metadata.json")
+            series_number += 1
                 
         self.statistics.save_global_metadata(self.target_path)
 

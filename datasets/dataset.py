@@ -7,6 +7,7 @@ import SimpleITK as sitk
 from tqdm import tqdm
 from abc import ABC, abstractmethod
 
+
 class DatasetBase(ABC):
     def __init__(self, config: dict):
         self.config = config
@@ -22,33 +23,24 @@ class DatasetBase(ABC):
         pass
     
     @abstractmethod
-    def get_patient_series_paths(self, patient_id: str) -> list:
-        pass
-    
-    @abstractmethod
     def extend_metadata(self, metadata: dict) -> None:
         pass
     
     def prepare_dataset(self):
         assert hasattr(self, 'get_patient_ids'), "The method 'get_patient_ids' must be implemented."
-        assert hasattr(self, 'get_patient_series_paths'), "The method 'get_patient_series_paths' must be implemented."
         
         patient_ids = self.get_patient_ids()
-        assert isinstance(patient_ids, list) and all(isinstance(pid, str) for pid in patient_ids), "Patient IDs must be a list of strings."
         
         series_number = 0
-        for patient_id in tqdm(patient_ids):
-            series_paths = self.get_patient_series_paths(patient_id)
-            
-            for series_path in series_paths:
-                series_id = f"series_{series_number:04d}"
-                processor = SeriesProcessorBase(self.config, self.statistics)
-                image_array, metadata = processor.process_series(series_path, series_id, patient_id)
-                self.extend_metadata(metadata)
-                series_save_path = os.path.join(self.target_path, series_id)
-                processor.save_array(image_array, series_save_path, "image.h5")
-                processor.save_metadata(metadata, series_save_path, "metadata.json")
-                series_number += 1
+        for patient_id, series_path in tqdm(patient_ids):
+            series_id = f"series_{series_number:04d}"
+            processor = SeriesProcessorBase(self.config, self.statistics)
+            image_array, metadata = processor.process_series(series_path, series_id, patient_id)
+            self.extend_metadata(metadata)
+            series_save_path = os.path.join(self.target_path, series_id)
+            processor.save_array(image_array, series_save_path, "image.h5")
+            processor.save_metadata(metadata, series_save_path, "metadata.json")
+            series_number += 1
 
         self.statistics.save_global_metadata(self.target_path)
         
