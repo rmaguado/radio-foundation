@@ -189,7 +189,7 @@ class LinearClassifier(nn.Module):
     def __init__(self, out_dim, use_n_blocks, use_avgpool, num_classes=1000):
         super().__init__()
         self.out_dim = out_dim
-        self.use_n_blocks = use_n_blocks
+        self.use_n_blocks = use_n_blocksLinearClassifier
         self.use_avgpool = use_avgpool
         self.num_classes = num_classes
         self.linear = nn.Linear(out_dim, num_classes)
