@@ -6,5 +6,6 @@
 from .image_net import ImageNet
 from .lidc_idri import LidcIdri
 from .nsclc_radiomics import NsclcRadiomics
+from .nsclc_radiogenomics import NsclcRadiogenomics
 from .ct_dataset import CtDataset
 from .ct_collection import CtCollection
