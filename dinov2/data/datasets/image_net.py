@@ -141,9 +141,9 @@ class ImageNet(ExtendedVisionDataset):
 
         image_relpath = self.split.get_image_relpath(actual_index, class_id)
         image_full_path = os.path.join(self.root, image_relpath)
-        with open(image_full_path, mode="rb") as f:
-            image_data = f.read()
-        return image_data
+        image = torchvision.io.read_image(image_full_path)
+
+        return image
 
     def get_target(self, index: int) -> Optional[Target]:
         entries = self._get_entries()

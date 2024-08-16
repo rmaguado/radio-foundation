@@ -7,8 +7,6 @@ from typing import Any, Tuple
 
 from torchvision.datasets import VisionDataset
 
-from .decoders import TargetDecoder, ImageDataDecoder
-
 
 class ExtendedVisionDataset(VisionDataset):
     def __init__(self, *args, **kwargs) -> None:
@@ -22,12 +20,10 @@ class ExtendedVisionDataset(VisionDataset):
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         try:
-            image_data = self.get_image_data(index)
-            image = ImageDataDecoder(image_data).decode()
+            image = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
         target = self.get_target(index)
-        target = TargetDecoder(target).decode()
 
         if self.transforms is not None:
             image, target = self.transforms(image, target)

@@ -1,6 +1,6 @@
 import os
 import h5py
-from PIL import Image
+import torch
 
 from dinov2.data.datasets import LidcIdri
 
@@ -21,4 +21,4 @@ class LidcIdriNodules(LidcIdri):
             data = f["data"]
             loaded_mask = data[slice_index]
 
-        return Image.fromarray(loaded_mask)
+        return torch.from_numpy(loaded_mask).unsqueeze(0)

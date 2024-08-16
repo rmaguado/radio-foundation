@@ -6,6 +6,8 @@
 import logging
 from typing import Callable, Optional, Any
 
+import torch
+
 from .ct_dataset import CtDataset
 
 logger = logging.getLogger("dinov2")

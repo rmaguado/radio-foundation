@@ -7,7 +7,7 @@ import logging
 import os
 from typing import Callable, Optional, Tuple, Any
 
-from PIL import Image
+import torch
 import numpy as np
 import h5py
 
@@ -57,4 +57,4 @@ class Ct3DDataset(ExtendedVisionDataset):
             data = f["data"]
             image = data[slice_index:slice_index+self.slice_count].astype(np.float32)
             
-        return Image.fromarray(image, 'F')
+        return torch.from_numpy(image).unsqueeze(0)

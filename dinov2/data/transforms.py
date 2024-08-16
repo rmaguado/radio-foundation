@@ -8,8 +8,6 @@ from typing import Sequence
 import random
 import numpy as np
 
-from PIL import Image
-
 import torch
 from torchvision import transforms
 
@@ -19,7 +17,7 @@ class RandomRotation:
         self.p = float(p)
         self.degrees = float(degrees)
         self.rotate = transforms.RandomRotation(
-            self.degrees, interpolation=Image.BILINEAR
+            self.degrees, interpolation=transforms.InterpolationMode.BILINEAR
         )
 
     def __call__(self, img):
@@ -50,18 +48,11 @@ class RandomContrast:
         self.contrast = float(contrast)
 
     def __call__(self, img):
-        if not isinstance(img, Image.Image):
-            raise TypeError('Input should be a PIL image.')
-        if img.mode != 'F':
-            raise TypeError('Image mode should be F.')
-            
         if random.random() < self.p:
-            img_array = np.array(img)
-            mean = np.mean(img_array)
+            mean = torch.mean(img)
             factor = 1.0 + random.uniform(-self.contrast, self.contrast)
-            img_array = (img_array - mean) * factor + mean
-            img_array = np.clip(img_array, 0, 1)
-            return Image.fromarray(img_array.astype(np.float32), mode='F')
+            img = (img - mean) * factor + mean
+            return torch.clip(img, 0.0, 1.0)
         return img
 
 
@@ -70,18 +61,11 @@ class RandomBrightness:
         self.p = float(p)
         self.brightness = float(brightness)
 
-    def __call__(self, img):
-        if not isinstance(img, Image.Image):
-            raise TypeError('Input should be a PIL image.')
-        if img.mode != 'F':
-            raise TypeError('Image mode should be F.')
-            
+    def __call__(self, img):            
         if random.random() < self.p:
-            img_array = np.array(img)
             factor = 1.0 + random.uniform(-self.brightness, self.brightness)
-            img_array = img_array * factor
-            img_array = np.clip(img_array, 0, 1)
-            return Image.fromarray(img_array.astype(np.float32), mode='F')
+            img = img * factor
+            return torch.clip(img, 0.0, 1.0)
         return img
 
 
@@ -91,42 +75,26 @@ class RandomSharpness:
         self.sharpness = float(sharpness)
 
     def __call__(self, img):
-        if not isinstance(img, Image.Image):
-            raise TypeError('Input should be a PIL image.')
-        if img.mode != 'F':
-            raise TypeError('Image mode should be F.')
-
         if random.random() < self.p:
-            img_array = np.array(img)
             factor = random.uniform(1 - self.sharpness, 1 + self.sharpness)
 
-            kernel = np.array([
+            kernel = torch.tensor([
                 [-1, -1, -1],
                 [-1, 9, -1],
                 [-1, -1, -1]
-            ]) * factor
+            ], dtype=torch.float32) * factor
 
-            img_array = self.convolve2d(img_array, kernel)
-            img_array = np.clip(img_array, 0, 1)
-            return Image.fromarray(img_array.astype(np.float32), mode='F')
+            img = self.convolve2d(img, kernel)
+            return torch.clip(img, 0.0, 1.0)
         return img
 
     def convolve2d(self, image, kernel):
-        kernel_height, kernel_width = kernel.shape
-        image_height, image_width = image.shape
-
-        pad_height = kernel_height // 2
-        pad_width = kernel_width // 2
-        padded_image = np.pad(image, ((pad_height, pad_height), (pad_width, pad_width)), mode='reflect')
-
-        output_image = np.zeros_like(image)
-
-        for i in range(image_height):
-            for j in range(image_width):
-                region = padded_image[i:i + kernel_height, j:j + kernel_width]
-                output_image[i, j] = np.sum(region * kernel)
-
-        return output_image
+        image = image.unsqueeze(0)
+        kernel = kernel.unsqueeze(0).unsqueeze(0)
+        
+        output_image = F.conv2d(image, kernel, padding=1)
+        
+        return output_image.squeeze(0)
 
 
 class RandomGaussianBlur:
@@ -145,13 +113,13 @@ class RandomSolarize:
         self.p = float(p)
         self.threshold = float(threshold)
         self.max_value = float(max_value)
-
+    
     def __call__(self, img):
         if random.random() < self.p:
-            mode = img.mode
-            img_array = np.array(img)
-            img_array[img_array > self.threshold] = self.max_value - img_array[img_array > self.threshold]
-            return Image.fromarray(img_array.astype(np.float32), mode=mode)
+            mask = img > self.threshold
+            img[mask] = self.max_value - img[mask]
+            
+            return img
         return img
     
     
@@ -168,14 +136,11 @@ class RandomNoise:
         self.p = float(p)
         self.noise_level = float(noise_level)
         self.max_value = float(max_value)
-
+    
     def __call__(self, img):
         if random.random() < self.p:
-            mode = img.mode
-            np_img = np.array(img)
-            noise = np.random.normal(0, self.noise_level, np_img.shape)
-            np_img = np.clip(np_img + noise, 0, self.max_value)
-            return Image.fromarray(np_img.astype(np.float32), mode=mode)
+            noise = torch.normal(0, self.noise_level, img.shape)
+            return torch.clip(img + noise, 0, self.max_value)
         return img
 
 

@@ -7,7 +7,7 @@ import logging
 import os
 from typing import Callable, Optional, Any
 
-from PIL import Image
+import torch
 import numpy as np
 import h5py
 
@@ -52,7 +52,7 @@ class CtCollection(CtDataset):
             data = f["data"]
             image = data[slice_index].astype(np.float32)
             
-        return Image.fromarray(image, 'F')
+        return torch.from_numpy(image).unsqueeze(0)
 
     def get_target(self, index: int) -> Optional[Any]:
         raise NotImplementedError

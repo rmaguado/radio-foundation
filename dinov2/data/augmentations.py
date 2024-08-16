@@ -54,12 +54,7 @@ class DataAugmentationDINO(object):
             ]
         )
         
-        normalize = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                make_normalize_transform(cfg.norm.mean, cfg.norm.std),
-            ]
-        )
+        normalize = make_normalize_transform(cfg.norm.mean, cfg.norm.std)
 
         self.global_transfo1 = parse_transforms(cfg.global_1, crop_global, normalize)
         self.global_transfo2 = parse_transforms(cfg.global_2, crop_global, normalize)
