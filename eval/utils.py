@@ -53,30 +53,6 @@ class ImageTargetTransform:
         ), torch.from_numpy(target_resized)
 
 
-def binary_mask_to_patch_labels(mask: torch.Tensor, patch_size: int) -> torch.Tensor:
-    """
-    Convert binary masks to patch-level labels.
-    
-    Parameters:
-    - mask (torch.Tensor): Input binary mask of shape (batch_size, 1, img_size, img_size)
-    - patch_size (int): Size of the patch (both width and height)
-    
-    Returns:
-    - patch_labels (torch.Tensor): Patch-level labels of shape (batch_size, num_patches, num_patches)
-    """
-    batch_size, _, img_size, _ = mask.shape
-    assert img_size % patch_size == 0, "Image size must be divisible by patch size"
-    
-    num_patches = img_size // patch_size
-    
-    patches = mask.unfold(2, patch_size, patch_size).unfold(3, patch_size, patch_size)
-    patches = patches.contiguous().view(batch_size, 1, num_patches, num_patches, -1)
-    
-    patch_labels = (patches.max(dim=-1)[0] > 0).long()
-    
-    return patch_labels.view(batch_size, -1)
-
-    
 class LinearClassifier(nn.Module):
     def __init__(self, embed_dim, hidden_dim, num_labels):
         super().__init__()
@@ -138,6 +114,32 @@ class DinoSegmentation(nn.Module):
         patch_tokens = torch.cat([patch_token for patch_token, _ in features], dim=-1)
         return self.classifier(patch_tokens)
 
+
+def show_mask(image_slice, mask_slice):
+    color_image = np.stack([np.array(image_slice).astype(np.float32)] * 3, axis=-1)
+    color_image[:,:,0] += np.array(mask_slice).astype(np.float32)
+    return np.clip(color_image, 0, 1)
+
+def binary_mask_to_patch_labels(mask: torch.Tensor, patch_size: int) -> torch.Tensor:
+    """
+    Convert binary masks to patch-level labels.
+    
+    Parameters:
+    - mask (torch.Tensor): Input binary mask of shape (batch_size, 1, img_size, img_size)
+    - patch_size (int): Size of the patch (both width and height)
+    
+    Returns:
+    - patch_labels (torch.Tensor): Patch-level labels of shape (batch_size, num_patches * num_patches. 1)
+    """
+    batch_size, _, img_size, _ = mask.shape
+    assert img_size % patch_size == 0, "Image size must be divisible by patch size"
+    
+    num_patches = img_size // patch_size
+    
+    mask = mask.unfold(2, patch_size, patch_size).unfold(3, patch_size, patch_size)
+    patch_labels = mask.max(dim=-1)[0].max(dim=-1)[0].squeeze(1)
+    
+    return patch_labels.view(batch_size, -1)
     
 def get_config(path_to_run):
     path_to_config = os.path.join(path_to_run, "config.yaml")
@@ -171,10 +173,27 @@ def load_model(path_to_run, checkpoint_name, device):
 def get_norm(config):
     return config.augmentations.norm.mean, config.augmentations.norm.std
 
-def get_accuracy_logits(outputs, targets):    
+def multiclass_accuracy_logits(outputs, targets):    
     predicted_labels = torch.argmax(outputs.detach().cpu(), dim=1)
-    correct_predictions = (predicted_labels == targets)
+    correct_predictions = (predicted_labels == targets.cpu())
     return correct_predictions.sum().item() / targets.size(0)
+
+def binary_accuracy_logits(outputs, targets):    
+    predicted_labels = (outputs.detach().cpu() > 0).int()
+    targets = targets.cpu().int()
+    
+    total_samples = targets.size(0)
+    
+    positives = (targets == 1).sum().item()
+    negatives = (targets == 0).sum().item()
+    
+    true_pred_positives = ((predicted_labels == 1) & (targets == 1)).sum().item()
+    true_pred_negatives = ((predicted_labels == 0) & (targets == 0)).sum().item()
+    
+    correct_predictions = (predicted_labels == targets).sum().item()
+    accuracy = correct_predictions / total_samples if total_samples > 0 else 0
+    
+    return accuracy, [positives, true_pred_positives, negatives, true_pred_negatives]
 
 def get_dataloader(dataset, is_infinite=False):
     def collate_fn(inputs):
