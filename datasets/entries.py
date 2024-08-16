@@ -44,7 +44,7 @@ def main(dataset_name):
 
     splits = {
         "train": 0.8,
-        "test": 0.2,
+        "val": 0.2,
     }
     split_ids = create_subsets(series_ids, splits)
 
