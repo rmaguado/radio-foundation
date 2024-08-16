@@ -4,6 +4,7 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
+- remove use of PIL image object (limited to 1,3 or 4 channels)
 - implement more datasets and benchmarks
 - implement use multiple slices at once
 - training ViT-l and ViT-g
