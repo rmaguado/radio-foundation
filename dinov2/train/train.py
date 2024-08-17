@@ -100,14 +100,61 @@ def build_schedulers(cfg):
 
     logger.info("Schedulers ready.")
 
-    return (
-        lr_schedule,
-        wd_schedule,
-        momentum_schedule,
-        teacher_temp_schedule,
-        last_layer_lr_schedule,
+    return {
+        'lr': lr_schedule,
+        'wd': wd_schedule,
+        'momentum': momentum_schedule,
+        'teacher_temp': teacher_temp_schedule,
+        'last_layer_lr': last_layer_lr_schedule
+    }
+    
+
+def setup_dataloader(cfg, image_mode="crop", inputs_dtype=torch.half):
+    if image_mode == "crop":
+        image_size = cfg.augmentations.crops.global_crops_size
+        batch_size = cfg.train.batch_size_per_gpu
+    elif image_mode == "full":
+        image_size = cfg.student.image_size_full
+        batch_size = cfg.train.batch_size_reduced
+        
+    patch_size = cfg.student.patch_size
+    n_tokens = (image_size // patch_size) ** 2
+    mask_generator = MaskingGenerator(
+        input_size=(image_size // patch_size, image_size // patch_size),
+        max_num_patches=0.5 * image_size // patch_size * image_size // patch_size,
     )
 
+    data_transform = DataAugmentationDINO(cfg.augmentations)
+
+    collate_fn = partial(
+        collate_data_and_cast,
+        mask_ratio_tuple=cfg.ibot.mask_ratio_min_max,
+        mask_probability=cfg.ibot.mask_sample_probability,
+        n_tokens=n_tokens,
+        mask_generator=mask_generator,
+        dtype=inputs_dtype,
+    )
+
+    dataset = make_dataset(
+        dataset_str=cfg.train.dataset_path,
+        transform=data_transform,
+        target_transform=lambda _: (),
+    )
+    # sampler_type = SamplerType.INFINITE
+    sampler_type = SamplerType.SHARDED_INFINITE
+    data_loader = make_data_loader(
+        dataset=dataset,
+        batch_size=batch_size,
+        num_workers=cfg.train.num_workers,
+        shuffle=True,
+        seed=start_iter,  # TODO: Fix this -- cfg.train.seed
+        sampler_type=sampler_type,
+        sampler_advance=0,  # TODO(qas): fix this -- start_iter * cfg.train.batch_size_per_gpu,
+        drop_last=True,
+        collate_fn=collate_fn,
+    )
+    
+    return data_loader
 
 def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
     for param_group in optimizer.param_groups:
@@ -134,93 +181,106 @@ def do_test(cfg, model, iteration):
         teacher_ckp_path = os.path.join(eval_dir, "teacher_checkpoint.pth")
         torch.save({"teacher": new_state_dict}, teacher_ckp_path)
 
-def do_train(cfg, model, resume=False):
-    model.train()
-    inputs_dtype = torch.half
-    fp16_scaler = model.fp16_scaler  # for mixed precision training
-
-    # setup optimizer
-
+def setup_training_components(cfg, model, resume):
     optimizer = build_optimizer(cfg, model.get_params_groups())
-    (
-        lr_schedule,
-        wd_schedule,
-        momentum_schedule,
-        teacher_temp_schedule,
-        last_layer_lr_schedule,
-    ) = build_schedulers(cfg)
+    schedulers = build_schedulers(cfg)
 
-    # checkpointer
-    checkpointer = FSDPCheckpointer(model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True)
     start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get("iteration", -1) + 1
-
-    OFFICIAL_EPOCH_LENGTH = cfg.train.OFFICIAL_EPOCH_LENGTH
-    GRAD_ACCUM_STEPS = cfg.train.grad_accum_steps
-    max_iter = cfg.optim.epochs * OFFICIAL_EPOCH_LENGTH * GRAD_ACCUM_STEPS
-
-    periodic_checkpointer = PeriodicCheckpointer(
-        checkpointer,
+    max_iter = cfg.optim.epochs * cfg.train.OFFICIAL_EPOCH_LENGTH * cfg.train.grad_accum_steps
+    
+    fsdp_checkpointer = FSDPCheckpointer(model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True)
+    checkpointer = PeriodicCheckpointer(
+        fsdp_checkpointer,
         period=cfg.train.saveckp_iterations,
         max_iter=max_iter,
         max_to_keep=3,
     )
+    
+    return optimizer, schedulers, checkpointer, start_iter, max_iter
 
-    # setup data preprocessing
+def update_schedules(optimizer, schedulers):
+    lr = schedulers['lr'][train_step]
+    wd = schedulers['wd'][train_step]
+    momentum = schedulers['momentum'][train_step]
+    teacher_temp = schedulers['teacher_temp'][train_step]
+    last_layer_lr = schedulers['last_layer_lr'][train_step]
+    apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
 
-    img_size = cfg.augmentations.crops.global_crops_size
-    patch_size = cfg.student.patch_size
-    n_tokens = (img_size // patch_size) ** 2
-    mask_generator = MaskingGenerator(
-        input_size=(img_size // patch_size, img_size // patch_size),
-        max_num_patches=0.5 * img_size // patch_size * img_size // patch_size,
-    )
+    return momentum, teacher_temp
 
-    data_transform = DataAugmentationDINO(cfg.augmentations)
+def apply_gradient_operations(cfg, model, optimizer, fp16_scaler):
+    if fp16_scaler is not None:
+        fp16_scaler.unscale_(optimizer)
 
-    collate_fn = partial(
-        collate_data_and_cast,
-        mask_ratio_tuple=cfg.ibot.mask_ratio_min_max,
-        mask_probability=cfg.ibot.mask_sample_probability,
-        n_tokens=n_tokens,
-        mask_generator=mask_generator,
-        dtype=inputs_dtype,
-    )
+    for group in optimizer.param_groups:
+        for param in group['params']:
+            if param.grad is not None:
+                param.grad.data.div_(GRAD_ACCUM_STEPS)
 
-    # setup data loader
+    if cfg.optim.clip_grad:
+        for v in model.student.values():
+            v.clip_grad_norm_(cfg.optim.clip_grad)
 
-    dataset = make_dataset(
-        dataset_str=cfg.train.dataset_path,
-        transform=data_transform,
-        target_transform=lambda _: (),
-    )
-    # sampler_type = SamplerType.INFINITE
-    sampler_type = SamplerType.SHARDED_INFINITE
-    data_loader = make_data_loader(
-        dataset=dataset,
-        batch_size=cfg.train.batch_size_per_gpu,
-        num_workers=cfg.train.num_workers,
-        shuffle=True,
-        seed=start_iter,  # TODO: Fix this -- cfg.train.seed
-        sampler_type=sampler_type,
-        sampler_advance=0,  # TODO(qas): fix this -- start_iter * cfg.train.batch_size_per_gpu,
-        drop_last=True,
-        collate_fn=collate_fn,
-    )
+    if fp16_scaler is not None:
+        fp16_scaler.step(optimizer)
+        fp16_scaler.update()
+    else:
+        optimizer.step()
 
-    # training loop
+        
+def log_training_step(metric_logger, loss_dict, schedulers, train_step, current_batch_size):
+    if distributed.get_global_size() > 1:
+        for v in loss_dict.values():
+            torch.distributed.all_reduce(v)
+    loss_dict_reduced = {k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()}
+
+    if math.isnan(sum(loss_dict_reduced.values())):
+        logger.error(f"NaN detected in reduced loss at iteration {iteration}")
+        logger.info(f"Reduced loss dict: {loss_dict_reduced}")
+        raise AssertionError
+
+    losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+
+    metric_logger.update(lr=schedulers['lr'][train_step])
+    metric_logger.update(wd=schedulers['wd'][train_step])
+    metric_logger.update(mom=schedulers['momentum'][train_step])
+    metric_logger.update(last_layer_lr=schedulers['last_layer_lr'][train_step])
+    metric_logger.update(current_batch_size=current_batch_size)
+    metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
+
+    
+def should_reset_grad(cfg, grad_accum_counter):
+    return grad_accum_counter % cfg.train.grad_accum_steps == 0
+
+def should_apply_training_step(cfg, grad_accum_counter):
+    return (grad_accum_counter + 1) % cfg.train.grad_accum_steps == 0
+
+def should_eval_model(cfg, iteration):
+    return cfg.evaluation.eval_period_iterations > 0 and \
+    (iteration + 1) % cfg.evaluation.eval_period_iterations == 0
+
+def do_train(cfg, model, resume=False):
+    model.train()
+    inputs_dtype = torch.half
+    fp16_scaler = model.fp16_scaler
+
+    optimizer, schedulers, checkpointer, start_iter, max_iter = setup_training_components(cfg, model, resume)
+    
+    full_size_start_iter = max_iter - cfg.train.full_size_steps * cfg.train.grad_accum_steps
+    
+    data_loader = setup_dataloader(cfg, "crop", inputs_dtype)
+
     iteration = start_iter
     train_step = start_iter // GRAD_ACCUM_STEPS
     grad_accum_counter = 0
 
     logger.info("Starting training from iteration {}".format(start_iter))
-    metrics_file = os.path.join(cfg.train.output_dir, "training_metrics.json")
-    metric_logger = MetricLogger(delimiter="  ", output_file=metrics_file)
-    header = "Training"
-
+    metric_logger = MetricLogger(delimiter="  ", output_file=os.path.join(cfg.train.output_dir, "training_metrics.json"))
+    
     for data in metric_logger.log_every(
         data_loader,
         cfg.train.print_freq,
-        header,
+        "Training",
         max_iter,
         start_iter,
     ):
@@ -228,79 +288,28 @@ def do_train(cfg, model, resume=False):
         if iteration > max_iter:
             return
         
-        if grad_accum_counter % GRAD_ACCUM_STEPS == 0:
-            # apply schedules
-            lr = lr_schedule[train_step]
-            wd = wd_schedule[train_step]
-            mom = momentum_schedule[train_step]
-            teacher_temp = teacher_temp_schedule[train_step]
-            last_layer_lr = last_layer_lr_schedule[train_step]
-            apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
-
+        if should_reset_grad(cfg, grad_accum_counter):
+            mom, teacher_temp = update_schedules()
             optimizer.zero_grad(set_to_none=True)
         
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
-            
-        # clip gradients and perform optimizer step after accumulation steps
-        if (grad_accum_counter + 1) % GRAD_ACCUM_STEPS == 0:
-            
-            # Unscale gradients
-            if fp16_scaler is not None:
-                fp16_scaler.unscale_(optimizer)
-
-            for group in optimizer.param_groups:
-                for param in group['params']:
-                    if param.grad is not None:
-                        param.grad.data.div_(GRAD_ACCUM_STEPS)
-            
-            # Clip gradients
-            if cfg.optim.clip_grad:
-                for v in model.student.values():
-                    v.clip_grad_norm_(cfg.optim.clip_grad)
-            
-            # Update optimizer
-            if fp16_scaler is not None:
-                fp16_scaler.step(optimizer)
-                fp16_scaler.update()
-            else:
-                optimizer.step()
-            
-            # perform teacher EMA update
+        
+        if should_apply_training_step(cfg, grad_accum_counter):
+            apply_gradient_operations(cfg, model, optimizer, fp16_scaler)
             model.update_teacher(mom)
-            
-
-            # logging
-            if distributed.get_global_size() > 1:
-                for v in loss_dict.values():
-                    torch.distributed.all_reduce(v)
-            loss_dict_reduced = {k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()}
-
-            if math.isnan(sum(loss_dict_reduced.values())):
-                logger.error(f"NaN detected in reduced loss at iteration {iteration}")
-                logger.info(f"Reduced loss dict: {loss_dict_reduced}")
-                raise AssertionError
-
-            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-
-            metric_logger.update(lr=lr)
-            metric_logger.update(wd=wd)
-            metric_logger.update(mom=mom)
-            metric_logger.update(last_layer_lr=last_layer_lr)
-            metric_logger.update(current_batch_size=current_batch_size)
-            metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
-            
+            log_training_step(metric_logger, loss_dict, schedulers, train_step, current_batch_size)
             train_step += 1
-            
-        # checkpointing and testing
-        if cfg.evaluation.eval_period_iterations > 0 and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0:
+        
+        if should_eval_model(cfg, iteration):
             do_test(cfg, model, f"training_{iteration}")
             torch.cuda.synchronize()
-        periodic_checkpointer.step(iteration)
-            
+        
+        checkpointer.step(iteration)
         grad_accum_counter += 1
         iteration += 1
-        
+    
     metric_logger.synchronize_between_processes()
+    
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
