@@ -59,7 +59,7 @@ def build_schedulers(cfg):
     }
     
 
-def setup_dataloader(cfg, image_mode="crop", inputs_dtype=torch.half, ):
+def setup_dataloader(cfg, image_mode, inputs_dtype=torch.half):
     if image_mode == "crop":
         image_size = cfg.augmentations.crops.global_crops_size
         batch_size = cfg.train.batch_size_per_gpu
@@ -74,7 +74,7 @@ def setup_dataloader(cfg, image_mode="crop", inputs_dtype=torch.half, ):
         max_num_patches=0.5 * image_size // patch_size * image_size // patch_size,
     )
 
-    data_transform = DataAugmentationDINO(cfg.augmentations)
+    data_transform = DataAugmentationDINO(cfg.augmentations, image_size)
 
     collate_fn = partial(
         collate_data_and_cast,

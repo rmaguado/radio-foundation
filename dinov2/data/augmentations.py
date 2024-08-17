@@ -17,15 +17,16 @@ logger = logging.getLogger("dinov2")
 
 
 class DataAugmentationDINO(object):
-    def __init__(self, cfg):
+    def __init__(self, cfg, global_crops_size):
         self.local_crops_number = cfg.crops.local_crops_number
+        self.global_crops_size = global_crops_size
 
         logger.info("###################################")
         logger.info("Using data augmentation parameters:")
         logger.info(f"global_crops_scale: {cfg.crops.global_crops_scale}")
         logger.info(f"local_crops_scale: {cfg.crops.local_crops_scale}")
         logger.info(f"local_crops_number: {cfg.crops.local_crops_number}")
-        logger.info(f"global_crops_size: {cfg.crops.global_crops_size}")
+        logger.info(f"global_crops_size: {self.global_crops_size}")
         logger.info(f"local_crops_size: {cfg.crops.local_crops_size}")
         logger.info("###################################")
 
@@ -33,7 +34,7 @@ class DataAugmentationDINO(object):
         crop_global = transforms.Compose(
             [
                 transforms.RandomResizedCrop(
-                    cfg.crops.global_crops_size,
+                    self.global_crops_size,
                     scale=cfg.crops.global_crops_scale,
                     interpolation=transforms.InterpolationMode.BICUBIC,
                     antialias=True

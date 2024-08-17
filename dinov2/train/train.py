@@ -36,35 +36,22 @@ def should_eval_model(cfg, iteration):
     return cfg.evaluation.eval_period_iterations > 0 and \
     (iteration + 1) % cfg.evaluation.eval_period_iterations == 0
 
-def do_train(cfg, model, resume=False):
-    model.train()
-    inputs_dtype = torch.half
+def train(
+    cfg,
+    metric_logger,
+    model,
+    optimizer,
+    schedulers,
+    checkpointer,
+    start_iter,
+    max_iter,
+    train_step
+):
     fp16_scaler = model.fp16_scaler
-
-    (
-        optimizer, schedulers, checkpointer, start_iter, max_iter
-    ) = setup_training_components(cfg, model, resume)
-    
-    full_size_start_iter = max_iter - cfg.train.full_size_steps * cfg.train.grad_accum_steps
-    
-    data_loader = setup_dataloader(cfg, "crop", inputs_dtype)
-
-    iteration = start_iter
-    train_step = start_iter // cfg.train.grad_accum_steps
     grad_accum_counter = 0
-
-    logger.info("Starting training from iteration {}".format(start_iter))
-    metric_logger = MetricLogger(
-        delimiter="  ",
-        output_file=os.path.join(cfg.train.output_dir, "training_metrics.json")
-    )
-    
+    iteration = start_iter
     for data in metric_logger.log_every(
-        data_loader,
-        cfg.train.print_freq,
-        "Training",
-        max_iter,
-        start_iter,
+        cfg.train.print_freq, "Training", max_iter, start_iter,
     ):
         current_batch_size = data["collated_global_crops"].shape[0] / 2
         if iteration > max_iter:
@@ -89,6 +76,59 @@ def do_train(cfg, model, resume=False):
         checkpointer.step(iteration)
         grad_accum_counter += 1
         iteration += 1
+    return iteration, train_step
+
+def do_train(cfg, model, resume=False):
+    model.train()
+    inputs_dtype = torch.half
+
+    (
+        optimizer, schedulers, checkpointer, start_iter, max_iter
+    ) = setup_training_components(cfg, model, resume)
+    
+    full_size_iterations = cfg.train.full_size_steps * cfg.train.grad_accum_steps
+
+    iteration = start_iter
+    train_step = start_iter // cfg.train.grad_accum_steps
+
+    logger.info("Starting training from iteration {}".format(start_iter))
+    metric_logger = MetricLogger(
+        delimiter="  ",
+        output_file=os.path.join(cfg.train.output_dir, "training_metrics.json")
+    )
+    
+    data_loader = setup_dataloader(cfg, "crop", inputs_dtype)
+    metric_logger.set_dataloader(data_loader)
+    
+    train_components = [
+        cfg,
+        metric_logger,
+        model,
+        optimizer,
+        schedulers,
+        checkpointer
+    ]
+    
+    iteration, train_step = train(
+        *train_components,
+        start_iter=start_iter,
+        max_iter=max_iter - full_size_iterations,
+        train_step=train_step
+    )
+    
+    logger.info(
+        f"Finished training on resize-crop images. Resuming with full-size images for {full_size_iterations} steps"
+    )
+    
+    data_loader = setup_dataloader(cfg, "full", inputs_dtype)
+    metric_logger.set_dataloader(data_loader)
+    train(
+        *train_components,
+        start_iter=iteration,
+        max_iter=max_iter,
+        train_step=train_step
+    )
+    logger.info("Finished training on full-size images")
     
     metric_logger.synchronize_between_processes()
     

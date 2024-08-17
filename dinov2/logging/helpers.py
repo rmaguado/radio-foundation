@@ -22,6 +22,10 @@ class MetricLogger(object):
         self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
         self.output_file = output_file
+        self.dataloader = None
+        
+    def set_dataloader(self, dataloader):
+        self.dataloader = dataloader
 
     def update(self, **kwargs):
         for k, v in kwargs.items():
@@ -63,7 +67,8 @@ class MetricLogger(object):
             f.write(json.dumps(dict_to_dump) + "\n")
         pass
 
-    def log_every(self, iterable, print_freq, header=None, n_iterations=None, start_iteration=0):
+    def log_every(self, print_freq, header=None, n_iterations=None, start_iteration=0):
+        iterable = self.dataloader
         i = start_iteration
         if not header:
             header = ""
