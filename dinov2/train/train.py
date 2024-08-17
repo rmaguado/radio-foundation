@@ -271,7 +271,7 @@ def do_train(cfg, model, resume=False):
     data_loader = setup_dataloader(cfg, "crop", inputs_dtype)
 
     iteration = start_iter
-    train_step = start_iter // GRAD_ACCUM_STEPS
+    train_step = start_iter // cfg.train.grad_accum_steps
     grad_accum_counter = 0
 
     logger.info("Starting training from iteration {}".format(start_iter))
