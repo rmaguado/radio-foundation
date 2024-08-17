@@ -61,6 +61,7 @@ ibot:
 train:
     grad_accum_steps: 1
     batch_size_per_gpu: 64
+    batch_size_reduced: 16
     batch_size_full: 1024
     dataset_path: ImageNet:split=TRAIN
     output_dir: .
@@ -71,9 +72,11 @@ train:
     OFFICIAL_EPOCH_LENGTH: 1250
     cache_dataset: true
     centering: "centering" # or "sinkhorn_knopp"
+    full_size_steps: 10000
 student:
     arch: vit_large
     patch_size: 16
+    image_size_full: 504
     channels: 3
     drop_path_rate: 0.3
     layerscale: 1.0e-05
