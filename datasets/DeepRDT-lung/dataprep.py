@@ -12,46 +12,36 @@ class DeepRDTlung(DatasetBase):
         super().__init__(config)
         
         self.datapath = config["datapath"]
-        self.df = pd.read_csv(config["dfpath"])
+
+        path_to_scans = os.path.join(self.datapath, "lung")
+        patient_folders = [
+            path for path in os.listdir(path_to_scans) \
+            if os.path.isdir(os.path.join(path_to_scans, path))
+        ]
+        patient_folders.sort()
+
+        path_mapping = os.path.join(self.datapath, "mapping_df_lung_noDupli_wNewPatient2022.csv")
+        path_metadata_1 = os.path.join(self.datapath, "DeepRDTPulmon_DATA_2024-07-17_1215.csv")
+        path_metadata_2 = os.path.join(self.datapath, "CodigoPacientes.csv")
+        
+        metadata_1 = pd.read_csv(path_metadata_1, delimiter=";")
+        metadata_1 = metadata_1.rename(columns={'nhc_sap': 'PID'})
+        metadata_1['PID'] = metadata_1['PID'].astype(int)
+        metadata_2 = pd.read_csv(path_metadata_2)
+        metadata_2 = metadata_2.rename(columns={'Num. SAP': 'PID'})
+        metadata_2['PID'] = metadata_2['PID'].astype(int)
+        mapping = pd.read_csv(path_mapping)
+        combined = pd.merge(metadata_1, mapping, on='PID', how='inner')
+        combined = pd.merge(combined, metadata_2, on='PID', how='inner')
+
+        self.df = combined[combined['MAPID'].astype(str).isin(patient_folders)]
         
     def get_patient_ids(self):
-        patient_ids = [
-            x for x in os.listdir(self.datapath) \
-            if os.path.isdir(os.path.join(self.datapath, x))
-        ]
-        patient_ids_series = []
-        for patient_id in patient_ids:
-            patient_folder_path = os.path.join(self.datapath, patient_id)
-            patient_series_paths = set()
-            for dirpath, dirnames, filenames in os.walk(patient_folder_path):
-                for filename in filenames:
-                    if fnmatch.fnmatch(filename, '*.dcm'):
-                        dcm = pydicom.dcmread(os.path.join(dirpath, filename))
-                        if dcm.Modality == "CT":
-                            patient_series_paths.add((patient_id, dirpath))
-                        break
-            patient_ids_series += list(patient_series_paths)
-        return patient_ids_series
-
+        patient_folders = list(self.df['MAPID'].astype(str))
+        raise NotImplementedError
+        
     def extend_metadata(self, metadata):
-        patient_id = metadata["patient_id"]
-        patient_row = self.df[self.df["PatientID"] == patient_id].iloc[0]
-        
-        age = patient_row['age']
-        age = round(float(age)) if age != "NA" else age
-
-        sex = {
-            'female': 'F',
-            'male': 'M'
-        }[patient_row['gender']]
-        
-        survival_time = patient_row['Survival.time']
-
-        metadata["other"] = {
-            'sex': sex,
-            'age': age,
-            'survival_time': survival_time
-        }
+        raise NotImplementedError
 
 def main():
     config = {
