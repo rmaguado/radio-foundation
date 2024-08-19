@@ -48,7 +48,7 @@ dtype = np.dtype(
     ]
 )
 
-dataset_names = ["LIDC-IDRI", "NSCLC-Radiomics"]
+dataset_names = ["LIDC-IDRI", "NSCLC-Radiomics", "NSCLC-Radiogenomics"]
 target_path = "extra"
 splits = {
     "train": 0.8,
