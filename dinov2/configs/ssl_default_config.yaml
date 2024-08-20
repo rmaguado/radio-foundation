@@ -1,5 +1,5 @@
 MODEL:
-    WEIGHTS: ''
+  WEIGHTS: ''
 compute_precision:
   grad_scaler: true
   teacher:
