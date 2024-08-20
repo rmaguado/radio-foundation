@@ -145,8 +145,8 @@ def get_config(path_to_run):
     path_to_config = os.path.join(path_to_run, "config.yaml")
     return OmegaConf.load(path_to_config)
 
-def get_autocast_dtype(config):
-    teacher_dtype_str = config.compute_precision.teacher.backbone.mixed_precision.param_dtype
+def get_autocast_dtype(cfg):
+    teacher_dtype_str = cfg.compute_precision.teacher.backbone.mixed_precision.param_dtype
     if teacher_dtype_str == "fp16":
         return torch.half
     elif teacher_dtype_str == "bf16":
@@ -170,8 +170,8 @@ def load_model(path_to_run, checkpoint_name, device):
     
     return feature_model, config
     
-def get_norm(config):
-    return config.augmentations.norm.mean, config.augmentations.norm.std
+def get_norm(cfg):
+    return cfg.norm.mean, cfg.norm.std
 
 def multiclass_accuracy_logits(outputs, targets):    
     predicted_labels = torch.argmax(outputs.detach().cpu(), dim=1)
