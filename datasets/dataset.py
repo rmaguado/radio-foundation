@@ -26,15 +26,18 @@ class DatasetBase(ABC):
     def extend_metadata(self, metadata: dict) -> None:
         pass
     
+    def get_series_processor(self):
+        return SeriesProcessorBase(self.config, self.statistics)
+    
     def prepare_dataset(self):
         assert hasattr(self, 'get_patient_ids'), "The method 'get_patient_ids' must be implemented."
         
         patient_ids = self.get_patient_ids()
-        
+        processor = self.get_series_processor()
         series_number = 0
         for patient_id, series_path in tqdm(patient_ids):
             series_id = f"series_{series_number:04d}"
-            processor = SeriesProcessorBase(self.config, self.statistics)
+            
             image_array, metadata = processor.process_series(series_path, series_id, patient_id)
             self.extend_metadata(metadata)
             series_save_path = os.path.join(self.target_path, series_id)
@@ -57,7 +60,7 @@ class SeriesProcessorBase:
         assert self.clip_window > 0, "Clip window must be positive (clip_max - clip_min > 0)."
     
     def process_series(self, path_to_series, series_id, patient_id):
-        image = self.get_image(path_to_series)
+        image = self.get_image(path_to_series, patient_id)
         original_spacing = self.get_spacing(image)
         image_array, resampled_spacing = self.preprocess_image(image)
 
@@ -75,7 +78,7 @@ class SeriesProcessorBase:
 
         return image_array, metadata
     
-    def get_image(self, path_to_series):
+    def get_image(self, path_to_series, patient_id):
         reader = sitk.ImageSeriesReader()
         dicom_names = reader.GetGDCMSeriesFileNames(path_to_series)
         reader.SetFileNames(dicom_names)
