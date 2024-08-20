@@ -67,7 +67,7 @@ def load_transforms_from_cfg(cfg, use_full_image: bool):
             return globalcrop
         elif name in transformkeys:
             transform_cls = transformkeys[name]
-            params = {k: float(v) if k != "name" else v for k, v in transform_cfg.items()}
+            params = {k: float(v) for k, v in transform_cfg.items() if k != "name"}
             return transform_cls(**params)
         else:
             raise ValueError(err_not_recognized.format(s=name))
