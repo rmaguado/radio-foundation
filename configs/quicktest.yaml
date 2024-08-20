@@ -7,7 +7,7 @@ train:
   saveckp_iterations: 10
   print_freq: 1
   full_image:
-    epochs: 20
+    epochs: 2
     batch_size_per_gpu: 2
     grad_accum_steps: 4
 evaluation:
@@ -20,5 +20,5 @@ teacher:
   warmup_teacher_temp_epochs: 4  
 optim:
   epochs: 8
-  warmup_epochs: 10
+  warmup_epochs: 2
   base_lr: 0.003
