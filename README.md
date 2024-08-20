@@ -7,8 +7,8 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 - implement use multiple slices at once
 - write userguide for data processing
 - add unit tests
+- add docstrings and type hints
 - implement more datasets and benchmarks
-- add comments showing modification
 
 ## Overview
 
