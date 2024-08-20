@@ -61,37 +61,41 @@ ibot:
 train:
     grad_accum_steps: 1
     batch_size_per_gpu: 64
-    batch_size_reduced: 16
-    batch_size_full: 1024
-    dataset_path: ImageNet:split=TRAIN
+    batch_size_overall: 3072
+    dataset_path: CtCollection:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
     output_dir: .
     saveckp_iterations: 5000
-    print_freq: 10
+    print_freq: 100
     seed: 0
     num_workers: 10
-    OFFICIAL_EPOCH_LENGTH: 1250
+    OFFICIAL_EPOCH_LENGTH: 1000
     cache_dataset: true
     centering: "centering" # or "sinkhorn_knopp"
-    full_size_steps: 10000
+    full_image:
+        epochs: 10
+        batch_size_per_gpu: 16
+        grad_accum_steps: 4
+evaluation:
+    eval_period_iterations: 10000
 student:
     arch: vit_large
-    patch_size: 16
+    patch_size: 14
     full_image_size: 504
-    channels: 3
-    drop_path_rate: 0.3
+    channels: 1
+    drop_path_rate: 0.4
     layerscale: 1.0e-05
     drop_path_uniform: true
     pretrained_weights: ''
-    ffn_layer: "mlp"
+    ffn_layer: "swiglu"
     block_chunks: 0
     qkv_bias: true
     proj_bias: true
     ffn_bias: true
-    num_register_tokens: 0
-    interpolate_antialias: false
-    interpolate_offset: 0.1
+    num_register_tokens: 4
+    interpolate_antialias: true
+    interpolate_offset: 0.0
 teacher:
-    momentum_teacher: 0.992
+    momentum_teacher: 0.994
     final_momentum_teacher: 1
     warmup_teacher_temp: 0.04
     teacher_temp: 0.07
@@ -99,8 +103,8 @@ teacher:
 optim:
     epochs: 100
     weight_decay: 0.04
-    weight_decay_end: 0.4
-    base_lr: 0.004  # learning rate for a batch size of 1024
+    weight_decay_end: 0.2
+    base_lr: 3.5e-4
     lr: 0.  # will be set after applying scaling rule
     warmup_epochs: 10
     min_lr: 1.0e-06
@@ -111,41 +115,64 @@ optim:
     layerwise_decay: 0.9
     adamw_beta1: 0.9
     adamw_beta2: 0.999
+crops:
+    global_crops_scale:
+    - 0.32
+    - 1.0
+    local_crops_number: 8
+    local_crops_scale:
+    - 0.05
+    - 0.32
+    global_crops_size: 224
+    local_crops_size: 96
+norm:
+    mean: 0.124
+    std: 0.121
 augmentations:
-    crops:
-      global_crops_scale:
-      - 0.32
-      - 1.0
-      local_crops_number: 8
-      local_crops_scale:
-      - 0.05
-      - 0.32
-      global_crops_size: 224
-      local_crops_size: 96
-    norm:
-        mean:
-        - 0.485
-        - 0.456
-        - 0.406
-        std:
-        - 0.229
-        - 0.224
-        - 0.225
     global_1:
-    - crop
-    - colorjitter_0.8_0.4_0.4_0.4_0.4
-    - grayscale_0.2
-    - blur_1
+    - name: rotation
+        p: 0.8
+        degrees: 90
+    - name: globalcrop
+    - name: flip
+        p: 0.5
+    - name: contrast
+        p: 0.8
+        contrast: 0.4
+    - name: brightness
+        p: 0.8
+        brightness: 0.4
+    - name: blur
+        p: 1.0
     global_2:
-    - crop
-    - colorjitter_0.8_0.4_0.4_0.4_0.4
-    - grayscale_0.2
-    - blur_0.1
-    - solarize_0.2_128_256
+    - name: globalcrop
+    - name: flip
+        p: 0.5
+    - name: contrast
+        p: 0.8
+        contrast: 0.4
+    - name: brightness
+        p: 0.8
+        brightness: 0.4
+    - name: solarize
+        p: 0.2
+        threshold: 0.5
+        max_value: 1.0
+    - name: noise
+        p: 0.5
+        noise_level: 0.02
+        max_value: 1.0
+    - name: blur
+        p: 0.1
     local:
-    - crop
-    - colorjitter_0.8_0.4_0.4_0.4_0.4
-    - grayscale_0.2
-    - blur_0.5
-evaluation:
-  eval_period_iterations: 12500
+    - name: lobalcrop
+    - name: flip
+        p: 0.5
+    - name: contrast
+        p: 0.8
+        contrast: 0.4
+    - name: brightness
+        p: 0.8
+        brightness: 0.4
+    - name: blur
+        p: 0.5
