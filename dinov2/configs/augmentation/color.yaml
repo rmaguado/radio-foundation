@@ -41,7 +41,7 @@ augmentations:
     threshold: 128
     max_value: 256
   local:
-  - name: lobalcrop
+  - name: localcrop
   - name: flip
   - name: colorjitter
     p: 0.8

@@ -124,7 +124,7 @@ crops:
   - 0.05
   - 0.32
   global_crops_size: 224
-  local_crops_size: 96
+  local_crops_size: 98
 norm:
   mean: 0.124
   std: 0.121
@@ -165,7 +165,7 @@ augmentations:
   - name: blur
     p: 0.1
   local:
-  - name: lobalcrop
+  - name: localcrop
   - name: flip
     p: 0.5
   - name: contrast

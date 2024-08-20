@@ -35,7 +35,7 @@ augmentations:
   - name: blur
     p: 0.1
   local:
-  - name: lobalcrop
+  - name: localcrop
   - name: flip
     p: 0.5
   - name: contrast
