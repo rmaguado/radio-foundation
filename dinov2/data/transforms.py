@@ -3,11 +3,7 @@
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
 
-from typing import Sequence
-
 import random
-import numpy as np
-
 import torch
 from torchvision import transforms
 
@@ -142,74 +138,42 @@ class RandomNoise:
             noise = torch.normal(0, self.noise_level, img.shape)
             return torch.clip(img + noise, 0, self.max_value)
         return img
+    
+    
+class RandomFlip:
+    def __init__(self, p):
+        self.p = float(p)
+        self.flip = transforms.RandomHorizontalFlip(self.p)
+    def __call__(self, img):
+        return self.flip(img)
+    
+class RandomGamma:
+    def __init__(self, p, gamma):
+        self.p = float(p)
+        self.gamma = float(gamma)
+
+    def __call__(self, img):
+        if random.random() < self.p:
+            return torch.pow(img, self.gamma)
+        return img
+    
+class RandomWindow:
+    def __init__(self, p, height, width):
+        self.p = float(p)
+        self.height = float(height)
+        self.width = float(width)
+        assert abs(self.height) < 0
+        assert abs(self.width) < 0
+        assert self.height + self.width <= 1
+    def __call__(self, img):
+        if random.random() < self.p:
+            width = random.uniform(self.width, 1)
+            height = random.uniform(0, 1 - self.width)
+            return torch.clip(img, height, height + width)
+        return img
 
 
-class MaybeToTensor(transforms.ToTensor):
-    """
-    Convert a ``PIL Image`` or ``numpy.ndarray`` to tensor, or keep as is if already a tensor.
-    """
-
-    def __call__(self, pic):
-        """
-        Args:
-            pic (PIL Image, numpy.ndarray or torch.tensor): Image to be converted to tensor.
-        Returns:
-            Tensor: Converted image.
-        """
-        if isinstance(pic, torch.Tensor):
-            return pic
-        return super().__call__(pic)
-
-
-def make_normalize_transform(
-    mean: Sequence[float],
-    std: Sequence[float],
-) -> transforms.Normalize:
-    return transforms.Normalize(mean=mean, std=std)
-
-
-# This roughly matches torchvision's preset for classification training:
-#   https://github.com/pytorch/vision/blob/main/references/classification/presets.py#L6-L44
-def make_classification_train_transform(
-    *,
-    crop_size: int = 224,
-    interpolation=transforms.InterpolationMode.BICUBIC,
-    hflip_prob: float = 0.5,
-    mean: Sequence[float] = 0.5,
-    std: Sequence[float] = 0.5,
-):
-    transforms_list = [transforms.RandomResizedCrop(crop_size, interpolation=interpolation)]
-    if hflip_prob > 0.0:
-        transforms_list.append(transforms.RandomHorizontalFlip(hflip_prob))
-    transforms_list.extend(
-        [
-            MaybeToTensor(),
-            make_normalize_transform(mean=mean, std=std),
-        ]
-    )
-    return transforms.Compose(transforms_list)
-
-
-# This matches (roughly) torchvision's preset for classification evaluation:
-#   https://github.com/pytorch/vision/blob/main/references/classification/presets.py#L47-L69
-def make_classification_eval_transform(
-    *,
-    resize_size: int = 256,
-    interpolation=transforms.InterpolationMode.BICUBIC,
-    crop_size: int = 224,
-    mean: Sequence[float] = 0.5,
-    std: Sequence[float] = 0.5,
-) -> transforms.Compose:
-    transforms_list = [
-        transforms.Resize(resize_size, interpolation=interpolation),
-        transforms.CenterCrop(crop_size),
-        MaybeToTensor(),
-        make_normalize_transform(mean=mean, std=std),
-    ]
-    return transforms.Compose(transforms_list)
-
-
-TRANSFORMS = {
+transformkeys = {
     "rotation" : RandomRotation,
     "colorjitter": RandomColorJitter,
     "contrast": RandomContrast,
@@ -219,4 +183,7 @@ TRANSFORMS = {
     "solarize": RandomSolarize,
     "grayscale": RandomGrayscale,
     "noise": RandomNoise,
+    "flip": RandomFlip,
+    "gamma": RandomGamma,
+    "window": RandomWindow
 }

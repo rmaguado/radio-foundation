@@ -57,16 +57,9 @@ def build_schedulers(cfg):
         'teacher_temp': teacher_temp_schedule,
         'last_layer_lr': last_layer_lr_schedule
     }
-    
 
-def setup_dataloader(cfg, image_mode, inputs_dtype=torch.half):
-    if image_mode == "crop":
-        image_size = cfg.augmentations.crops.global_crops_size
-        batch_size = cfg.train.batch_size_per_gpu
-    elif image_mode == "full":
-        image_size = cfg.student.full_image_size
-        batch_size = cfg.train.batch_size_reduced
-        
+def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
+
     patch_size = cfg.student.patch_size
     n_tokens = (image_size // patch_size) ** 2
     mask_generator = MaskingGenerator(
@@ -74,7 +67,7 @@ def setup_dataloader(cfg, image_mode, inputs_dtype=torch.half):
         max_num_patches=0.5 * image_size // patch_size * image_size // patch_size,
     )
 
-    data_transform = DataAugmentationDINO(cfg.augmentations, image_size)
+    data_transform = DataAugmentationDINO(cfg, use_full_image=image_mode=="full")
 
     collate_fn = partial(
         collate_data_and_cast,
@@ -90,7 +83,10 @@ def setup_dataloader(cfg, image_mode, inputs_dtype=torch.half):
         transform=data_transform,
         target_transform=lambda _: (),
     )
-
+    
+    batch_size = cfg.train.full_image.batch_size_per_gpu \
+    if use_full_image else cfg.train.batch_size_per_gpu
+    
     sampler_type = SamplerType.SHARDED_INFINITE
     data_loader = make_data_loader(
         dataset=dataset,
@@ -106,6 +102,20 @@ def setup_dataloader(cfg, image_mode, inputs_dtype=torch.half):
     
     return data_loader
 
+def get_full_size_iter(cfg):
+    full_img_epochs = cfg.train.full_image.epochs
+    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
+    accum_steps = cfg.train.full_image.grad_accum_steps
+    return full_img_epochs * epoch_len * accum_steps
+    
+def get_cropped_iter(cfg):
+    total_epochs = cfg.optim.epochs
+    full_img_epochs = cfg.train.full_image.epoch
+    cropped_epochs = total_epochs - full_img_epochs
+    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
+    accum_steps = cfg.train.grad_accum_steps
+    return cropped_epochs * epoch_len * accum_steps
+    
 def setup_training_components(cfg, model, resume):
     logger = logging.getLogger("dinov2")
     
@@ -116,8 +126,18 @@ def setup_training_components(cfg, model, resume):
 
     fsdp_checkpointer = FSDPCheckpointer(model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True)
     
-    start_iter = fsdp_checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get("iteration", -1) + 1
-    max_iter = cfg.optim.epochs * cfg.train.OFFICIAL_EPOCH_LENGTH * cfg.train.grad_accum_steps
+    start_iter = fsdp_checkpointer.resume_or_load(
+        cfg.MODEL.WEIGHTS, resume=resume
+    ).get("iteration", -1) + 1
+    
+    full_size_iter = get_full_size_iter(cfg)
+    cropped_iter = get_cropped_iter(cfg)
+    max_iter = cropped_iter + full_size_iter
+    
+    if start_iter <= cropped_iter:
+        train_step = start_iter // cfg.train.grad_accum_steps
+    else:
+        train_step = (start_iter - cropped_iter) // cfg.train.full_image.grad_accum_steps
     
     checkpointer = PeriodicCheckpointer(
         fsdp_checkpointer,
@@ -126,4 +146,4 @@ def setup_training_components(cfg, model, resume):
         max_to_keep=3,
     )
     
-    return optimizer, schedulers, checkpointer, start_iter, max_iter
+    return optimizer, schedulers, checkpointer, start_iter, train_step, max_iter, full_size_iter

@@ -26,11 +26,11 @@ torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")
 
 
-def should_reset_grad(cfg, grad_accum_counter):
-    return grad_accum_counter % cfg.train.grad_accum_steps == 0
+def should_reset_grad(cfg, grad_accum_counter, accum_steps):
+    return grad_accum_counter % accum_steps == 0
 
-def should_apply_training_step(cfg, grad_accum_counter):
-    return (grad_accum_counter + 1) % cfg.train.grad_accum_steps == 0
+def should_apply_training_step(cfg, grad_accum_counter, accum_steps):
+    return (grad_accum_counter + 1) % accum_steps == 0
 
 def should_eval_model(cfg, iteration):
     return cfg.evaluation.eval_period_iterations > 0 and \
@@ -43,13 +43,22 @@ def train(
     optimizer,
     schedulers,
     checkpointer,
-    start_iter,
-    max_iter,
-    train_step
+    img_mode: str,
+    start_iter: int,
+    max_iter: int,
+    train_step: int
 ):
     fp16_scaler = model.fp16_scaler
     grad_accum_counter = 0
     iteration = start_iter
+    
+    if img_mode == "crop":
+        accum_steps = cfg.train.grad_accum_steps
+    elif img_mode == "full":
+        accum_steps = cfg.train.full_image.grad_accum_steps
+    else:
+        raise ValueError
+    
     for data in metric_logger.log_every(
         cfg.train.print_freq, "Training", max_iter, start_iter,
     ):
@@ -57,14 +66,14 @@ def train(
         if iteration > max_iter:
             return
         
-        if should_reset_grad(cfg, grad_accum_counter):
+        if should_reset_grad(cfg, grad_accum_counter, accum_steps):
             mom, teacher_temp = update_schedules(optimizer, schedulers, train_step)
             optimizer.zero_grad(set_to_none=True)
         
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
         
-        if should_apply_training_step(cfg, grad_accum_counter):
-            apply_gradient_operations(cfg, model, optimizer, fp16_scaler)
+        if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
+            apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps)
             model.update_teacher(mom)
             log_training_step(metric_logger, loss_dict, schedulers, train_step, current_batch_size)
             train_step += 1
@@ -83,22 +92,22 @@ def do_train(cfg, model, resume=False):
     inputs_dtype = torch.half
 
     (
-        optimizer, schedulers, checkpointer, start_iter, max_iter
+        optimizer,
+        schedulers,
+        checkpointer,
+        start_iter,
+        train_step,
+        max_iter,
+        full_size_iter
     ) = setup_training_components(cfg, model, resume)
-    
-    full_size_iterations = cfg.train.full_size_steps * cfg.train.grad_accum_steps
 
     iteration = start_iter
-    train_step = start_iter // cfg.train.grad_accum_steps
 
     logger.info("Starting training from iteration {}".format(start_iter))
     metric_logger = MetricLogger(
         delimiter="  ",
         output_file=os.path.join(cfg.train.output_dir, "training_metrics.json")
     )
-    
-    data_loader = setup_dataloader(cfg, "crop", inputs_dtype)
-    metric_logger.set_dataloader(data_loader)
     
     train_components = [
         cfg,
@@ -109,21 +118,26 @@ def do_train(cfg, model, resume=False):
         checkpointer
     ]
     
-    iteration, train_step = train(
-        *train_components,
-        start_iter=start_iter,
-        max_iter=max_iter - full_size_iterations,
-        train_step=train_step
-    )
+    if iteration < max_iter - full_size_iter:
+        data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=False)
+        metric_logger.set_dataloader(data_loader)
     
-    logger.info(
-        f"Finished training on resize-crop images. Resuming with full-size images for {full_size_iterations} steps"
-    )
+        iteration, train_step = train(
+            *train_components,
+            img_mode="crop",
+            start_iter=start_iter,
+            max_iter=max_iter - full_size_iter,
+            train_step=train_step
+        )
     
-    data_loader = setup_dataloader(cfg, "full", inputs_dtype)
+        logger.info(f"Finished training on resize-crop images.")
+    logger.info(f"Resuming with full-size images for {max_iter - iteration} steps")
+    
+    data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=True)
     metric_logger.set_dataloader(data_loader)
     train(
         *train_components,
+        img_mode="full",
         start_iter=iteration,
         max_iter=max_iter,
         train_step=train_step
