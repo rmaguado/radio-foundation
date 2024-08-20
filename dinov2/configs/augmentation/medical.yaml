@@ -1,48 +1,48 @@
 augmentations:
-    global_1:
-    - name: rotation
-        p: 0.8
-        degrees: 90
-    - name: globalcrop
-    - name: flip
-        p: 0.5
-    - name: contrast
-        p: 0.8
-        contrast: 0.4
-    - name: brightness
-        p: 0.8
-        brightness: 0.4
-    - name: blur
-        p: 1.0
-    global_2:
-    - name: globalcrop
-    - name: flip
-        p: 0.5
-    - name: contrast
-        p: 0.8
-        contrast: 0.4
-    - name: brightness
-        p: 0.8
-        brightness: 0.4
-    - name: solarize
-        p: 0.2
-        threshold: 0.5
-        max_value: 1.0
-    - name: noise
-        p: 0.5
-        noise_level: 0.02
-        max_value: 1.0
-    - name: blur
-        p: 0.1
-    local:
-    - name: lobalcrop
-    - name: flip
-        p: 0.5
-    - name: contrast
-        p: 0.8
-        contrast: 0.4
-    - name: brightness
-        p: 0.8
-        brightness: 0.4
-    - name: blur
-        p: 0.5
+  global_1:
+  - name: rotation
+    p: 0.8
+    degrees: 90
+  - name: globalcrop
+  - name: flip
+    p: 0.5
+  - name: contrast
+    p: 0.8
+    contrast: 0.4
+  - name: brightness
+    p: 0.8
+    brightness: 0.4
+  - name: blur
+    p: 1.0
+  global_2:
+  - name: globalcrop
+  - name: flip
+    p: 0.5
+  - name: contrast
+    p: 0.8
+    contrast: 0.4
+  - name: brightness
+    p: 0.8
+    brightness: 0.4
+  - name: solarize
+    p: 0.2
+    threshold: 0.5
+    max_value: 1.0
+  - name: noise
+    p: 0.5
+    noise_level: 0.02
+    max_value: 1.0
+  - name: blur
+    p: 0.1
+  local:
+  - name: lobalcrop
+  - name: flip
+    p: 0.5
+  - name: contrast
+    p: 0.8
+    contrast: 0.4
+  - name: brightness
+    p: 0.8
+    brightness: 0.4
+  - name: blur
+    p: 0.5

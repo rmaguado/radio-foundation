@@ -1,15 +1,15 @@
 train:
-    grad_accum_steps: 8
-    batch_size_per_gpu: 64
-    batch_size_overall: 2048
-    dataset_path: CtCollection:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
+  grad_accum_steps: 8
+  batch_size_per_gpu: 64
+  batch_size_overall: 2048
+  dataset_path: CtCollection:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
 student:
-    arch: vit_base
-    ffn_layer: "mlp"
-    drop_path_rate: 0.1
+  arch: vit_base
+  ffn_layer: "mlp"
+  drop_path_rate: 0.1
 teacher:
-    warmup_teacher_temp_epochs: 20
+  warmup_teacher_temp_epochs: 20
 optim:
-    epochs: 50
-    warmup_epochs: 10
-    base_lr: 0.003
+  epochs: 50
+  warmup_epochs: 10
+  base_lr: 0.003
