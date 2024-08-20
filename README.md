@@ -4,9 +4,11 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- add transform: window and clip image
-- implement more datasets and benchmarks
 - implement use multiple slices at once
+- write userguide for data processing
+- add unit tests
+- implement more datasets and benchmarks
+- add comments showing modification
 
 ## Overview
 
