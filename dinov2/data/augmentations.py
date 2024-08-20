@@ -21,18 +21,18 @@ class DataAugmentationDINO(object):
     def __init__(self, cfg, use_full_image: bool):
         self.local_crops_number = cfg.crops.local_crops_number
 
-        self.global1, self.global2, self.local = load_transforms_from_cfg(cfg, use_full_image)
+        self.global1, self.global2, self.local1 = load_transforms_from_cfg(cfg, use_full_image)
 
     def __call__(self, image):
         output = {}
 
-        global_crop_1 = self.global(image)
+        global_crop_1 = self.global1(image)
         global_crop_2 = self.global2(image)
 
         output["global_crops"] = [global_crop_1, global_crop_2]
         output["global_crops_teacher"] = [global_crop_1, global_crop_2]
 
-        local_crops = [self.local(image) for _ in range(self.crops.local_crops_number)]
+        local_crops = [self.local1(image) for _ in range(self.local_crops_number)]
         
         output["local_crops"] = local_crops
         output["offsets"] = ()
