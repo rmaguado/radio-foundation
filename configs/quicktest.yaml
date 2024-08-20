@@ -1,15 +1,8 @@
 train:
+  dataset_path: CtCollection:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
   grad_accum_steps: 2
   batch_size_per_gpu: 4
   batch_size_overall: 2048
-  dataset_path: CtCollection:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
-student:
-  arch: vit_small
-  ffn_layer: "mlp"
-  drop_path_rate: 0
-teacher:
-  warmup_teacher_temp_epochs: 4
-train:
   OFFICIAL_EPOCH_LENGTH: 10
   saveckp_iterations: 10
   print_freq: 1
@@ -19,6 +12,12 @@ train:
     grad_accum_steps: 4
 evaluation:
   eval_period_iterations: 10
+student:
+  arch: vit_small
+  ffn_layer: "mlp"
+  drop_path_rate: 0
+teacher:
+  warmup_teacher_temp_epochs: 4  
 optim:
   epochs: 8
   warmup_epochs: 10
