@@ -6,6 +6,9 @@
 import logging
 import os
 import torch
+import warnings
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from dinov2.logging import MetricLogger
 from dinov2.utils.config import setup
@@ -20,7 +23,6 @@ from dinov2.train.utils import (
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
 from dinov2.train.setup import setup_training_components, setup_dataloader
-
 
 torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")
@@ -158,6 +160,8 @@ def main(args):
     logger.info("Model:\n{}".format(model))
     
     do_train(cfg, model, resume=not args.no_resume)
+    
+    torch.distributed.destroy_process_group()
 
 
 if __name__ == "__main__":

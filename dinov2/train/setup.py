@@ -14,29 +14,29 @@ def build_optimizer(cfg, params_groups):
     return torch.optim.AdamW(params_groups, betas=(cfg.optim.adamw_beta1, cfg.optim.adamw_beta2))
 
 def build_schedulers(cfg):
-    OFFICIAL_EPOCH_LENGTH = cfg.train.OFFICIAL_EPOCH_LENGTH
+    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
     lr = dict(
         base_value=cfg.optim["lr"],
         final_value=cfg.optim["min_lr"],
-        total_iters=cfg.optim["epochs"] * OFFICIAL_EPOCH_LENGTH,
-        warmup_iters=cfg.optim["warmup_epochs"] * OFFICIAL_EPOCH_LENGTH,
+        total_iters=cfg.optim["epochs"] * epoch_len,
+        warmup_iters=cfg.optim["warmup_epochs"] * epoch_len,
         start_warmup_value=0,
     )
     wd = dict(
         base_value=cfg.optim["weight_decay"],
         final_value=cfg.optim["weight_decay_end"],
-        total_iters=cfg.optim["epochs"] * OFFICIAL_EPOCH_LENGTH,
+        total_iters=cfg.optim["epochs"] * epoch_len,
     )
     momentum = dict(
         base_value=cfg.teacher["momentum_teacher"],
         final_value=cfg.teacher["final_momentum_teacher"],
-        total_iters=cfg.optim["epochs"] * OFFICIAL_EPOCH_LENGTH,
+        total_iters=cfg.optim["epochs"] * epoch_len,
     )
     teacher_temp = dict(
         base_value=cfg.teacher["teacher_temp"],
         final_value=cfg.teacher["teacher_temp"],
-        total_iters=cfg.teacher["warmup_teacher_temp_epochs"] * OFFICIAL_EPOCH_LENGTH,
-        warmup_iters=cfg.teacher["warmup_teacher_temp_epochs"] * OFFICIAL_EPOCH_LENGTH,
+        total_iters=cfg.teacher["warmup_teacher_temp_epochs"] * epoch_len,
+        warmup_iters=cfg.teacher["warmup_teacher_temp_epochs"] * epoch_len,
         start_warmup_value=cfg.teacher["warmup_teacher_temp"],
     )
 
@@ -47,7 +47,7 @@ def build_schedulers(cfg):
     last_layer_lr_schedule = CosineScheduler(**lr)
 
     last_layer_lr_schedule.schedule[
-        : cfg.optim["freeze_last_layer_epochs"] * OFFICIAL_EPOCH_LENGTH
+        : cfg.optim["freeze_last_layer_epochs"] * epoch_len
     ] = 0
 
     return {
@@ -60,6 +60,9 @@ def build_schedulers(cfg):
 
 def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
 
+    image_size = cfg.student.full_image_size \
+    if use_full_image else cfg.crops.global_crops_size
+    
     patch_size = cfg.student.patch_size
     n_tokens = (image_size // patch_size) ** 2
     mask_generator = MaskingGenerator(
@@ -67,7 +70,7 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         max_num_patches=0.5 * image_size // patch_size * image_size // patch_size,
     )
 
-    data_transform = DataAugmentationDINO(cfg, use_full_image=image_mode=="full")
+    data_transform = DataAugmentationDINO(cfg, use_full_image)
 
     collate_fn = partial(
         collate_data_and_cast,
@@ -110,7 +113,7 @@ def get_full_size_iter(cfg):
     
 def get_cropped_iter(cfg):
     total_epochs = cfg.optim.epochs
-    full_img_epochs = cfg.train.full_image.epoch
+    full_img_epochs = cfg.train.full_image.epochs
     cropped_epochs = total_epochs - full_img_epochs
     epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
     accum_steps = cfg.train.grad_accum_steps
