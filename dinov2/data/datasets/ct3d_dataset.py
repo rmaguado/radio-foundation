@@ -12,6 +12,7 @@ import numpy as np
 import h5py
 
 from .ct_dataset import CtDataset
+from .extended import ExtendedVisionDataset
 
 logger = logging.getLogger("dinov2")
 
