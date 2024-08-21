@@ -4,10 +4,14 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
+- segmentation eval: add queue for difficult negative patches
+- config validation
+- unit tests for image transforms and data loaders
 - implement use multiple slices at once
+
 - write userguide for data processing
-- add unit tests
 - add docstrings and type hints
+- add unit tests
 - implement more datasets and benchmarks
 
 ## Overview
@@ -27,29 +31,53 @@ Here is an example of how the config file is parsed to select which transforms a
 
 ```
 augmentations:
-    crops:
-        local_crops_size: 98
-    norm:
-        mean: 0.124
-        std: 0.121
-    global_1:
-    - rotation_0.8_90
-    - crop
-    - contrast_0.8_0.4
-    - brightness_0.8_0.4
-    - blur_1
-    global_2:
-    - crop
-    - contrast_0.8_0.4
-    - brightness_0.8_0.4
-    - solarize_0.2_0.5_1
-    - noise_0.5_0.02_1
-    - blur_0.1
-    local:
-    - crop
-    - contrast_0.8_0.4
-    - brightness_0.8_0.4
-    - blur_0.5
+  global_1:
+  - name: rotation
+    p: 0.8
+    degrees: 90
+  - name: globalcrop
+  - name: flip
+    p: 0.5
+  - name: contrast
+    p: 0.8
+    contrast: 0.4
+  - name: brightness
+    p: 0.8
+    brightness: 0.4
+  - name: blur
+    p: 1.0
+  global_2:
+  - name: globalcrop
+  - name: flip
+    p: 0.5
+  - name: contrast
+    p: 0.8
+    contrast: 0.4
+  - name: brightness
+    p: 0.8
+    brightness: 0.4
+  - name: solarize
+    p: 0.2
+    threshold: 0.5
+    max_value: 1.0
+  - name: noise
+    p: 0.5
+    noise_level: 0.02
+    max_value: 1.0
+  - name: blur
+    p: 0.1
+  local:
+  - name: localcrop
+  - name: flip
+    p: 0.5
+  - name: contrast
+    p: 0.8
+    contrast: 0.4
+  - name: brightness
+    p: 0.8
+    brightness: 0.4
+  - name: blur
+    p: 0.5
 ```
 Check dinov2/data/transforms.py to check the parameter usage.
 

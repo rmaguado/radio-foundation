@@ -8,7 +8,6 @@ from functools import partial
 from omegaconf import OmegaConf
 
 from dinov2.data.samplers import InfiniteSampler
-from dinov2.data.datasets import LidcIdri, NsclcRadiomics
 from dinov2.models import build_model_from_cfg
 from dinov2.eval.utils import ModelWithIntermediateLayers
 from dinov2.utils.utils import load_pretrained_weights
@@ -17,55 +16,46 @@ from dinov2.utils.utils import load_pretrained_weights
 class ImageTransform:
     def __init__(self, img_size, mean, std):
         self.img_size = img_size
+        self.resize = transforms.Resize((img_size, img_size))
         self.normalize = transforms.Normalize(mean=mean, std=std)
 
     def __call__(self, image):
-        np_resized = np.expand_dims(
-            np.array(
-                image.resize((self.img_size, self.img_size))
-            ).astype(np.float32),
-            axis=0
-        )
-        return self.normalize(
-            torch.from_numpy(np_resized)
-        )
+        resized = self.resize(image)
+        normalized = self.normalize(resized)
+        return normalized
     
 class ImageTargetTransform:
     def __init__(self, img_size, mean, std):
         self.img_size = img_size
+        self.resize = transforms.Resize((img_size, img_size))
         self.normalize = transforms.Normalize(mean=mean, std=std)
 
     def __call__(self, image, target):
-        image_resized = np.expand_dims(
-            np.array(
-                image.resize((self.img_size, self.img_size))
-            ).astype(np.float32),
-            axis=0
-        )
-        target_resized = np.expand_dims(
-            np.array(
-                target.resize((self.img_size, self.img_size))
-            ).astype(np.float32),
-            axis=0
-        )
-        return self.normalize(
-            torch.from_numpy(image_resized)
-        ), torch.from_numpy(target_resized)
+        image_resized = self.resize(image)
+        target_resized = self.resize(target)
+        return self.normalize(image_resized), target_resized
 
 
 class LinearClassifier(nn.Module):
-    def __init__(self, embed_dim, hidden_dim, num_labels):
+    def __init__(self, embed_dim, hidden_dim, num_labels, dropout=0.5):
         super().__init__()
         
         self.mlp = nn.Sequential(
             nn.Linear(embed_dim, hidden_dim),
-            nn.ReLU(),
+            nn.LeakyReLU(),
+            nn.Dropout(p=dropout),
             nn.Linear(hidden_dim, num_labels)
         )
 
     def forward(self, x):
         return self.mlp(x)
 
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
 class DinoClassifier(nn.Module):
     USE_N_BLOCKS = 4
@@ -85,7 +75,8 @@ class DinoClassifier(nn.Module):
         ).to(device)
         
     def forward(self, image):
-        x_tokens_list = self.feature_model(image)
+        with torch.no_grad():
+            x_tokens_list = self.feature_model(image)
         intermediate_output = x_tokens_list[-DinoClassifier.USE_N_BLOCKS:]
         class_tokens = torch.cat([class_token for _, class_token in intermediate_output], dim=-1)
         return self.classifier(class_tokens)
@@ -170,9 +161,6 @@ def load_model(path_to_run, checkpoint_name, device):
     
     return feature_model, config
     
-def get_norm(cfg):
-    return cfg.norm.mean, cfg.norm.std
-
 def multiclass_accuracy_logits(outputs, targets):    
     predicted_labels = torch.argmax(outputs.detach().cpu(), dim=1)
     correct_predictions = (predicted_labels == targets.cpu())
@@ -222,6 +210,6 @@ def get_dataloader(dataset, is_infinite=False):
         return iter(loader)
     
     return torch.utils.data.DataLoader(
-            dataset,
-            **loader_kwargs
-        )
+        dataset,
+        **loader_kwargs
+    )
