@@ -25,6 +25,7 @@ class Ct3DDataset(ExtendedVisionDataset):
         split: str,
         root: str,
         extra: str,
+        slices: str,
         transforms: Optional[Callable] = None,
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
@@ -39,6 +40,7 @@ class Ct3DDataset(ExtendedVisionDataset):
             target_transform=target_transform,
             enable_targets=enable_targets
         )
+        self.slice_count = int(slices)
 
     def _get_entries(self) -> np.ndarray:
         if self._entries is None:
