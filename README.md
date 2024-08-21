@@ -5,6 +5,7 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 ### TODO
 
 - implement use multiple slices at once
+- redesign entries for possible multiple files (entry file only contains series ids, generate indexes for slices during runtime)
 - config validation
 - unit tests for image transforms and data loaders
 
@@ -12,6 +13,7 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 - add docstrings and type hints
 - add unit tests
 - implement more datasets and benchmarks
+- use various PatchEmbed modules (from dinov2.layers) for different modalities / num slices
 
 ## Overview
 
