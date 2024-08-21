@@ -10,7 +10,7 @@ from typing import Any, Callable, List, Optional, TypeVar
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import ImageNet, CtDataset, CtCollection
+from .datasets import ImageNet, CtDataset, CtCollection, Ct3DDataset
 from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 
 
@@ -49,7 +49,7 @@ def _parse_dataset_str(dataset_str: str):
 
     for token in tokens[1:]:
         key, value = token.split("=")
-        assert key in ("root", "extra", "split")
+        assert key in ("root", "extra", "split", "slices")
         kwargs[key] = value
 
     if name == "ImageNet":
@@ -58,6 +58,8 @@ def _parse_dataset_str(dataset_str: str):
             kwargs["split"] = ImageNet.Split[kwargs["split"]]
     elif name == 'CtDataset':
         class_ = CtDataset
+    elif name == "Ct3DDataset":
+        class_ = Ct3DDataset
     elif name == "CtCollection":
         class_ = CtCollection
     else:

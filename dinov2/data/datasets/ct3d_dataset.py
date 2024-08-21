@@ -58,4 +58,4 @@ class Ct3DDataset(ExtendedVisionDataset):
             data = f["data"]
             image = data[slice_index:slice_index+self.slice_count].astype(np.float32)
             
-        return torch.from_numpy(image).unsqueeze(0)
+        return torch.from_numpy(image)
