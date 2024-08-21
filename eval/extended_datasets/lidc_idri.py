@@ -2,10 +2,10 @@ import os
 import h5py
 import torch
 
-from dinov2.data.datasets import LidcIdri
+from dinov2.data.datasets import CtDataset
 
 
-class LidcIdriNodules(LidcIdri):
+class LidcIdriNodules(CtDataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, enable_targets=True)
                 

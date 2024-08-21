@@ -2,10 +2,10 @@ import os
 import json
 import torch
 
-from dinov2.data.datasets import NsclcRadiomics
+from dinov2.data.datasets import CtDataset
 
 
-class NsclcRadiomicsEvalSex(NsclcRadiomics):
+class NsclcRadiomicsEvalSex(CtDataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, enable_targets=True)
         self.series_targets = dict()

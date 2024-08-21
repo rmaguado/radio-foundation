@@ -2,10 +2,10 @@ import os
 import json
 import torch
 
-from dinov2.data.datasets import NsclcRadiogenomics
+from dinov2.data.datasets import CtDataset
 
 
-class NsclcRadiogenomicsEvalSmokers(NsclcRadiogenomics):
+class NsclcRadiogenomicsEvalSmokers(CtDataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, enable_targets=True)
         self.series_targets = dict()
