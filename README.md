@@ -4,10 +4,9 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- segmentation eval: add queue for difficult negative patches
+- implement use multiple slices at once
 - config validation
 - unit tests for image transforms and data loaders
-- implement use multiple slices at once
 
 - write userguide for data processing
 - add docstrings and type hints
