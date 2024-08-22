@@ -4,8 +4,28 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- implement use multiple slices at once
 - redesign entries for possible multiple files (entry file only contains series ids, generate indexes for slices during runtime)
+- create dataset 
+
+Example datasets folder layout
+```
+datasets
++- LIDC-IDRI
+|  +- data
+|  |  +- series_0000
+|  |     +- image.h5
+|  |     +- metadata.json
+|  |  +- ...
+|  +- extra
+|     +- splits.json
++- ...
++- __init__.py
++- dataset.py
++- entries.py
+```
+
+
+- implement use multiple slices at once
 - config validation
 - unit tests for image transforms and data loaders
 
