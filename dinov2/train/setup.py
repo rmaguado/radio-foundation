@@ -60,6 +60,7 @@ def build_schedulers(cfg):
 
 def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
 
+    num_slices = cfg.student.channels
     image_size = cfg.student.full_image_size \
     if use_full_image else cfg.crops.global_crops_size
     

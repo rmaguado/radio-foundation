@@ -24,15 +24,15 @@ class CtDataset(ExtendedVisionDataset):
         split: str,
         root: str,
         extra: str,
+        num_slices: int,
         transforms: Optional[Callable] = None,
         transform: Optional[Callable] = None,
-        target_transform: Optional[Callable] = None,
-        enable_targets: bool = False
+        target_transform: Optional[Callable] = None
     ) -> None:
         super().__init__(root, transforms, transform, target_transform)
         self._extra_root = extra
         self._split = split
-        self.enable_targets = enable_targets
+        self._num_slices = num_slices
         
         self._entries = None
 
@@ -57,7 +57,7 @@ class CtDataset(ExtendedVisionDataset):
         return torch.from_numpy(image).unsqueeze(0)
 
     def get_target(self, index: int) -> Optional[Any]:
-        raise NotImplementedError
+        return None
 
     def get_targets(self) -> Optional[np.ndarray]:
         entries = self._get_entries()
@@ -73,10 +73,7 @@ class CtDataset(ExtendedVisionDataset):
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
             
-        if self.enable_targets:
-            target = self.get_target(index)
-        else:
-            target = None
+        target = self.get_target(index)
             
         if self.transforms is not None:
             image, target = self.transforms(image, target)
