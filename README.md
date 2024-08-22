@@ -5,7 +5,6 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 ### TODO
 
 - redesign entries for possible multiple files (entry file only contains series ids, generate indexes for slices during runtime)
-- create dataset 
 
 Example datasets folder layout
 ```
