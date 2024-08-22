@@ -10,7 +10,7 @@ from typing import Any, Callable, List, Optional, TypeVar
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import ImageNet, CtDataset, CtCollection, Ct3DDataset
+from .datasets import CtDataset, CtCollection
 from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 
 
@@ -52,14 +52,8 @@ def _parse_dataset_str(dataset_str: str):
         assert key in ("root", "extra", "split", "slices")
         kwargs[key] = value
 
-    if name == "ImageNet":
-        class_ = ImageNet
-        if "split" in kwargs:
-            kwargs["split"] = ImageNet.Split[kwargs["split"]]
-    elif name == 'CtDataset':
+    if name == 'CtDataset':
         class_ = CtDataset
-    elif name == "Ct3DDataset":
-        class_ = Ct3DDataset
     elif name == "CtCollection":
         class_ = CtCollection
     else:
@@ -71,6 +65,7 @@ def _parse_dataset_str(dataset_str: str):
 def make_dataset(
     *,
     dataset_str: str,
+    num_slices: int,
     transform: Optional[Callable] = None,
     target_transform: Optional[Callable] = None,
 ):
@@ -79,6 +74,7 @@ def make_dataset(
 
     Args:
         dataset_str: A dataset string description (e.g. ImageNet:split=TRAIN).
+        num_slices: Number of slices to take from a 3d volume.
         transform: A transform to apply to images.
         target_transform: A transform to apply to targets.
 
@@ -88,7 +84,7 @@ def make_dataset(
     logger.info(f'using dataset: "{dataset_str}"')
 
     class_, kwargs = _parse_dataset_str(dataset_str)
-    dataset = class_(transform=transform, target_transform=target_transform, **kwargs)
+    dataset = class_(num_slices=num_slices, transform=transform, target_transform=target_transform, **kwargs)
 
     logger.info(f"# of dataset samples: {len(dataset):,d}")
 
