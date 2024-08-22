@@ -16,7 +16,7 @@ from .ct_dataset import CtDataset
 logger = logging.getLogger("dinov2")
 
 
-class CtCollection(CtDataset):
+class MultiDataset(CtDataset):
 
     def __init__(
         self,
@@ -26,8 +26,7 @@ class CtCollection(CtDataset):
         extra: str,
         transforms: Optional[Callable] = None,
         transform: Optional[Callable] = None,
-        target_transform: Optional[Callable] = None,
-        enable_targets: bool = False
+        target_transform: Optional[Callable] = None
     ) -> None:
         super().__init__(
             split=split,
@@ -35,8 +34,7 @@ class CtCollection(CtDataset):
             extra=extra,
             transforms=transforms,
             transform=transform,
-            target_transform=target_transform,
-            enable_targets=enable_targets
+            target_transform=target_transform
         )
 
 
@@ -55,4 +53,4 @@ class CtCollection(CtDataset):
         return torch.from_numpy(image).unsqueeze(0)
 
     def get_target(self, index: int) -> Optional[Any]:
-        raise NotImplementedError
+        return None
