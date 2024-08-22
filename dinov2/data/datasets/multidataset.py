@@ -24,6 +24,7 @@ class MultiDataset(CtDataset):
         split: str,
         root: str,
         extra: str,
+        num_slices: int,
         transforms: Optional[Callable] = None,
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None
@@ -32,12 +33,12 @@ class MultiDataset(CtDataset):
             split=split,
             root=root,
             extra=extra,
+            num_slices=num_slices,
             transforms=transforms,
             transform=transform,
             target_transform=target_transform
         )
-
-
+    
     def get_image_data(self, index: int) -> np.ndarray:
         entries = self._get_entries()
         dataset = entries[index]["dataset"]
@@ -49,8 +50,5 @@ class MultiDataset(CtDataset):
         with h5py.File(image_full_path, 'r') as f:
             data = f["data"]
             image = data[slice_index].astype(np.float32)
-            
-        return torch.from_numpy(image).unsqueeze(0)
-
-    def get_target(self, index: int) -> Optional[Any]:
-        return None
+        
+        return torch.from_numpy(image)

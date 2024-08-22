@@ -32,7 +32,7 @@ class CtDataset(ExtendedVisionDataset):
         super().__init__(root, transforms, transform, target_transform)
         self._extra_root = extra
         self._split = split
-        self._num_slices = num_slices
+        self.num_slices = num_slices
         
         self._entries = None
 
@@ -52,30 +52,10 @@ class CtDataset(ExtendedVisionDataset):
         
         with h5py.File(image_full_path, 'r') as f:
             data = f["data"]
-            image = data[slice_index].astype(np.float32)
+            image = data[slice_index:slice_index+self.num_slices].astype(np.float32)
             
-        return torch.from_numpy(image).unsqueeze(0)
-
-    def get_target(self, index: int) -> Optional[Any]:
-        return None
-
-    def get_targets(self) -> Optional[np.ndarray]:
-        entries = self._get_entries()
-        return [self.get_target(i) for i in range(len(entries))]
+        return torch.from_numpy(image)
 
     def __len__(self) -> int:
         entries = self._get_entries()
         return len(entries)
-
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
-        try:
-            image = self.get_image_data(index)
-        except Exception as e:
-            raise RuntimeError(f"can not read image for sample {index}") from e
-            
-        target = self.get_target(index)
-            
-        if self.transforms is not None:
-            image, target = self.transforms(image, target)
-            
-        return image, target

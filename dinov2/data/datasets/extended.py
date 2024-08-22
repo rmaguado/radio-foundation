@@ -14,15 +14,20 @@ class ExtendedVisionDataset(VisionDataset):
 
     def get_image_data(self, index: int) -> bytes:
         raise NotImplementedError
+        
+    def get_target(self, index: int) -> Optional[Any]:
+        return None
 
-    def get_target(self, index: int) -> Any:
-        raise NotImplementedError
+    def get_targets(self) -> Optional[np.ndarray]:
+        entries = self._get_entries()
+        return [self.get_target(i) for i in range(len(entries))]
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         try:
             image = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
+        
         target = self.get_target(index)
 
         if self.transforms is not None:
