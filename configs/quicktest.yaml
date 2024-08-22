@@ -1,5 +1,5 @@
 train:
-  dataset_path: CtCollection:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
+  dataset_path: MultiDataset:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
   grad_accum_steps: 2
   batch_size_per_gpu: 4
   batch_size_overall: 2048

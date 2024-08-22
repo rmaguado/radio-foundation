@@ -10,7 +10,7 @@ from typing import Any, Callable, List, Optional, TypeVar
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import CtDataset, CtCollection
+from .datasets import CtDataset, MultiDataset
 from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 
 
@@ -54,8 +54,8 @@ def _parse_dataset_str(dataset_str: str):
 
     if name == 'CtDataset':
         class_ = CtDataset
-    elif name == "CtCollection":
-        class_ = CtCollection
+    elif name == "MultiDataset":
+        class_ = MultiDataset
     else:
         raise ValueError(f'Unsupported dataset "{name}"')
 
