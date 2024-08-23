@@ -62,7 +62,6 @@ train:
   grad_accum_steps: 1
   batch_size_per_gpu: 64
   batch_size_overall: 3072
-  dataset_path: MultiDataset:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
   output_dir: .
   saveckp_iterations: 5000
   print_freq: 100
@@ -77,6 +76,13 @@ train:
     grad_accum_steps: 4
 evaluation:
   eval_period_iterations: 10000
+data:
+  root_path: ./datasets
+  datasets:
+  - name: LIDC-IDRI
+    type: ct
+    split: train
+    num_slices: 1
 student:
   arch: vit_large
   patch_size: 14
