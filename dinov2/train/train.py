@@ -152,7 +152,7 @@ def do_train(cfg, model, resume=False):
 
     metric_logger.synchronize_between_processes()
 
-    return metric_logger.meters.items()
+    return {k: meter.avg for k, meter in metric_logger.meters.items()}
 
 
 def main(args):

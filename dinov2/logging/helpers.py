@@ -1,8 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-#
-# This source code is licensed under the Apache License, Version 2.0
-# found in the LICENSE file in the root directory of this source tree.
-
 from collections import defaultdict
 import datetime
 import json
@@ -19,8 +14,7 @@ logger = logging.getLogger("dinov2")
 
 class MetricLogger(object):
     def __init__(self, delimiter="\t", output_file=None):
-        self.meters = defaultdict(float)
-        self.counts = defaultdict(int)
+        self.meters = defaultdict(RunningAverage)
         self.delimiter = delimiter
         self.output_file = output_file
         self.dataloader = None
@@ -33,28 +27,29 @@ class MetricLogger(object):
             if isinstance(v, torch.Tensor):
                 v = v.item()
             assert isinstance(v, (float, int))
-            self.meters[k] += v
-            self.counts[k] += 1
+            self.meters[k].update(v)
 
-    def synchronize_between_processes(self):
-        """Synchronize metrics between processes in distributed training."""
-        if not distributed.is_enabled():
-            return
-        for meter_name, meter_value in self.meters.items():
-            t = torch.tensor(
-                [meter_value, self.counts[meter_name]],
-                dtype=torch.float64,
-                device="cuda",
-            )
-            torch.distributed.barrier()
-            torch.distributed.all_reduce(t)
-            self.meters[meter_name], self.counts[meter_name] = t.tolist()
+    def __getattr__(self, attr):
+        if attr in self.meters:
+            return self.meters[attr]
+        if attr in self.__dict__:
+            return self.__dict__[attr]
+        raise AttributeError(
+            "'{}' object has no attribute '{}'".format(type(self).__name__, attr)
+        )
 
     def __str__(self):
-        return self.delimiter.join(
-            f"{name}: {value / self.counts[name]:.4f}"
-            for name, value in self.meters.items()
-        )
+        loss_str = []
+        for name, meter in self.meters.items():
+            loss_str.append("{}: {:.4f}".format(name, meter.avg))
+        return self.delimiter.join(loss_str)
+
+    def synchronize_between_processes(self):
+        for meter in self.meters.values():
+            meter.synchronize_between_processes()
+
+    def add_meter(self, name, meter):
+        self.meters[name] = meter
 
     def dump_in_output_file(self, iteration, iter_time, data_time):
         if self.output_file is None or not distributed.is_main_process():
@@ -64,8 +59,8 @@ class MetricLogger(object):
             iter_time=iter_time,
             data_time=data_time,
         )
-        dict_to_dump.update({k: v / self.counts[k] for k, v in self.meters.items()})
-        with open(self.output_file, "a", encoding="utf-8") as f:
+        dict_to_dump.update({k: v.avg for k, v in self.meters.items()})
+        with open(self.output_file, "a") as f:
             f.write(json.dumps(dict_to_dump) + "\n")
 
     def log_every(self, print_freq, header=None, n_iterations=None, start_iteration=0):
@@ -75,6 +70,8 @@ class MetricLogger(object):
             header = ""
         start_time = time.time()
         end = time.time()
+        iter_time = RunningAverage()
+        data_time = RunningAverage()
 
         if n_iterations is None:
             n_iterations = len(iterable)
@@ -86,25 +83,23 @@ class MetricLogger(object):
             "[{0" + space_fmt + "}/{1}]",
             "eta: {eta}",
             "{meters}",
-            "time: {time:.4f}",
-            "data: {data:.4f}",
+            "time: {time:.6f}",
+            "data: {data:.6f}",
         ]
         if torch.cuda.is_available():
             log_list += ["max mem: {memory:.0f}"]
 
         log_msg = self.delimiter.join(log_list)
         MB = 1024.0 * 1024.0
-
         for obj in iterable:
-            data_time = time.time() - end
+            data_time.update(time.time() - end)
             yield obj
-            iter_time = time.time() - end
+            iter_time.update(time.time() - end)
             if i % print_freq == 0 or i == n_iterations - 1:
-                self.synchronize_between_processes()  # Ensure metrics are synchronized
                 self.dump_in_output_file(
-                    iteration=i, iter_time=iter_time, data_time=data_time
+                    iteration=i, iter_time=iter_time.avg, data_time=data_time.avg
                 )
-                eta_seconds = iter_time * (n_iterations - i)
+                eta_seconds = iter_time.avg * (n_iterations - i)
                 eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
                 if torch.cuda.is_available():
                     logger.info(
@@ -113,8 +108,8 @@ class MetricLogger(object):
                             n_iterations,
                             eta=eta_string,
                             meters=str(self),
-                            time=iter_time,
-                            data=data_time,
+                            time=iter_time.avg,
+                            data=data_time.avg,
                             memory=torch.cuda.max_memory_allocated() / MB,
                         )
                     )
@@ -125,8 +120,8 @@ class MetricLogger(object):
                             n_iterations,
                             eta=eta_string,
                             meters=str(self),
-                            time=iter_time,
-                            data=data_time,
+                            time=iter_time.avg,
+                            data=data_time.avg,
                         )
                     )
             i += 1
@@ -134,11 +129,38 @@ class MetricLogger(object):
             if i >= n_iterations:
                 break
         total_time = time.time() - start_time
-        seconds_per_iteration = total_time / n_iterations
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logger.info(
-            "%s Total time: %s (%.4f s / it)",
-            header,
-            total_time_str,
-            seconds_per_iteration,
+            "{} Total time: {} ({:.6f} s / it)".format(
+                header, total_time_str, total_time / n_iterations
+            )
         )
+
+
+class RunningAverage:
+    """Track a running average of a series of values."""
+
+    def __init__(self):
+        self.total = 0.0
+        self.count = 0
+
+    def update(self, value, num=1):
+        self.count += num
+        self.total += value * num
+
+    @property
+    def avg(self):
+        return self.total / self.count if self.count > 0 else 0.0
+
+    def synchronize_between_processes(self):
+        """
+        Distributed synchronization of the metric
+        """
+        if not distributed.is_enabled():
+            return
+        t = torch.tensor([self.count, self.total], dtype=torch.float64, device="cuda")
+        torch.distributed.barrier()
+        torch.distributed.all_reduce(t)
+        t = t.tolist()
+        self.count = int(t[0])
+        self.total = t[1]
