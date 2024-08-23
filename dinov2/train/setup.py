@@ -82,11 +82,7 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         dtype=inputs_dtype,
     )
 
-    dataset = make_dataset(
-        dataset_str=cfg.train.dataset_path,
-        transform=data_transform,
-        target_transform=lambda _: (),
-    )
+    dataset = make_dataset(cfg, transform=data_transform)
     
     batch_size = cfg.train.full_image.batch_size_per_gpu \
     if use_full_image else cfg.train.batch_size_per_gpu
