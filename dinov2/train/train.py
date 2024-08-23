@@ -118,7 +118,6 @@ def do_train(cfg, model, resume=False):
 
     logger.info("Starting training from iteration {}".format(start_iter))
     metric_logger = MetricLogger(
-        delimiter="  ",
         output_file=os.path.join(cfg.train.output_dir, "training_metrics.json"),
     )
 
