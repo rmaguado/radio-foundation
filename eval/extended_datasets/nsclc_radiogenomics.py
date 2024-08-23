@@ -10,20 +10,21 @@ class NsclcRadiogenomicsEvalSmokers(CtDataset):
         super().__init__(*args, **kwargs, enable_targets=True)
         self.series_targets = dict()
         self.extend_entries()
-    
+
     def extend_entries(self):
         entries = self._get_entries()
         series_ids = list(set([x[0] for x in entries]))
-        
+
         for s_id in series_ids:
-            path_to_meta = os.path.join("../datasets/NSCLC-Radiogenomics/data/", s_id, "metadata.json")
+            path_to_meta = os.path.join(
+                "../datasets/NSCLC-Radiogenomics/data/", s_id, "metadata.json"
+            )
             with open(path_to_meta, "rb") as f:
                 metadata = json.load(f)
-                #self.series_targets[s_id] = [
-                #    "Nonsmoker", "Current", "Former", 
-                #].index(metadata["other"]["smoking_status"])
-                self.series_targets[s_id] = int(metadata["other"]["smoking_status"] == "Nonsmoker")
-    
+                self.series_targets[s_id] = int(
+                    metadata["other"]["smoking_status"] == "Nonsmoker"
+                )
+
     def get_target(self, index: int):
         entries = self._get_entries()
         series_id = entries[index][0]

@@ -14,6 +14,7 @@ logger = logging.getLogger("dinov2")
 err_drop_path = "Drop path is not supported for ViT-Small. \
 Please set drop_path_rate to 0 in the config."
 
+
 def build_model(args, only_teacher=False, img_size=224):
     args.arch = args.arch.removesuffix("_memeff")
     if "vit" in args.arch:
@@ -46,4 +47,6 @@ def build_model(args, only_teacher=False, img_size=224):
 
 
 def build_model_from_cfg(cfg, only_teacher=False):
-    return build_model(cfg.student, only_teacher=only_teacher, img_size=cfg.student.full_image_size)
+    return build_model(
+        cfg.student, only_teacher=only_teacher, img_size=cfg.student.full_image_size
+    )

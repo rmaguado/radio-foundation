@@ -30,7 +30,10 @@ def _make_bool_str(b: bool) -> str:
     return "yes" if b else "no"
 
 
-def _make_sample_transform(image_transform: Optional[Callable] = None, target_transform: Optional[Callable] = None):
+def _make_sample_transform(
+    image_transform: Optional[Callable] = None,
+    target_transform: Optional[Callable] = None,
+):
     def transform(sample):
         image, target = sample
         if image_transform is not None:
@@ -41,59 +44,61 @@ def _make_sample_transform(image_transform: Optional[Callable] = None, target_tr
 
     return transform
 
-    
+
 def make_dataset(
     config: DictConfig,
     transform: Callable,
-    target_transform: Optional[Callable] = lambda _:_
+    target_transform: Optional[Callable] = lambda _: _,
 ) -> Union[ImageDataset, VolumeDataset, MultiDataset]:
     """
     Parse the dataset from the given OmegaConf configuration.
-    
+
     Args:
         config (DictConfig): The OmegaConf dictionary configuration for the dataset.
         transform (Optional[Callable]): Function to be applied to images.
         target_transform (Optional[Callable]): Function to be applied to targets.
-    
+
     Returns:
         Union[ImageDataset, VolumeDataset, MultiDataset]: The corresponding dataset object(s).
     """
+
     def create_volume_dataset(dataset_config, **kwargs):
-        return VolumeDataset(
-            **kwargs,
-            num_slices=dataset_config.get("num_slices", 1)
-        )
+        return VolumeDataset(**kwargs, num_slices=dataset_config.get("num_slices", 1))
 
     dataset_mapping = {
         "ct": create_volume_dataset,
         "mri": create_volume_dataset,
-        "xray": ImageDataset
+        "xray": ImageDataset,
     }
-    
+
     root_path = config.data.root_path
     datasets = config.data.datasets
     dataset_objects = []
-    
+
     for dataset_config in datasets:
         dataset_name = dataset_config.name
         dataset_type = dataset_config.type
-        
+
         dataset_kwargs = {
             "root_path": root_path,
             "dataset_name": dataset_name,
             "output_path": config.train.output_dir,
             "split": dataset_config.split,
             "transform": transform,
-            "target_transform": target_transform
+            "target_transform": target_transform,
         }
-        
+
         if dataset_type not in dataset_mapping:
             raise ValueError(f"Unknown dataset type: {dataset_type}")
-        
+
         dataset_object = dataset_mapping[dataset_type](dataset_config, **dataset_kwargs)
         dataset_objects.append(dataset_object)
-    
-    return dataset_objects[0] if len(dataset_objects) == 1 else MultiDataset(dataset_objects)
+
+    return (
+        dataset_objects[0]
+        if len(dataset_objects) == 1
+        else MultiDataset(dataset_objects)
+    )
 
 
 def _make_sampler(

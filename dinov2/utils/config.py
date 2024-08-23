@@ -23,7 +23,10 @@ def apply_scaling_rules_to_cfg(cfg):  # to fix
         base_lr = cfg.optim.base_lr
         cfg.optim.lr = base_lr
         cfg.optim.lr *= math.sqrt(
-            cfg.train.grad_accum_steps * cfg.train.batch_size_per_gpu * distributed.get_global_size() / cfg.train.batch_size_overall
+            cfg.train.grad_accum_steps
+            * cfg.train.batch_size_per_gpu
+            * distributed.get_global_size()
+            / cfg.train.batch_size_overall
         )
         logger.info(f"sqrt scaling learning rate; base: {base_lr}, new: {cfg.optim.lr}")
     else:
@@ -59,7 +62,9 @@ def default_setup(args):
 
     utils.fix_random_seeds(seed + rank)
     logger.info("git:\n  {}\n".format(utils.get_sha()))
-    logger.info("\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items())))
+    logger.info(
+        "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items()))
+    )
 
 
 def setup(args):

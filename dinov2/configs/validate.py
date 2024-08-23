@@ -1,5 +1,12 @@
 from omegaconf import DictConfig
 
+def dataset_validation(config: DictConfig) -> None:
+    """Validate the dataset configuration.
+    Check that datasets can be found and are formatted correctly.
+    Check for no issues with num_slices.
+    """
+    raise NotImplementedError("Dataset validation is not implemented yet.")
+
 def validate_config(config: DictConfig) -> None:
     errors = []
     
