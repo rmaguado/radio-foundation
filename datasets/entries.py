@@ -11,20 +11,20 @@ def assign_subsets(data, proportions):
     Assign each series into a subsets based on the given proportions.
     """
     random.shuffle(data)
+    assignments = {}
     num_items = len(data)
     start_index = 0
-    assignments = {}
-    
     for subset_name, proportion in proportions.items():
         subset_size = int(proportion * num_items)
         end_index = start_index + subset_size
-        for d in data[start_index:end_index]:
-            assignments[d] = subset_name
+        assignments[subset_name] = data[start_index:end_index]
         start_index = end_index
     
     if start_index < num_items:
-        for d in data[start_index:]:
-            assignments[d] = list(proportions.keys())[0]
+        assignments[list(proportions.keys())[0]] += data[start_index:]
+        
+    for subset in assignments.values():
+        subset.sort()
     
     return assignments
 
@@ -41,19 +41,22 @@ def load_slice_counts(base_dir, series_ids):
     
     return slice_counts
 
-def compile_entries(series_ids, assignments, slice_counts):
-    series_ids.sort()
-    entries = OrderedDict([
-        (s_id, {
-            "split": assignments[s_id],
-            "slices": slice_counts[s_id]
-        }) for s_id in series_ids
-    ])
+def compile_entries(subsets, slice_counts):
+    entries = {}
+    
+    for subset_name, series_ids in subsets.items():
+        entry = OrderedDict([
+            (s_id, {
+                "slices": slice_counts[s_id]
+            }) for s_id in series_ids
+        ])
+        entries[subset_name] = entry
     return entries
     
 def save_entries(target_path, entries_data):
-    with open(os.path.join(target_path, "entries.json"), "w") as f:
-        json.dump(entries_data, f)
+    for subset_name, entry in entries_data.items():
+        with open(os.path.join(target_path, f"{subset_name}.json"), "w") as f:
+            json.dump(entry, f, allow_nan=False, indent="    ")
 
 def main(dataset_name):
     base_dir = os.path.join("datasets", dataset_name, "data")
@@ -68,8 +71,8 @@ def main(dataset_name):
     slice_counts = load_slice_counts(base_dir, series_ids)
 
     splits = {"train": 0.8, "val": 0.2}
-    assignments = assign_subsets(series_ids, splits)    
-    entries = compile_entries(series_ids, assignments, slice_counts)
+    subsets = assign_subsets(series_ids, splits)    
+    entries = compile_entries(subsets, slice_counts)
     
     save_entries(target_path, entries)
 
