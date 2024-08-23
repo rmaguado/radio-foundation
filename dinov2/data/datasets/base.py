@@ -5,12 +5,36 @@
 
 from typing import Any, Tuple, Optional
 import torch
+import numpy as np
+import os
+
+import torch.distributed as dist
 
 
 class BaseDataset:
     def __init__(self):
         self.transform = lambda _: _
         self.target_transform = lambda _: _
+        self.dataset_name = "DatasetNotGiven"
+        self.output_path = "OutputPathNotGiven"
+
+    def get_entries(self) -> np.ndarray:
+        entries_path = os.path.join(self.output_path, "entries")
+        os.makedirs(entries_path, exist_ok=True)
+
+        entries_dataset_path = os.path.join(entries_path, f"{self.dataset_name}.npy")
+
+        if dist.is_initialized() and dist.get_rank() == 0:
+            if not os.path.exists(entries_dataset_path):
+                self.create_entries(entries_dataset_path)
+
+        if dist.is_initialized():
+            dist.barrier()
+
+        return np.load(entries_dataset_path, mmap_mode="r")
+
+    def create_entries(self, entries_dataset_path: str) -> np.ndarray:
+        raise NotImplementedError
 
     def get_image_data(self, index: int) -> torch.tensor:
         raise NotImplementedError

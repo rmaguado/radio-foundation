@@ -41,15 +41,6 @@ class ImageDataset(BaseDataset):
         self.entries = self.get_entries()
         self.data_path = os.path.join(root_path, dataset_name, "data")
 
-    def get_entries(self) -> np.ndarray:
-        entries_path = os.path.join(self.output_path, "entries")
-        os.makedirs(entries_path, exist_ok=True)
-
-        entries_dataset_path = os.path.join(entries_path, f"{self.dataset_name}.npy")
-        if os.path.exists(entries_dataset_path):
-            return np.load(entries_dataset_path, mmap_mode="r")
-        return self.create_entries(entries_dataset_path)
-
     def create_entries(self, entries_dataset_path):
         split_path = os.path.join(
             self.root_path, self.dataset_name, f"extra/{self.split}.json"
