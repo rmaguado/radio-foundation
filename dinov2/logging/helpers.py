@@ -65,7 +65,7 @@ class MetricLogger(object):
             data_time=data_time,
         )
         dict_to_dump.update({k: v / self.counts[k] for k, v in self.meters.items()})
-        with open(self.output_file, "a") as f:
+        with open(self.output_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(dict_to_dump) + "\n")
 
     def log_every(self, print_freq, header=None, n_iterations=None, start_iteration=0):
@@ -134,7 +134,11 @@ class MetricLogger(object):
             if i >= n_iterations:
                 break
         total_time = time.time() - start_time
+        seconds_per_iteration = total_time / n_iterations
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logger.info(
-            f"{header} Total time: {total_time_str} ({total_time / n_iterations:.4f} s / it)"
+            "%s Total time: %s (%.4f s / it)",
+            header,
+            total_time_str,
+            seconds_per_iteration,
         )
