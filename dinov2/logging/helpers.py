@@ -13,7 +13,7 @@ logger = logging.getLogger("dinov2")
 
 class MetricLogger(object):
     def __init__(self, delimiter="    ", output_file=None, window_size=20):
-        self.meters = defaultdict(lambda: SimpleAverage(window_size))
+        self.meters = defaultdict(lambda: Metric(window_size))
         self.delimiter = delimiter
         self.output_file = output_file
         self.dataloader = None
@@ -69,8 +69,8 @@ class MetricLogger(object):
             header = ""
         start_time = time.time()
         end = time.time()
-        iter_time = SimpleAverage()
-        data_time = SimpleAverage()
+        iter_time = Metric()
+        data_time = Metric()
 
         if n_iterations is None:
             n_iterations = len(iterable)
@@ -136,7 +136,7 @@ class MetricLogger(object):
         )
 
 
-class SimpleAverage:
+class Metric:
     """Track a series of values and provide access to the average over a sliding window."""
 
     def __init__(self, window_size=20):
