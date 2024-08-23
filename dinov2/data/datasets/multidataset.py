@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import Callable, Optional, Any, Tuple
+import numpy as np
 
 logger = logging.getLogger("dinov2")
 
