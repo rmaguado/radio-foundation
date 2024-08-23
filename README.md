@@ -4,7 +4,6 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- simplify logging module: remove smooth value
 - config validation
 - unit tests for image transforms and data loaders
 
