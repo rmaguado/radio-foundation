@@ -88,7 +88,7 @@ class RandomSharpness:
         image = image.unsqueeze(0)
         kernel = kernel.unsqueeze(0).unsqueeze(0)
         
-        output_image = F.conv2d(image, kernel, padding=1)
+        output_image = torch.nn.functional.conv2d(image, kernel, padding=1)
         
         return output_image.squeeze(0)
 
