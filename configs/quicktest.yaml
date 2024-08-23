@@ -1,5 +1,4 @@
 train:
-  dataset_path: MultiDataset:root=./datasets:extra=./datasets/combined/extra:split=TRAIN
   grad_accum_steps: 2
   batch_size_per_gpu: 4
   batch_size_overall: 2048
@@ -10,12 +9,23 @@ train:
     epochs: 2
     batch_size_per_gpu: 2
     grad_accum_steps: 4
+data:
+  datasets:
+  - name: LIDC-IDRI
+    type: ct
+    split: train
+    num_slices: 4
+  - name: NSCLC-Radiomics
+    type: ct
+    split: train
+    num_slices: 4
 evaluation:
   eval_period_iterations: 10
 student:
   arch: vit_small
   ffn_layer: "mlp"
   drop_path_rate: 0
+  channels: 4
 teacher:
   warmup_teacher_temp_epochs: 4  
 optim:
