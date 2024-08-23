@@ -5,12 +5,13 @@
 
 import logging
 from enum import Enum
-from typing import Any, Callable, List, Optional, TypeVar
+from typing import Any, Callable, List, Optional, TypeVar, Union
+from omegaconf import DictConfig
 
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import CtDataset, MultiDataset
+from .datasets import ImageDataset, VolumeDataset, MultiDataset
 from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 
 
@@ -40,61 +41,59 @@ def _make_sample_transform(image_transform: Optional[Callable] = None, target_tr
 
     return transform
 
-
-def _parse_dataset_str(dataset_str: str):
-    tokens = dataset_str.split(":")
-
-    name = tokens[0]
-    kwargs = {}
-
-    for token in tokens[1:]:
-        key, value = token.split("=")
-        assert key in ("root", "extra", "split", "slices")
-        kwargs[key] = value
-
-    if name == 'CtDataset':
-        class_ = CtDataset
-    elif name == "MultiDataset":
-        class_ = MultiDataset
-    else:
-        raise ValueError(f'Unsupported dataset "{name}"')
-
-    return class_, kwargs
-
-
+    
 def make_dataset(
-    *,
-    dataset_str: str,
-    num_slices: int,
-    transform: Optional[Callable] = None,
-    target_transform: Optional[Callable] = None,
-):
+    config: DictConfig,
+    transform: Callable,
+    target_transform: Optional[Callable] = lambda _:_
+) -> Union[ImageDataset, VolumeDataset, MultiDataset]:
     """
-    Creates a dataset with the specified parameters.
-
+    Parse the dataset from the given OmegaConf configuration.
+    
     Args:
-        dataset_str: A dataset string description (e.g. ImageNet:split=TRAIN).
-        num_slices: Number of slices to take from a 3d volume.
-        transform: A transform to apply to images.
-        target_transform: A transform to apply to targets.
-
+        config (DictConfig): The OmegaConf dictionary configuration for the dataset.
+        transform (Optional[Callable]): Function to be applied to images.
+        target_transform (Optional[Callable]): Function to be applied to targets.
+    
     Returns:
-        The created dataset.
+        Union[ImageDataset, VolumeDataset, MultiDataset]: The corresponding dataset object(s).
     """
-    logger.info(f'using dataset: "{dataset_str}"')
+    def create_volume_dataset(dataset_config, **kwargs):
+        return VolumeDataset(
+            **kwargs,
+            num_slices=dataset_config.get("num_slices", 1)
+        )
 
-    class_, kwargs = _parse_dataset_str(dataset_str)
-    dataset = class_(num_slices=num_slices, transform=transform, target_transform=target_transform, **kwargs)
-
-    logger.info(f"# of dataset samples: {len(dataset):,d}")
-
-    # Aggregated datasets do not expose (yet) these attributes, so add them.
-    if not hasattr(dataset, "transform"):
-        setattr(dataset, "transform", transform)
-    if not hasattr(dataset, "target_transform"):
-        setattr(dataset, "target_transform", target_transform)
-
-    return dataset
+    dataset_mapping = {
+        "ct": create_volume_dataset,
+        "mri": create_volume_dataset,
+        "xray": ImageDataset
+    }
+    
+    root_path = config.data.root_path
+    datasets = config.data.datasets
+    dataset_objects = []
+    
+    for dataset_config in datasets:
+        dataset_name = dataset_config.name
+        dataset_type = dataset_config.type
+        
+        dataset_kwargs = {
+            "root_path": root_path,
+            "dataset_name": dataset_name,
+            "output_path": config.train.output_dir,
+            "split": dataset_config.split,
+            "transform": transform,
+            "target_transform": target_transform
+        }
+        
+        if dataset_type not in dataset_mapping:
+            raise ValueError(f"Unknown dataset type: {dataset_type}")
+        
+        dataset_object = dataset_mapping[dataset_type](dataset_config, **dataset_kwargs)
+        dataset_objects.append(dataset_object)
+    
+    return dataset_objects[0] if len(dataset_objects) == 1 else MultiDataset(dataset_objects)
 
 
 def _make_sampler(
