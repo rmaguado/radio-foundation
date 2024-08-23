@@ -12,6 +12,10 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 - unique PatchEmbed modules (from dinov2.layers) for each input type
 - refactor sampler module
 
+- Remove support for old shuffling (dinov2/data/loaders.py)
+- Use cross_entropy_distribution (dinov2/loss/dino_clstoken_loss.py)
+- fix or remove advance for dataloaders
+
 - write userguide for data processing
 - add docstrings and type hints
 - add unit tests
