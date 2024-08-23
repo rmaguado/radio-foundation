@@ -4,35 +4,19 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- redesign entries for possible multiple files (entry file only contains series ids, generate indexes for slices during runtime)
-
-Example datasets folder layout
-```
-datasets
-+- LIDC-IDRI
-|  +- data
-|  |  +- series_0000
-|  |     +- image.h5
-|  |     +- metadata.json
-|  |  +- ...
-|  +- extra
-|     +- splits.json
-+- ...
-+- __init__.py
-+- dataset.py
-+- entries.py
-```
-
-
-- implement use multiple slices at once
+- simplify logging module: remove smooth value
 - config validation
 - unit tests for image transforms and data loaders
+
+- eval using entire volume
+- unique norm and std for each dataset
+- unique PatchEmbed modules (from dinov2.layers) for each input type
+- refactor sampler module
 
 - write userguide for data processing
 - add docstrings and type hints
 - add unit tests
 - implement more datasets and benchmarks
-- use various PatchEmbed modules (from dinov2.layers) for different modalities / num slices
 
 ## Overview
 
@@ -102,6 +86,24 @@ augmentations:
 Check dinov2/data/transforms.py to check the parameter usage.
 
 ## Data Preparation
+
+Example datasets folder layout
+```
+datasets
++- LIDC-IDRI
+|  +- data
+|  |  +- series_0000
+|  |     +- image.h5
+|  |     +- metadata.json
+|  |  +- ...
+|  +- extra
+|     +- train.json
+|     +- val.json
++- ...
++- __init__.py
++- dataset.py
++- entries.py
+```
 
 The project is currently only geared to processing CT scans. To prepare a dataset for training, follow these steps:
 
