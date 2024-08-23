@@ -3,7 +3,7 @@
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
 
-from collections import defaultdict, deque
+from collections import defaultdict
 import datetime
 import json
 import logging
@@ -20,6 +20,7 @@ logger = logging.getLogger("dinov2")
 class MetricLogger(object):
     def __init__(self, delimiter="\t", output_file=None):
         self.meters = defaultdict(float)
+        self.counts = defaultdict(int)
         self.delimiter = delimiter
         self.output_file = output_file
         self.dataloader = None
@@ -33,18 +34,27 @@ class MetricLogger(object):
                 v = v.item()
             assert isinstance(v, (float, int))
             self.meters[k] += v
+            self.counts[k] += 1
+
+    def synchronize_between_processes(self):
+        """Synchronize metrics between processes in distributed training."""
+        if not distributed.is_enabled():
+            return
+        for meter_name, meter_value in self.meters.items():
+            t = torch.tensor(
+                [meter_value, self.counts[meter_name]],
+                dtype=torch.float64,
+                device="cuda",
+            )
+            torch.distributed.barrier()
+            torch.distributed.all_reduce(t)
+            self.meters[meter_name], self.counts[meter_name] = t.tolist()
 
     def __str__(self):
         return self.delimiter.join(
-            f"{name}: {value:.4f}" for name, value in self.meters.items()
+            f"{name}: {value / self.counts[name]:.4f}"
+            for name, value in self.meters.items()
         )
-
-    def synchronize_between_processes(self):
-        for meter in self.meters.values():
-            meter.synchronize_between_processes()
-
-    def add_meter(self, name, meter):
-        self.meters[name] = meter
 
     def dump_in_output_file(self, iteration, iter_time, data_time):
         if self.output_file is None or not distributed.is_main_process():
@@ -54,7 +64,7 @@ class MetricLogger(object):
             iter_time=iter_time,
             data_time=data_time,
         )
-        dict_to_dump.update(self.meters)
+        dict_to_dump.update({k: v / self.counts[k] for k, v in self.meters.items()})
         with open(self.output_file, "a") as f:
             f.write(json.dumps(dict_to_dump) + "\n")
 
@@ -90,6 +100,7 @@ class MetricLogger(object):
             yield obj
             iter_time = time.time() - end
             if i % print_freq == 0 or i == n_iterations - 1:
+                self.synchronize_between_processes()  # Ensure metrics are synchronized
                 self.dump_in_output_file(
                     iteration=i, iter_time=iter_time, data_time=data_time
                 )
