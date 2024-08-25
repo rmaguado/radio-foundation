@@ -14,7 +14,6 @@ from dinov2.logging import MetricLogger
 from dinov2.utils.config import setup
 
 from dinov2.train.utils import (
-    apply_optim_scheduler,
     update_schedules,
     apply_gradient_operations,
     log_training_step,
