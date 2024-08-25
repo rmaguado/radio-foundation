@@ -22,6 +22,7 @@ from dinov2.train.utils import (
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
 from dinov2.train.setup import setup_training_components, setup_dataloader
+from dinov2.configs.validation import validate_config
 
 torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")
@@ -155,6 +156,8 @@ def do_train(cfg, model, resume=False):
 
 def main(args):
     cfg = setup(args)
+    is_validated = validate_config(cfg)
+    assert is_validated, "Config validation failed."
 
     model = SSLMetaArch(cfg).to(torch.device("cuda"))
     model.prepare_for_distributed_training()
