@@ -94,7 +94,7 @@ def validate_data(config: DictConfig) -> None:
     for datasetConfig in config.data.datasets:
         return all(
             [
-                test_dataset_attributes_exist(datasetConfig, root_path),
+                test_dataset_attributes_exist(datasetConfig),
                 test_dataset_data_exist(datasetConfig, root_path),
                 test_dataset_extra_exist(datasetConfig, root_path),
             ]
