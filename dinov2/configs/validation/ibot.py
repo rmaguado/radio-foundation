@@ -15,7 +15,7 @@ logger = logging.getLogger("dinov2")
 def test_mask_ratio_min_max(ibot_config: DictConfig) -> bool:
     if not hasattr(ibot_config, "mask_ratio_min_max"):
         return False
-    if not isinstance(ibot_config.mask_ratio_min_max, list):
+    if not isinstance(ibot_config.mask_ratio_min_max, DictConfig):
         return False
     if not len(ibot_config.mask_ratio_min_max) == 2:
         logger.error(Errors.INVALID_LENGTH.format("ibot", "mask_ratio_min_max", 2))
@@ -53,7 +53,7 @@ def validate_ibot(config: DictConfig) -> bool:
         ("head_bottleneck_dim", int),
         ("head_nlayers", int),
         ("head_hidden_dim", int),
-        ("mask_ratio_min_max", list),
+        ("mask_ratio_min_max", DictConfig),
     ]
     if not test_attributes_dtypes(ibot_config, required_attributes, "ibot"):
         return False

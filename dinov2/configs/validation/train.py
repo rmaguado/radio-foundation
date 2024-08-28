@@ -80,7 +80,7 @@ def test_full_image_config(train_config: DictConfig) -> bool:
     if not test_has_section(train_config, "full_image"):
         return False
     full_image_config = train_config.full_image
-    if not isinstance(full_image_config, list):
+    if not isinstance(full_image_config, DictConfig):
         return False
 
     required_attributes = [
@@ -133,7 +133,7 @@ def validate_train(config: DictConfig) -> bool:
         ("OFFICIAL_EPOCH_LENGTH", int),
         ("cache_dataset", bool),
         ("centering", str),
-        ("full_image", list),
+        ("full_image", DictConfig),
     ]
     if not test_attributes_dtypes(train_config, required_attributes, "train"):
         return False

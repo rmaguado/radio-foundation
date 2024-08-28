@@ -38,7 +38,7 @@ def validate_data(config: DictConfig) -> None:
     data_config = config.data
     required_attributes = [
         ("root_path", str),
-        ("datasets", list),
+        ("datasets", DictConfig),
     ]
     if not test_attributes_dtypes(data_config, required_attributes, "data"):
         return False
