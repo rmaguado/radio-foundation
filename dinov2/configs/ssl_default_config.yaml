@@ -102,7 +102,7 @@ student:
   interpolate_offset: 0.0
 teacher:
   momentum_teacher: 0.994
-  final_momentum_teacher: 1
+  final_momentum_teacher: 1.0
   warmup_teacher_temp: 0.04
   teacher_temp: 0.07
   warmup_teacher_temp_epochs: 30

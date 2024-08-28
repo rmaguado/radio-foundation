@@ -55,7 +55,7 @@ def validate_student(config: DictConfig) -> bool:
         ("ffn_bias", bool),
         ("num_register_tokens", int),
         ("interpolate_antialias", bool),
-        ("interpolate_offset", bool),
+        ("interpolate_offset", float),
     ]
     if not test_attributes_dtypes(student_config, required_attributes, "student"):
         return False
@@ -68,6 +68,7 @@ def validate_student(config: DictConfig) -> bool:
         ("layerscale", ValueRange(0.0, float("inf"))),
         ("block_chunks", ValueRange(1, float("inf"))),
         ("num_register_tokens", ValueRange(1, float("inf"))),
+        ("interpolate_offset", ValueRange(0.0, 1.0)),
     ]
     if not test_attributes_range(student_config, attributes_ranges, "ibot"):
         return False
