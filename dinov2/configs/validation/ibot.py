@@ -13,10 +13,6 @@ logger = logging.getLogger("dinov2")
 
 
 def test_mask_ratio_min_max(ibot_config: DictConfig) -> bool:
-    if not hasattr(ibot_config, "mask_ratio_min_max"):
-        return False
-    if not isinstance(ibot_config.mask_ratio_min_max, DictConfig):
-        return False
     if not len(ibot_config.mask_ratio_min_max) == 2:
         logger.error(Errors.INVALID_LENGTH.format("ibot", "mask_ratio_min_max", 2))
         return False

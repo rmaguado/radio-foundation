@@ -15,8 +15,6 @@ logger = logging.getLogger("dinov2")
 
 
 def test_root_path_exists(data_config: DictConfig) -> None:
-    if not hasattr(data_config, "root_path"):
-        return False
     datasets_root = data_config.root_path
     if not os.path.exists(datasets_root):
         logger.error(Errors.PATH_NOT_FOUND.format(datasets_root))
@@ -25,8 +23,6 @@ def test_root_path_exists(data_config: DictConfig) -> None:
 
 
 def test_has_dataset(data_config: DictConfig) -> None:
-    if not hasattr(data_config, "datasets"):
-        return False
     if len(data_config.datasets) == 0:
         logger.error(Errors.NO_DATASETS_FOUND)
         return False

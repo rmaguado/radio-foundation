@@ -77,11 +77,7 @@ def test_epoch_nums_config(config: DictConfig) -> bool:
 
 
 def test_full_image_config(train_config: DictConfig) -> bool:
-    if not test_has_section(train_config, "full_image"):
-        return False
     full_image_config = train_config.full_image
-    if not isinstance(full_image_config, DictConfig):
-        return False
 
     required_attributes = [
         ("epochs", int),
@@ -107,8 +103,6 @@ def test_full_image_config(train_config: DictConfig) -> bool:
 
 def test_centering_config(train_config: DictConfig) -> bool:
     centering_modes = ["centering", "sinkhorn_knopp"]
-    if not test_has_section(train_config, "centering"):
-        return False
     if train_config.centering not in centering_modes:
         logger.error(
             Errors.INVALID_VALUE.format("train", "centering", train_config.centering)
