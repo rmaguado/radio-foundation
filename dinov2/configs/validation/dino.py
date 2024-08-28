@@ -1,4 +1,5 @@
 from omegaconf import DictConfig
+import logging
 
 from .utils import (
     test_has_section,
@@ -6,6 +7,8 @@ from .utils import (
     test_attributes_range,
     ValueRange,
 )
+
+logger = logging.getLogger("dinov2")
 
 
 def validate_dino(config: DictConfig) -> bool:
