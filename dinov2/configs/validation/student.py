@@ -35,6 +35,18 @@ def test_vit_small_drop_path(student_config: DictConfig) -> bool:
     return True
 
 
+def test_ffn_layer(student_config: DictConfig) -> bool:
+    valid_ffn_layers = ["swiglu", "mlp"]
+    if student_config.ffn_layer not in valid_ffn_layers:
+        logger.error(
+            Errors.INVALID_VALUE.format(
+                "student", "ffn_layer", ",".join(valid_ffn_layers)
+            )
+        )
+        return False
+    return True
+
+
 def validate_student(config: DictConfig) -> bool:
     if not test_has_section(config, "student"):
         return False
@@ -66,13 +78,17 @@ def validate_student(config: DictConfig) -> bool:
         ("channels", ValueRange(1, float("inf"))),
         ("drop_path_rate", ValueRange(0.0, 1.0, right_inclusive=False)),
         ("layerscale", ValueRange(0.0, float("inf"))),
-        ("block_chunks", ValueRange(1, float("inf"))),
+        ("block_chunks", ValueRange(0, float("inf"))),
         ("num_register_tokens", ValueRange(1, float("inf"))),
         ("interpolate_offset", ValueRange(0.0, 1.0)),
     ]
-    if not test_attributes_range(student_config, attributes_ranges, "ibot"):
+    if not test_attributes_range(student_config, attributes_ranges, "student"):
         return False
 
     return all(
-        [test_architecture(student_config), test_vit_small_drop_path(student_config)]
+        [
+            test_architecture(student_config),
+            test_vit_small_drop_path(student_config),
+            test_ffn_layer(student_config),
+        ]
     )
