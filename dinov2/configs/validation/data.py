@@ -1,5 +1,5 @@
 import os
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 import logging
 
 from .utils import (
@@ -38,7 +38,7 @@ def validate_data(config: DictConfig) -> None:
     data_config = config.data
     required_attributes = [
         ("root_path", str),
-        ("datasets", DictConfig),
+        ("datasets", ListConfig),
     ]
     if not test_attributes_dtypes(data_config, required_attributes, "data"):
         return False

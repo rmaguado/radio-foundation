@@ -1,4 +1,4 @@
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 import logging
 
 from .utils import (
@@ -53,7 +53,7 @@ def validate_ibot(config: DictConfig) -> bool:
         ("head_bottleneck_dim", int),
         ("head_nlayers", int),
         ("head_hidden_dim", int),
-        ("mask_ratio_min_max", DictConfig),
+        ("mask_ratio_min_max", ListConfig),
     ]
     if not test_attributes_dtypes(ibot_config, required_attributes, "ibot"):
         return False
