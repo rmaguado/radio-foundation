@@ -78,14 +78,13 @@ def test_attributes_dtypes(
     return True
 
 
-def test_attirbutes_range(
+def test_attributes_range(
     config: DictConfig,
-    required_attrs: List[str],
     value_ranges: List[ValueRange],
     config_section: str,
 ) -> bool:
     invalid_values = []
-    for attr, value_range in zip(required_attrs, value_ranges):
+    for attr, value_range in value_ranges:
         if not getattr(config, attr) in value_range:
             invalid_values.append((attr, value_range))
     if len(invalid_values) > 0:
