@@ -43,10 +43,6 @@ class MetricLogger(object):
             loss_str.append("{}: {:.4f}".format(name, meter.avg()))
         return self.delimiter.join(loss_str)
 
-    def synchronize_between_processes(self):
-        # Synchronization logic removed for simplicity
-        pass
-
     def add_meter(self, name, meter):
         self.meters[name] = meter
 
@@ -137,7 +133,7 @@ class MetricLogger(object):
 
 
 class Metric:
-    """Track a series of values and provide access to the average over a sliding window."""
+    """Track a series of values and provide the recent average."""
 
     def __init__(self, window_size=20):
         self.deque = deque(maxlen=window_size)
