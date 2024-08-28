@@ -4,22 +4,19 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- config validation
-- unit tests for image transforms and data loaders
+- Add support for loading dicom datasets
 
-- eval using entire volume
-- unique norm and std for each dataset
-- unique PatchEmbed modules (from dinov2.layers) for each input type
-- refactor sampler module
-
+- Add docstrings and type hints
 - Remove support for old shuffling (dinov2/data/loaders.py)
 - Use cross_entropy_distribution (dinov2/loss/dino_clstoken_loss.py)
-- fix or remove advance for dataloaders
+- Fix or Remove advance for dataloaders
 
+- eval using entire volume
+- script for running benchmark tests (after I have many datasets)
+
+- unit tests for image transforms and data loaders
 - write userguide for data processing
-- add docstrings and type hints
-- add unit tests
-- implement more datasets and benchmarks
+- unique PatchEmbed modules (from dinov2.layers) for each input type
 
 ## Overview
 
