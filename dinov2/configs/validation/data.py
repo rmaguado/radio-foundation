@@ -2,7 +2,7 @@ import os
 from omegaconf import DictConfig
 import logging
 
-from utils import (
+from .utils import (
     test_has_section,
     test_attributes_dtypes,
     test_attirbutes_range,

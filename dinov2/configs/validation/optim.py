@@ -1,6 +1,6 @@
 from omegaconf import DictConfig
 
-from utils import (
+from .utils import (
     test_has_section,
     test_attributes_dtypes,
     test_attirbutes_range,
