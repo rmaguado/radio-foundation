@@ -157,14 +157,17 @@ def do_train(cfg, model, resume=False):
 def main(args):
     cfg = setup(args)
     is_validated = validate_config(cfg)
-    assert is_validated, "Config validation failed."
+    if is_validated:
+        logger.info("Config is validated.")
 
-    model = SSLMetaArch(cfg).to(torch.device("cuda"))
-    model.prepare_for_distributed_training()
+        model = SSLMetaArch(cfg).to(torch.device("cuda"))
+        model.prepare_for_distributed_training()
 
-    logger.info("Model:\n{}".format(model))
+        logger.info("Model:\n{}".format(model))
 
-    do_train(cfg, model, resume=not args.no_resume)
+        do_train(cfg, model, resume=not args.no_resume)
+    else:
+        logger.error("Config validation failed. Exiting.")
 
     torch.distributed.destroy_process_group()
 
