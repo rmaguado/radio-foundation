@@ -149,29 +149,24 @@ def do_train(cfg, model, resume=False):
     )
     logger.info("Finished training on full-size images")
 
-    metric_logger.synchronize_between_processes()
-
-    return {k: meter.avg for k, meter in metric_logger.meters.items()}
-
 
 def main(args):
     cfg = setup(args)
     is_validated = validate_config(cfg)
-    if is_validated:
-        logger.info("Config is validated.")
-
-        model = SSLMetaArch(cfg).to(torch.device("cuda"))
-        model.prepare_for_distributed_training()
-
-        logger.info("Model:\n{}".format(model))
-
-        do_train(cfg, model, resume=not args.no_resume)
-    else:
+    if not is_validated:
         logger.error("Config validation failed. Exiting.")
+        return
 
-    torch.distributed.destroy_process_group()
+    logger.info("Config is validated.")
+    model = SSLMetaArch(cfg).to(torch.device("cuda"))
+    model.prepare_for_distributed_training()
+
+    logger.info("Model:\n{}".format(model))
+
+    do_train(cfg, model, resume=not args.no_resume)
 
 
 if __name__ == "__main__":
     args = get_args_parser(add_help=True).parse_args()
     main(args)
+    torch.distributed.destroy_process_group()
