@@ -118,7 +118,6 @@ def validate_train(config: DictConfig) -> bool:
     required_attributes = [
         ("grad_accum_steps", int),
         ("batch_size_per_gpu", int),
-        ("batch_size_overall", int),
         ("output_dir", str),
         ("saveckp_iterations", int),
         ("print_freq", int),
@@ -135,7 +134,6 @@ def validate_train(config: DictConfig) -> bool:
     attributes_ranges = [
         ("grad_accum_steps", ValueRange(1)),
         ("batch_size_per_gpu", ValueRange(1)),
-        ("batch_size_overall", ValueRange(1)),
         ("saveckp_iterations", ValueRange(1)),
         ("print_freq", ValueRange(1)),
         ("num_workers", ValueRange(0)),

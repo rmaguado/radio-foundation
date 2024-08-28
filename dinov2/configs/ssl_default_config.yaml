@@ -61,7 +61,6 @@ ibot:
 train:
   grad_accum_steps: 1
   batch_size_per_gpu: 64
-  batch_size_overall: 3072
   output_dir: .
   saveckp_iterations: 5000
   print_freq: 100
@@ -116,7 +115,6 @@ optim:
   min_lr: 1.0e-06
   clip_grad: 3.0
   freeze_last_layer_epochs: 1
-  scaling_rule: sqrt_wrt_1024
   patch_embed_lr_mult: 0.2
   layerwise_decay: 0.9
   adamw_beta1: 0.9

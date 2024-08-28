@@ -18,22 +18,6 @@ from dinov2.configs import dinov2_default_config
 logger = logging.getLogger("dinov2")
 
 
-def apply_scaling_rules_to_cfg(cfg):  # to fix
-    if cfg.optim.scaling_rule == "sqrt_wrt_1024":
-        base_lr = cfg.optim.base_lr
-        cfg.optim.lr = base_lr
-        cfg.optim.lr *= math.sqrt(
-            cfg.train.grad_accum_steps
-            * cfg.train.batch_size_per_gpu
-            * distributed.get_global_size()
-            / cfg.train.batch_size_overall
-        )
-        logger.info(f"sqrt scaling learning rate; base: {base_lr}, new: {cfg.optim.lr}")
-    else:
-        raise NotImplementedError
-    return cfg
-
-
 def write_config(cfg, output_dir, name="config.yaml"):
     logger.info(OmegaConf.to_yaml(cfg))
     saved_cfg_path = os.path.join(output_dir, name)
@@ -74,6 +58,6 @@ def setup(args):
     cfg = get_cfg_from_args(args)
     os.makedirs(args.output_dir, exist_ok=True)
     default_setup(args)
-    apply_scaling_rules_to_cfg(cfg)
+    cfg.optim.lr = cfg.optim.base_lr
     write_config(cfg, args.output_dir)
     return cfg
