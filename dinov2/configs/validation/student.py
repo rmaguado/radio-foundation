@@ -93,5 +93,5 @@ def validate_student(config: DictConfig) -> bool:
         ]
     ):
         return False
-    logger.info("'student' config is valid.")
+    logger.debug("'student' config is valid.")
     return True

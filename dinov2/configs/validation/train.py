@@ -152,5 +152,5 @@ def validate_train(config: DictConfig) -> bool:
         ]
     ):
         return False
-    logger.info("'train' config is valid.")
+    logger.debug("'train' config is valid.")
     return True

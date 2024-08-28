@@ -35,5 +35,5 @@ def validate_teacher(config: DictConfig) -> bool:
     if not test_attributes_range(teacher_config, attributes_ranges, "teacher"):
         return False
 
-    logger.info("'teacher' config is valid.")
+    logger.debug("'teacher' config is valid.")
     return True
