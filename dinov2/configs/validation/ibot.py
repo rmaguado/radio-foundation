@@ -21,7 +21,14 @@ def test_mask_ratio_min_max(ibot_config: DictConfig) -> bool:
         logger.error(Errors.INVALID_LENGTH.format("ibot", "mask_ratio_min_max", 2))
         return False
     if not all(isinstance(val, float) for val in ibot_config.mask_ratio_min_max):
-        logger.error(Errors.INVALID_TYPE.format("ibot", "mask_ratio_min_max", "float"))
+        logger.error(
+            Errors.INVALID_TYPE.format(
+                "ibot",
+                "mask_ratio_min_max",
+                "float",
+                type(ibot_config.mask_ratio_min_max),
+            )
+        )
         return False
     mask_ratio_range = ValueRange(0.0, 1.0, right_inclusive=False)
     if not all(val in mask_ratio_range for val in ibot_config.mask_ratio_min_max):

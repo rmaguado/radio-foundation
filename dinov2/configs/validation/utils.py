@@ -7,7 +7,7 @@ logger = logging.getLogger("dinov2")
 
 class Errors:
     MISSING_ATTR = "Missing attribute in {}: {}."
-    INVALID_TYPE = "Invalid type in {}: {} should be of type {}."
+    INVALID_TYPE = "Invalid type in {}: {} should be of type {}. Found {}"
     INVALID_VALUE = "Invalid value in {}: {} should be {}."
     INVALID_LENGTH = "Invalid length in {}: {} should have length {}."
     PATH_NOT_FOUND = "Path not found: {}."
@@ -73,7 +73,11 @@ def test_attributes_dtypes(
         return False
     if len(incorrect_dtype) > 0:
         for attr in incorrect_dtype:
-            logger.error(Errors.INVALID_TYPE.format(config_section, attr, dtype))
+            logger.error(
+                Errors.INVALID_TYPE.format(
+                    config_section, attr, dtype, type(getattr(config, attr))
+                )
+            )
         return False
     return True
 
