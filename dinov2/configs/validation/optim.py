@@ -20,6 +20,7 @@ def test_weight_decay(optim_config: DictConfig) -> bool:
             )
         )
         return False
+    return True
 
 
 def validate_optim(config: DictConfig) -> bool:
@@ -64,5 +65,5 @@ def validate_optim(config: DictConfig) -> bool:
         ]
     ):
         return False
-    logger.info("'optim' config is valid.")
+    logger.debug("'optim' config is valid.")
     return True
