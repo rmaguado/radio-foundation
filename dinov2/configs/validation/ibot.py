@@ -48,23 +48,23 @@ def validate_ibot(config: DictConfig) -> bool:
     required_attributes = [
         ("loss_weight", float),
         ("mask_sample_probability", float),
+        ("mask_ratio_min_max", ListConfig),
         ("separate_head", bool),
         ("head_n_prototypes", int),
         ("head_bottleneck_dim", int),
         ("head_nlayers", int),
         ("head_hidden_dim", int),
-        ("mask_ratio_min_max", ListConfig),
     ]
     if not test_attributes_dtypes(ibot_config, required_attributes, "ibot"):
         return False
 
     attributes_ranges = [
-        ("loss_weight", ValueRange(0.0, float("inf"))),
-        ("mask_sample_probability", ValueRange(0.0, 1.0)),
-        ("head_n_prototypes", ValueRange(1, float("inf"))),
-        ("head_bottleneck_dim", ValueRange(1, float("inf"))),
-        ("head_nlayers", ValueRange(1, float("inf"))),
-        ("head_hidden_dim", ValueRange(1, float("inf"))),
+        ("loss_weight", ValueRange(0.0)),
+        ("mask_sample_probability", ValueRange(0.0, 1.0, right_inclusive=False)),
+        ("head_n_prototypes", ValueRange(1)),
+        ("head_bottleneck_dim", ValueRange(1)),
+        ("head_nlayers", ValueRange(1)),
+        ("head_hidden_dim", ValueRange(1)),
     ]
     if not test_attributes_range(ibot_config, attributes_ranges, "ibot"):
         return False
