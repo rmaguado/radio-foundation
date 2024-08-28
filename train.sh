@@ -37,6 +37,7 @@ OUTPUT_DIR=${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}
 # Export environment variables
 export CUDA_VISIBLE_DEVICES=$DEVICES
 export PYTHONPATH=.
+export OMP_NUM_THREADS=10
 
 # Run the torchrun command with the specified or default arguments
 torchrun --nproc_per_node=$(echo $DEVICES | tr -cd ',' | wc -c | awk '{print $1+1}') ./dinov2/train/train.py \
