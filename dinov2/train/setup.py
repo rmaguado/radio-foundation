@@ -11,7 +11,10 @@ from dinov2.data import SamplerType, make_data_loader, make_dataset
 
 
 def build_optimizer(cfg, params_groups):
-    return torch.optim.AdamW(params_groups, betas=(cfg.optim.adamw_beta1, cfg.optim.adamw_beta2))
+    return torch.optim.AdamW(
+        params_groups, betas=(cfg.optim.adamw_beta1, cfg.optim.adamw_beta2)
+    )
+
 
 def build_schedulers(cfg):
     epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
@@ -51,19 +54,20 @@ def build_schedulers(cfg):
     ] = 0
 
     return {
-        'lr': lr_schedule,
-        'wd': wd_schedule,
-        'momentum': momentum_schedule,
-        'teacher_temp': teacher_temp_schedule,
-        'last_layer_lr': last_layer_lr_schedule
+        "lr": lr_schedule,
+        "wd": wd_schedule,
+        "momentum": momentum_schedule,
+        "teacher_temp": teacher_temp_schedule,
+        "last_layer_lr": last_layer_lr_schedule,
     }
+
 
 def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
 
-    num_slices = cfg.student.channels
-    image_size = cfg.student.full_image_size \
-    if use_full_image else cfg.crops.global_crops_size
-    
+    image_size = (
+        cfg.student.full_image_size if use_full_image else cfg.crops.global_crops_size
+    )
+
     patch_size = cfg.student.patch_size
     n_tokens = (image_size // patch_size) ** 2
     mask_generator = MaskingGenerator(
@@ -83,10 +87,13 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
     )
 
     dataset = make_dataset(cfg, transform=data_transform)
-    
-    batch_size = cfg.train.full_image.batch_size_per_gpu \
-    if use_full_image else cfg.train.batch_size_per_gpu
-    
+
+    batch_size = (
+        cfg.train.full_image.batch_size_per_gpu
+        if use_full_image
+        else cfg.train.batch_size_per_gpu
+    )
+
     sampler_type = SamplerType.SHARDED_INFINITE
     data_loader = make_data_loader(
         dataset=dataset,
@@ -99,15 +106,17 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         drop_last=True,
         collate_fn=collate_fn,
     )
-    
+
     return data_loader
+
 
 def get_full_size_iter(cfg):
     full_img_epochs = cfg.train.full_image.epochs
     epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
     accum_steps = cfg.train.full_image.grad_accum_steps
     return full_img_epochs * epoch_len * accum_steps
-    
+
+
 def get_cropped_iter(cfg):
     total_epochs = cfg.optim.epochs
     full_img_epochs = cfg.train.full_image.epochs
@@ -115,35 +124,51 @@ def get_cropped_iter(cfg):
     epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
     accum_steps = cfg.train.grad_accum_steps
     return cropped_epochs * epoch_len * accum_steps
-    
+
+
 def setup_training_components(cfg, model, resume):
     logger = logging.getLogger("dinov2")
-    
+
     optimizer = build_optimizer(cfg, model.get_params_groups())
     logger.info("Optimizer ready.")
     schedulers = build_schedulers(cfg)
     logger.info("Schedulers ready.")
 
-    fsdp_checkpointer = FSDPCheckpointer(model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True)
-    
-    start_iter = fsdp_checkpointer.resume_or_load(
-        cfg.MODEL.WEIGHTS, resume=resume
-    ).get("iteration", -1) + 1
-    
+    fsdp_checkpointer = FSDPCheckpointer(
+        model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
+    )
+
+    start_iter = (
+        fsdp_checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get(
+            "iteration", -1
+        )
+        + 1
+    )
+
     full_size_iter = get_full_size_iter(cfg)
     cropped_iter = get_cropped_iter(cfg)
     max_iter = cropped_iter + full_size_iter
-    
+
     if start_iter <= cropped_iter:
         train_step = start_iter // cfg.train.grad_accum_steps
     else:
-        train_step = (start_iter - cropped_iter) // cfg.train.full_image.grad_accum_steps
-    
+        train_step = (
+            start_iter - cropped_iter
+        ) // cfg.train.full_image.grad_accum_steps
+
     checkpointer = PeriodicCheckpointer(
         fsdp_checkpointer,
         period=cfg.train.saveckp_iterations,
         max_iter=max_iter,
         max_to_keep=3,
     )
-    
-    return optimizer, schedulers, checkpointer, start_iter, train_step, max_iter, full_size_iter
+
+    return (
+        optimizer,
+        schedulers,
+        checkpointer,
+        start_iter,
+        train_step,
+        max_iter,
+        full_size_iter,
+    )
