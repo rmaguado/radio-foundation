@@ -14,11 +14,11 @@ data:
   - name: LIDC-IDRI
     type: ct
     split: train
-    num_slices: 4
+    channels: 4
   - name: NSCLC-Radiomics
     type: ct
     split: train
-    num_slices: 4
+    channels: 4
 evaluation:
   eval_period_iterations: 10
 student:
