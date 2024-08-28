@@ -25,11 +25,12 @@ def test_root_path_exists(data_config: DictConfig) -> None:
 
 
 def test_has_dataset(data_config: DictConfig) -> None:
-    if hasattr(data_config, "datasets"):
-        if len(data_config.datasets) > 0:
-            return True
-    logger.error(Errors.NO_DATASETS_FOUND)
-    return False
+    if not hasattr(data_config, "datasets"):
+        return False
+    if len(data_config.datasets) == 0:
+        logger.error(Errors.NO_DATASETS_FOUND)
+        return False
+    return True
 
 
 def validate_data(config: DictConfig) -> None:
