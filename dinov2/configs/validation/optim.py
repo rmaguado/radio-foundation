@@ -57,9 +57,12 @@ def validate_optim(config: DictConfig) -> bool:
         ("adamw_beta1", ValueRange(0, 1, left_inclusive=False, right_inclusive=False)),
         ("adamw_beta2", ValueRange(0, 1, left_inclusive=False, right_inclusive=False)),
     ]
-    return all(
+    if not all(
         [
             test_attributes_range(optim_config, attributes_ranges, "optim"),
             test_weight_decay(optim_config),
         ]
-    )
+    ):
+        return False
+    logger.info("'optim' config is valid.")
+    return True

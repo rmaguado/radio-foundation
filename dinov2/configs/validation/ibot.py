@@ -66,4 +66,5 @@ def validate_ibot(config: DictConfig) -> bool:
         return False
     if not test_mask_ratio_min_max(ibot_config):
         return False
+    logger.info("'ibot' config is valid.")
     return True

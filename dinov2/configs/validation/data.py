@@ -66,4 +66,6 @@ def validate_data(config: DictConfig) -> None:
         if not test_attributes_range(dataset_config, attributes_ranges, "dataset"):
             return False
 
+    logger.info("'data' config is valid.")
+
     return True

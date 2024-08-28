@@ -144,10 +144,13 @@ def validate_train(config: DictConfig) -> bool:
     if not test_attributes_range(train_config, attributes_ranges, "train"):
         return False
 
-    return all(
+    if not all(
         [
             test_epoch_nums_config(config),
             test_full_image_config(train_config),
             test_centering_config(train_config),
         ]
-    )
+    ):
+        return False
+    logger.info("'train' config is valid.")
+    return True

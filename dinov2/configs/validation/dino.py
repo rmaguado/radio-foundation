@@ -34,4 +34,7 @@ def validate_dino(config: DictConfig) -> bool:
     ]
     if not test_attributes_range(dino_config, attributes_ranges, "dino"):
         return False
+
+    logger.info("'dino' config is valid.")
+
     return True

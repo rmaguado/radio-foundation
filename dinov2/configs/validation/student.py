@@ -85,10 +85,13 @@ def validate_student(config: DictConfig) -> bool:
     if not test_attributes_range(student_config, attributes_ranges, "student"):
         return False
 
-    return all(
+    if not all(
         [
             test_architecture(student_config),
             test_vit_small_drop_path(student_config),
             test_ffn_layer(student_config),
         ]
-    )
+    ):
+        return False
+    logger.info("'student' config is valid.")
+    return True
