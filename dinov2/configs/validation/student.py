@@ -73,13 +73,13 @@ def validate_student(config: DictConfig) -> bool:
         return False
 
     attributes_ranges = [
-        ("patch_size", ValueRange(1, float("inf"))),
-        ("full_image_size", ValueRange(1, float("inf"))),
-        ("channels", ValueRange(1, float("inf"))),
+        ("patch_size", ValueRange(1)),
+        ("full_image_size", ValueRange(1)),
+        ("channels", ValueRange(1)),
         ("drop_path_rate", ValueRange(0.0, 1.0, right_inclusive=False)),
-        ("layerscale", ValueRange(0.0, float("inf"))),
-        ("block_chunks", ValueRange(0, float("inf"))),
-        ("num_register_tokens", ValueRange(1, float("inf"))),
+        ("layerscale", ValueRange(0.0)),
+        ("block_chunks", ValueRange(0)),
+        ("num_register_tokens", ValueRange(1)),
         ("interpolate_offset", ValueRange(0.0, 1.0)),
     ]
     if not test_attributes_range(student_config, attributes_ranges, "student"):

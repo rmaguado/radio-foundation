@@ -30,7 +30,7 @@ def validate_teacher(config: DictConfig) -> bool:
         ("final_momentum_teacher", ValueRange(0.0, 1.0)),
         ("warmup_teacher_temp", ValueRange(0.0, 1.0)),
         ("teacher_temp", ValueRange(0.0, 1.0)),
-        ("warmup_teacher_temp_epochs", ValueRange(0, float("inf"))),
+        ("warmup_teacher_temp_epochs", ValueRange(0)),
     ]
     if not test_attributes_range(teacher_config, attributes_ranges, "teacher"):
         return False
