@@ -26,7 +26,7 @@ class VolumeDataset(BaseDataset):
         output_path: str,
         dataset_name: str,
         split: str,
-        num_slices: int,
+        channels: int,
         transform: Optional[Callable] = lambda _: _,
         target_transform: Optional[Callable] = lambda _: _,
     ) -> None:
@@ -36,7 +36,7 @@ class VolumeDataset(BaseDataset):
         self.output_path = output_path
         self.dataset_name = dataset_name
         self.split = split
-        self.num_slices = num_slices
+        self.channels = channels
 
         self.transform = transform
         self.target_transform = target_transform
@@ -52,7 +52,7 @@ class VolumeDataset(BaseDataset):
             entries_data = json.load(f)
 
         total_slices = sum(
-            [x["slices"] // self.num_slices for x in entries_data.values()]
+            [x["slices"] // self.channels for x in entries_data.values()]
         )
 
         dtype = np.dtype([("series_id", "U256"), ("slice_index", "uint16")])
@@ -60,9 +60,9 @@ class VolumeDataset(BaseDataset):
 
         counter = 0
         for series_id, series_data in entries_data.items():
-            series_slices = series_data["slices"] // self.num_slices
+            series_slices = series_data["slices"] // self.channels
             for series_slice_index in range(
-                0, series_slices * self.num_slices, self.num_slices
+                0, series_slices * self.channels, self.channels
             ):
                 entries_array[counter] = (series_id, series_slice_index)
                 counter += 1
@@ -82,7 +82,7 @@ class VolumeDataset(BaseDataset):
         with h5py.File(image_full_path, "r") as f:
             data = f["data"]
             image_array = np.array(
-                data[slice_index : slice_index + self.num_slices], dtype=np.float32
+                data[slice_index : slice_index + self.channels], dtype=np.float32
             )
 
         return torch.from_numpy(image_array)

@@ -63,7 +63,7 @@ def make_dataset(
     """
 
     def create_volume_dataset(dataset_config, **kwargs):
-        return VolumeDataset(**kwargs, num_slices=dataset_config.get("num_slices", 1))
+        return VolumeDataset(**kwargs, channels=dataset_config.get("channels", 1))
 
     dataset_mapping = {
         "ct": create_volume_dataset,
