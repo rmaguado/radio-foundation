@@ -3,7 +3,7 @@ from omegaconf import DictConfig
 from .utils import (
     test_has_section,
     test_attributes_dtypes,
-    test_attirbutes_range,
+    test_attributes_range,
     ValueRange,
 )
 
@@ -32,6 +32,6 @@ def validate_dino(config: DictConfig) -> bool:
         ("head_hidden_dim", ValueRange(1)),
         ("koleo_loss_weight", ValueRange(0.0)),
     ]
-    if not test_attirbutes_range(dino_config, attributes_ranges, "dino"):
+    if not test_attributes_range(dino_config, attributes_ranges, "dino"):
         return False
     return True

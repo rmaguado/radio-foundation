@@ -4,7 +4,7 @@ import logging
 from .utils import (
     test_has_section,
     test_attributes_dtypes,
-    test_attirbutes_range,
+    test_attributes_range,
     ValueRange,
     Errors,
 )
@@ -100,7 +100,7 @@ def test_full_image_config(train_config: DictConfig) -> bool:
         ("batch_size_per_gpu", ValueRange(1)),
         ("grad_accum_steps", ValueRange(1)),
     ]
-    if not test_attirbutes_range(full_image_config, attributes_ranges, "full_image"):
+    if not test_attributes_range(full_image_config, attributes_ranges, "full_image"):
         return False
     return True
 
@@ -147,7 +147,7 @@ def validate_train(config: DictConfig) -> bool:
         ("num_workers", ValueRange(0)),
         ("OFFICIAL_EPOCH_LENGTH", ValueRange(1)),
     ]
-    if not test_attirbutes_range(train_config, attributes_ranges, "train"):
+    if not test_attributes_range(train_config, attributes_ranges, "train"):
         return False
 
     return all(

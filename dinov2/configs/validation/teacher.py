@@ -4,7 +4,7 @@ import logging
 from .utils import (
     test_has_section,
     test_attributes_dtypes,
-    test_attirbutes_range,
+    test_attributes_range,
     ValueRange,
 )
 
@@ -32,7 +32,7 @@ def validate_teacher(config: DictConfig) -> bool:
         ("teacher_temp", ValueRange(0.0, 1.0)),
         ("warmup_teacher_temp_epochs", ValueRange(0, float("inf"))),
     ]
-    if not test_attirbutes_range(teacher_config, attributes_ranges, "teacher"):
+    if not test_attributes_range(teacher_config, attributes_ranges, "teacher"):
         return False
 
     return True

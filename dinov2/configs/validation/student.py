@@ -4,7 +4,7 @@ import logging
 from .utils import (
     test_has_section,
     test_attributes_dtypes,
-    test_attirbutes_range,
+    test_attributes_range,
     ValueRange,
     Errors,
 )
@@ -69,7 +69,7 @@ def validate_student(config: DictConfig) -> bool:
         ("block_chunks", ValueRange(1, float("inf"))),
         ("num_register_tokens", ValueRange(1, float("inf"))),
     ]
-    if not test_attirbutes_range(student_config, attributes_ranges, "ibot"):
+    if not test_attributes_range(student_config, attributes_ranges, "ibot"):
         return False
 
     return all(

@@ -5,7 +5,7 @@ import logging
 from .utils import (
     test_has_section,
     test_attributes_dtypes,
-    test_attirbutes_range,
+    test_attributes_range,
     ValueRange,
     Errors,
 )
@@ -66,7 +66,7 @@ def validate_data(config: DictConfig) -> None:
         attributes_ranges = [
             ("channels", ValueRange(1)),
         ]
-        if not test_attirbutes_range(dataset_config, attributes_ranges, "dataset"):
+        if not test_attributes_range(dataset_config, attributes_ranges, "dataset"):
             return False
 
     return True

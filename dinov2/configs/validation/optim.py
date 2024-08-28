@@ -3,7 +3,7 @@ from omegaconf import DictConfig
 from .utils import (
     test_has_section,
     test_attributes_dtypes,
-    test_attirbutes_range,
+    test_attributes_range,
     ValueRange,
 )
 
@@ -44,6 +44,6 @@ def validate_optim(config: DictConfig) -> bool:
         ("adamw_beta1", ValueRange(0, 1, left_inclusive=False, right_inclusive=False)),
         ("adamw_beta2", ValueRange(0, 1, left_inclusive=False, right_inclusive=False)),
     ]
-    if not test_attirbutes_range(optim_config, attributes_ranges, "optim"):
+    if not test_attributes_range(optim_config, attributes_ranges, "optim"):
         return False
     return True

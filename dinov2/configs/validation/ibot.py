@@ -4,7 +4,7 @@ import logging
 from .utils import (
     test_has_section,
     test_attributes_dtypes,
-    test_attirbutes_range,
+    test_attributes_range,
     ValueRange,
     Errors,
 )
@@ -59,7 +59,7 @@ def validate_ibot(config: DictConfig) -> bool:
         ("head_nlayers", ValueRange(1, float("inf"))),
         ("head_hidden_dim", ValueRange(1, float("inf"))),
     ]
-    if not test_attirbutes_range(ibot_config, attributes_ranges, "ibot"):
+    if not test_attributes_range(ibot_config, attributes_ranges, "ibot"):
         return False
     if not test_mask_ratio_min_max(ibot_config):
         return False
