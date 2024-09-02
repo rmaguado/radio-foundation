@@ -137,7 +137,7 @@ class DatasetBase(ABC):
         )
         cursor.execute(
             f"""
-            CREATE TABLE IF NOT EXISTS {dataset_name} (
+            CREATE TABLE IF NOT EXISTS {dataset_name.replace("-", "\\-")} (
                 series_id TEXT PRIMARY KEY,
                 {dataset_table_columns}
             )
