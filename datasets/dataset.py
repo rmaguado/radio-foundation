@@ -103,7 +103,8 @@ class DatasetBase(ABC):
         for series_id, series_path in tqdm(series_paths):
             metadata, dicom_paths = self.process_series(series_path, series_id)
 
-            self.insert_global_data(cursor, dicom_paths, metadata)
+            for dicom_path in dicom_paths:
+                self.insert_global_data(cursor, dicom_path, metadata)
             self.insert_dataset_data(cursor, dataset_name, series_id, metadata)
 
         statistics = self.statistics.gather_statistics()
@@ -131,15 +132,15 @@ class DatasetBase(ABC):
         )
 
     def create_dataset_table(self, cursor, dataset_name):
-
         dataset_table_columns = ", ".join(
-            f"{column} {dtype}" for column, dtype in self.other_headers.items()
+            f'"{column}" {dtype}' for column, dtype in self.other_headers.items()
         )
+        dataset_name = f'"{dataset_name}"'
         cursor.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {dataset_name} (
-            series_id TEXT PRIMARY KEY,
-            {dataset_table_columns.replace("-", r"\-")}
+                series_id TEXT PRIMARY KEY,
+                {dataset_table_columns}
             )
             """
         )
@@ -147,7 +148,7 @@ class DatasetBase(ABC):
     def create_statistics_table(self, cursor):
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS statistics (
+            CREATE TABLE IF NOT EXISTS "statistics" (
                 dataset TEXT PRIMARY KEY,
                 mean REAL,
                 std_dev REAL,
@@ -158,19 +159,22 @@ class DatasetBase(ABC):
             """
         )
 
-    def insert_global_data(self, cursor, dicom_paths, metadata):
+    def insert_global_data(self, cursor, dicom_path, metadata):
+        dicom_path = f'"{dicom_path}"'
+        series_id = f'"{metadata["series_id"]}"'
+        dataset = f'"{metadata["dataset"]}"'
         cursor.execute(
             """
-            INSERT INTO global (
+            INSERT INTO "global" (
                 dicom_path, series_id, dataset, num_slices, image_shape_x, image_shape_y, image_shape_z,
                 spacing_x, spacing_y, spacing_z
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                dicom_paths[0],
-                metadata["series_id"],
-                metadata["dataset"],
+                dicom_path,
+                series_id,
+                dataset,
                 metadata["num_slices"],
                 metadata["image_shape"][0],
                 metadata["image_shape"][1],
@@ -182,27 +186,36 @@ class DatasetBase(ABC):
         )
 
     def insert_dataset_data(self, cursor, dataset_name, series_id, metadata):
-        dataset_table_columns = ", ".join(self.other_headers.keys())
+        dataset_name = f'"{dataset_name}"'
+        series_id = f'"{series_id}"'
+        dataset_table_columns = ", ".join(
+            f'"{column}"' for column in self.other_headers.keys()
+        )
+        dataset_table_values = [
+            metadata["other"].get(column, None) for column in self.other_headers.keys()
+        ]
+        dataset_table_values = [
+            f'"{value}"' if isinstance(value, str) else value
+            for value in dataset_table_values
+        ]
+
         cursor.execute(
             f"""
             INSERT INTO {dataset_name} (
                 series_id, {dataset_table_columns}
             )
-            VALUES ({(["?"] * (len(self.other_headers) + 1)).join(", ")})
+            VALUES ({", ".join(["?"] * (len(self.other_headers) + 1))})
             """,
             (
                 series_id,
-                *[
-                    metadata["other"].get(column, None)
-                    for column in self.other_headers.keys()
-                ],
+                *dataset_table_values,
             ),
         )
 
     def insert_statistics_data(self, cursor, dataset, statistics):
         cursor.execute(
             """
-            INSERT INTO statistics (dataset, mean, std_dev, total_voxels, total_slices, total_series)
+            INSERT INTO "statistics" (dataset, mean, std_dev, total_voxels, total_slices, total_series)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
