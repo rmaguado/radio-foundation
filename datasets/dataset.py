@@ -116,7 +116,7 @@ class DatasetBase(ABC):
         dataset_name = f'"{dataset_name}"'
         cursor.execute(
             f"""
-            CREATE TABLE IF NOT EXISTS (?) (
+            CREATE TABLE IF NOT EXISTS {dataset_name} (
                 series_id TEXT PRIMARY KEY,
                 num_slices INTEGER,
                 image_shape_x INTEGER,
@@ -126,8 +126,7 @@ class DatasetBase(ABC):
                 spacing_y REAL,
                 spacing_z REAL
             )
-            """,
-            (dataset_name),
+            """
         )
 
     def create_statistics_table(self, cursor: sqlite3.Cursor) -> None:

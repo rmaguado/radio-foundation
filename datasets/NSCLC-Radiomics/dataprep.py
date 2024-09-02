@@ -1,6 +1,7 @@
 import os
 import SimpleITK as sitk
 import pydicom
+from tqdm import tqdm
 from typing import List, Tuple
 
 from datasets import DatasetBase
@@ -15,7 +16,8 @@ class NsclcRadiomics(DatasetBase):
         series_paths = []
         reader = sitk.ImageSeriesReader()
 
-        for data_folder, dirs, files in os.walk(datapath):
+        print("Scanning data folder for dicom series paths.")
+        for data_folder, dirs, files in tqdm(os.walk(datapath)):
             series_ids = reader.GetGDCMSeriesIDs(data_folder)
             for series_id in series_ids:
                 series_file_names = reader.GetGDCMSeriesFileNames(
