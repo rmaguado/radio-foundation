@@ -87,7 +87,7 @@ class DatasetBase(ABC):
 
     def prepare_dataset(self) -> None:
         assert hasattr(
-            self, "get_patient_ids"
+            self, "get_series_paths"
         ), "The method 'get_patient_ids' must be implemented."
 
         dataset_name = self.config["dataset"]
