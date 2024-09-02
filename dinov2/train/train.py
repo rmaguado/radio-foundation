@@ -168,5 +168,7 @@ def main(args):
 
 if __name__ == "__main__":
     args = get_args_parser(add_help=True).parse_args()
-    main(args)
-    torch.distributed.destroy_process_group()
+    try:
+        main(args)
+    finally:
+        torch.distributed.destroy_process_group()
