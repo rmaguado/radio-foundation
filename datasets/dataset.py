@@ -1,189 +1,252 @@
-import os
-import h5py
-import json
+import sqlite3
 import numpy as np
 from tqdm import tqdm
 import SimpleITK as sitk
 from tqdm import tqdm
+from typing import List, Tuple
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 
 
 class DatasetBase(ABC):
     def __init__(self, config: dict):
         self.config = config
-
         self.target_path = config["target_path"]
-        self.chunk_size = config.get("chunk_size", (1, 512, 512))
         self.statistics = StatisticsManager()
-
-        sitk.ProcessObject_SetGlobalWarningDisplay(False)
+        self.other_headers = OrderedDict([("series_path", "TEXT")])
 
     @abstractmethod
-    def get_patient_ids(self) -> list:
+    def get_series_paths(self) -> List[Tuple[str, str]]:
+        """
+        Return a list of tuples with series_id and path to series.
+
+        Returns:
+            List[Tuple[str, str]]: A list of tuples with series_id and path to series.
+        """
         pass
 
     @abstractmethod
     def extend_metadata(self, metadata: dict) -> None:
+        """
+        Extend the metadata dictionary with additional information.
+
+        Args:
+            metadata (dict): The metadata dictionary to be extended.
+        """
         pass
 
-    def get_series_processor(self):
-        return SeriesProcessorBase(self.config, self.statistics)
+    def get_spacing(self, image: sitk.Image) -> List[float]:
+        spacing = image.GetSpacing()
+        return [spacing[i] for i in [2, 0, 1]]
 
-    def prepare_dataset(self):
-        assert hasattr(
-            self, "get_patient_ids"
-        ), "The method 'get_patient_ids' must be implemented."
+    def get_shape(self, image: sitk.Image) -> Tuple[Tuple[int, int], int]:
+        image_array = sitk.GetArrayFromImage(image)
+        return image_array.shape[1, 2], image_array.shape[0]
 
-        patient_ids = self.get_patient_ids()
-        processor = self.get_series_processor()
-        series_number = 0
-        for patient_id, series_path in tqdm(patient_ids):
-            series_id = f"series_{series_number:04d}"
+    def load_image(self, dicom_paths: List[str]) -> sitk.Image:
+        reader = sitk.ImageSeriesReader()
+        reader.SetFileNames(dicom_paths)
+        image = reader.Execute()
 
-            image_array, metadata = processor.process_series(
-                series_path, series_id, patient_id
-            )
-            self.extend_metadata(metadata)
-            series_save_path = os.path.join(self.target_path, series_id)
-            processor.save_array(image_array, series_save_path, "image.h5")
-            processor.save_metadata(metadata, series_save_path, "metadata.json")
-            series_number += 1
+        return image
 
-        self.statistics.save_global_metadata(self.target_path)
+    def process_series(
+        self, path_to_series: str, series_id: str
+    ) -> Tuple[dict, List[str]]:
+        """
+        Process a series and return metadata and paths to dicom files.
 
+        Args:
+            path_to_series (str): Path to the series.
+            series_id (str): Series ID.
 
-class SeriesProcessorBase:
-    def __init__(self, config: dict, statistics_manager):
-        self.config = config
-        self.clip_min = config["clip_min"]
-        self.clip_max = config["clip_max"]
-        self.clip_window = self.clip_max - self.clip_min
-        self.z_spacing = config["z_spacing"]
-        self.statistics_manager = statistics_manager
-
-        assert (
-            self.clip_window > 0
-        ), "Clip window must be positive (clip_max - clip_min > 0)."
-
-    def process_series(self, path_to_series, series_id, patient_id):
-        image = self.get_image(path_to_series, patient_id)
-        original_spacing = self.get_spacing(image)
-        image_array, resampled_spacing = self.preprocess_image(image)
+        Returns:
+            Tuple[dict, List[str]]: Metadata and paths to dicom files.
+        """
+        dicom_paths = sitk.ImageSeriesReader.GetGDCMSeriesFileNames(
+            path_to_series, series_id
+        )
+        image = self.load_image(dicom_paths)
+        image_spacing = self.get_spacing(image)
+        image_shape, num_slices = self.get_shape(image)
 
         metadata = {
             "dataset": self.config["dataset"],
             "series_id": series_id,
-            "patient_id": patient_id,
-            "shape": list(image_array.shape),
-            "spacing": {"original": original_spacing, "resampled": resampled_spacing},
-            "other": dict(),
+            "num_slices": num_slices,
+            "image_shape": image_shape,
+            "spacing": image_spacing,
+            "other": {
+                "series_path": path_to_series,
+            },
         }
+        self.extend_metadata(metadata)
 
-        return image_array, metadata
+        self.statistics.update_statistics(sitk.GetArrayFromImage(image))
 
-    def get_image(self, path_to_series, patient_id):
-        reader = sitk.ImageSeriesReader()
-        dicom_names = reader.GetGDCMSeriesFileNames(path_to_series)
-        reader.SetFileNames(dicom_names)
-        image = reader.Execute()
-        return image
+        return metadata, dicom_paths
 
-    def preprocess_image(self, image: sitk.Image):
-        assert isinstance(image, sitk.Image), "Image must be a SimpleITK image."
+    def prepare_dataset(self) -> None:
+        assert hasattr(
+            self, "get_patient_ids"
+        ), "The method 'get_patient_ids' must be implemented."
 
-        resampled_image, resampled_spacing = self.resample_image(image)
-        image_array = sitk.GetArrayViewFromImage(resampled_image)
-        clipped_hu_array = self.clip_hu(image_array)
+        dataset_name = self.config["dataset"]
 
-        self.statistics_manager.update_statistics(clipped_hu_array)
+        conn = sqlite3.connect(self.config["database_path"])
+        cursor = conn.cursor()
 
-        return clipped_hu_array, resampled_spacing
+        self.create_global_table(cursor)
+        self.create_dataset_table(cursor, dataset_name)
+        self.create_statistics_table(cursor)
 
-    def clip_hu(self, image_array):
-        clipped_array = np.clip(image_array, self.clip_min, self.clip_max)
-        standardized_array = (clipped_array - self.clip_min) / self.clip_window
-        return standardized_array.astype(np.float32)
+        series_paths = self.get_series_paths()
+        for series_id, series_path in tqdm(series_paths):
+            metadata, dicom_paths = self.process_series(series_path, series_id)
 
-    def get_spacing(self, image):
-        spacing = image.GetSpacing()
-        return [spacing[i] for i in [2, 0, 1]]
+            self.insert_global_data(cursor, dicom_paths, metadata)
+            self.insert_dataset_data(cursor, dataset_name, series_id, metadata)
 
-    def resample_image(self, image):
-        current_spacing = image.GetSpacing()
-        current_size = image.GetSize()
+        statistics = self.statistics.gather_statistics()
+        self.insert_statistics_data(cursor, self.config["dataset"], statistics)
 
-        desired_spacing = (current_spacing[0], current_spacing[1], self.z_spacing)
-        desired_size = [
-            int(round(current_size[i] * (current_spacing[i] / desired_spacing[i])))
-            for i in range(3)
-        ]
+        conn.commit()
+        conn.close()
 
-        resample = sitk.ResampleImageFilter()
-        resample.SetOutputSpacing(desired_spacing)
-        resample.SetSize(desired_size)
-        resample.SetInterpolator(sitk.sitkLinear)
-        resample.SetOutputDirection(image.GetDirection())
-        resample.SetOutputOrigin(image.GetOrigin())
-        resampled_image = resample.Execute(image)
-
-        resampled_spacing = self.get_spacing(resampled_image)
-
-        return resampled_image, resampled_spacing
-
-    def save_array(self, array_data, path_to_save, filename="image.h5"):
-        assert isinstance(array_data, np.ndarray), "Array data must be a numpy array."
-        if not array_data.shape:
-            raise ValueError("Array data must have a shape.")
-
-        os.makedirs(path_to_save, exist_ok=True)
-        with h5py.File(os.path.join(path_to_save, filename), "w") as f:
-            f.create_dataset(
-                "data",
-                data=array_data,
-                compression="lzf",
-                chunks=self.config["chunk_size"],
+    def create_global_table(self, cursor):
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS global (
+                dicom_path TEXT PRIMARY KEY,
+                series_id TEXT,
+                dataset TEXT,
+                num_slices INTEGER,
+                image_shape_x INTEGER,
+                image_shape_y INTEGER,
+                image_shape_z INTEGER,
+                spacing_x REAL,
+                spacing_y REAL,
+                spacing_z REAL
             )
+            """
+        )
 
-    def save_metadata(self, metadata, path_to_save, filename="metadata.json"):
-        assert isinstance(metadata, dict), "Metadata must be a dictionary."
+    def create_dataset_table(self, cursor, dataset_name):
 
-        os.makedirs(path_to_save, exist_ok=True)
-        with open(os.path.join(path_to_save, filename), "w") as f:
-            json.dump(metadata, f, indent=4)
+        dataset_table_columns = ", ".join(
+            f"{column} {dtype}" for column, dtype in self.other_headers.items()
+        )
+        cursor.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {dataset_name} (
+                series_id TEXT PRIMARY KEY,
+                {dataset_table_columns}
+            )
+            """
+        )
+
+    def create_statistics_table(self, cursor):
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS statistics (
+                dataset TEXT PRIMARY KEY,
+                mean REAL,
+                std_dev REAL,
+                total_voxels INTEGER,
+                total_slices INTEGER,
+                total_series INTEGER
+            )
+            """
+        )
+
+    def insert_global_data(self, cursor, dicom_paths, metadata):
+        cursor.execute(
+            """
+            INSERT INTO global (
+                dicom_path, series_id, dataset, num_slices, image_shape_x, image_shape_y, image_shape_z,
+                spacing_x, spacing_y, spacing_z
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dicom_paths[0],
+                metadata["series_id"],
+                metadata["dataset"],
+                metadata["num_slices"],
+                metadata["image_shape"][0],
+                metadata["image_shape"][1],
+                metadata["image_shape"][2],
+                metadata["spacing"][0],
+                metadata["spacing"][1],
+                metadata["spacing"][2],
+            ),
+        )
+
+    def insert_dataset_data(self, cursor, dataset_name, series_id, metadata):
+        dataset_table_columns = ", ".join(self.other_headers.keys())
+        cursor.execute(
+            f"""
+            INSERT INTO {dataset_name} (
+                series_id, {dataset_table_columns}
+            )
+            VALUES ({(["?"] * (len(self.other_headers) + 1)).join(", ")})
+            """,
+            (
+                series_id,
+                *[
+                    metadata["other"].get(column, None)
+                    for column in self.other_headers.keys()
+                ],
+            ),
+        )
+
+    def insert_statistics_data(self, cursor, dataset, statistics):
+        cursor.execute(
+            """
+            INSERT INTO statistics (dataset, mean, std_dev, total_voxels, total_slices, total_series)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dataset,
+                statistics["mean"],
+                statistics["std_dev"],
+                statistics["total_voxels"],
+                statistics["total_slices"],
+                statistics["total_series"],
+            ),
+        )
 
 
 class StatisticsManager:
     def __init__(self):
-        self.total_voxels = 0
-        self.sum_voxels = 0.0
-        self.sum_squares_voxels = 0.0
+        self.total_voxels: int = 0
+        self.sum_voxels: float = 0.0
+        self.sum_squares_voxels: float = 0.0
+        self.total_slices: int = 0
+        self.total_series: int = 0
 
-    def update_statistics(self, image_array):
+    def update_statistics(self, image_array: np.ndarray) -> None:
         """
         Update the running sum and sum of squares of voxel intensities.
         """
         self.total_voxels += image_array.size
         self.sum_voxels += np.sum(image_array)
         self.sum_squares_voxels += np.sum(np.square(image_array))
+        self.total_slices += image_array.shape[0]
+        self.total_series += 1
 
-    def finalize_statistics(self):
+    def gather_statistics(self) -> Tuple[float, float]:
         """
-        Calculate and return the final mean and standard deviation.
+        Calculate and the global mean and standard deviation and return the collected statistics.
         """
         mean = self.sum_voxels / self.total_voxels
         variance = (self.sum_squares_voxels / self.total_voxels) - (mean**2)
         std_dev = np.sqrt(variance)
-        return mean, std_dev
 
-    def save_global_metadata(self, target_path):
-        """
-        Save the global mean and standard deviation to the target path.
-        """
-        mean, std_dev = self.finalize_statistics()
-        global_metadata = {
+        return {
             "mean": mean,
             "std_dev": std_dev,
             "total_voxels": self.total_voxels,
+            "total_slices": self.total_slices,
+            "total_series": self.total_series,
         }
-        with open(os.path.join(target_path, "metadata.json"), "w") as f:
-            json.dump(global_metadata, f, indent=4)
