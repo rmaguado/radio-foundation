@@ -5,16 +5,14 @@ import SimpleITK as sitk
 from tqdm import tqdm
 from typing import List, Tuple
 from abc import ABC, abstractmethod
-from collections import OrderedDict
 
 
 class DatasetBase(ABC):
     def __init__(self, config: dict):
         sitk.ProcessObject_SetGlobalWarningDisplay(False)
-        
+
         self.config = config
         self.statistics = StatisticsManager()
-        self.other_headers = OrderedDict([("series_path", "TEXT")])
 
     @abstractmethod
     def get_series_paths(self) -> List[Tuple[str, str]]:
@@ -23,16 +21,6 @@ class DatasetBase(ABC):
 
         Returns:
             List[Tuple[str, str]]: A list of tuples with series_id and path to series.
-        """
-        pass
-
-    @abstractmethod
-    def extend_metadata(self, metadata: dict) -> None:
-        """
-        Extend the metadata dictionary with additional information.
-
-        Args:
-            metadata (dict): The metadata dictionary to be extended.
         """
         pass
 
@@ -72,16 +60,10 @@ class DatasetBase(ABC):
         image_shape, num_slices = self.get_shape(image)
 
         metadata = {
-            "dataset": self.config["dataset"],
-            "series_id": series_id,
             "num_slices": num_slices,
             "image_shape": image_shape,
             "spacing": image_spacing,
-            "other": {
-                "series_path": path_to_series,
-            },
         }
-        self.extend_metadata(metadata)
 
         self.statistics.update_statistics(sitk.GetArrayFromImage(image))
 
@@ -91,10 +73,10 @@ class DatasetBase(ABC):
         assert hasattr(
             self, "get_series_paths"
         ), "The method 'get_series_paths' must be implemented."
-        
-        dataset_name = self.config["dataset"]
 
-        conn = sqlite3.connect(self.config["database_path"])
+        dataset_name = self.config["dataset_name"]
+
+        conn = sqlite3.connect(self.config["target_path"])
         cursor = conn.cursor()
 
         self.create_global_table(cursor)
@@ -106,23 +88,36 @@ class DatasetBase(ABC):
         for series_id, series_path in tqdm(series_paths):
             metadata, dicom_paths = self.process_series(series_path, series_id)
 
-            for dicom_path in dicom_paths:
-                self.insert_global_data(cursor, dicom_path, metadata)
+            for slice_index, dicom_path in enumerate(dicom_paths):
+                self.insert_global_data(
+                    cursor, dicom_path, series_id, dataset_name, slice_index
+                )
             self.insert_dataset_data(cursor, dataset_name, series_id, metadata)
 
         statistics = self.statistics.gather_statistics()
-        self.insert_statistics_data(cursor, self.config["dataset"], statistics)
+        self.insert_statistics_data(cursor, dataset_name, statistics)
 
         conn.commit()
         conn.close()
 
-    def create_global_table(self, cursor):
+    def create_global_table(self, cursor: sqlite3.Cursor) -> None:
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS global (
                 dicom_path TEXT PRIMARY KEY,
                 series_id TEXT,
                 dataset TEXT,
+                slice_index REAL
+            )
+            """
+        )
+
+    def create_dataset_table(self, cursor: sqlite3.Cursor, dataset_name: str) -> None:
+        dataset_name = f'"{dataset_name}"'
+        cursor.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS (?) (
+                series_id TEXT PRIMARY KEY,
                 num_slices INTEGER,
                 image_shape_x INTEGER,
                 image_shape_y INTEGER,
@@ -131,53 +126,56 @@ class DatasetBase(ABC):
                 spacing_y REAL,
                 spacing_z REAL
             )
-            """
+            """,
+            (dataset_name),
         )
 
-    def create_dataset_table(self, cursor, dataset_name):
-        dataset_table_columns = ", ".join(
-            f'"{column}" {dtype}' for column, dtype in self.other_headers.items()
-        )
-        dataset_name = f'"{dataset_name}"'
-        cursor.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {dataset_name} (
-                series_id TEXT PRIMARY KEY,
-                {dataset_table_columns}
-            )
-            """
-        )
-
-    def create_statistics_table(self, cursor):
+    def create_statistics_table(self, cursor: sqlite3.Cursor) -> None:
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS "statistics" (
                 dataset TEXT PRIMARY KEY,
                 mean REAL,
                 std_dev REAL,
-                total_voxels INTEGER,
                 total_slices INTEGER,
                 total_series INTEGER
             )
             """
         )
 
-    def insert_global_data(self, cursor, dicom_path, metadata):
-        dicom_path = f'"{dicom_path}"'
-        series_id = f'"{metadata["series_id"]}"'
-        dataset = f'"{metadata["dataset"]}"'
+    def insert_global_data(
+        self,
+        cursor: sqlite3.Cursor,
+        dicom_path: str,
+        series_id: str,
+        dataset_name: str,
+        slice_index: int,
+    ) -> None:
         cursor.execute(
             """
             INSERT INTO "global" (
-                dicom_path, series_id, dataset, num_slices, image_shape_x, image_shape_y, image_shape_z,
+                dicom_path, series_id, dataset, slice_index
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (dicom_path, series_id, dataset_name, slice_index),
+        )
+
+    def insert_dataset_data(
+        self, cursor: sqlite3.Cursor, dataset_name: str, series_id: str, metadata: dict
+    ) -> None:
+
+        cursor.execute(
+            f"""
+            INSERT INTO (?) (
+                series_id, series_id, num_slices, image_shape_x, image_shape_y, image_shape_z,
                 spacing_x, spacing_y, spacing_z
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                dicom_path,
+                dataset_name,
                 series_id,
-                dataset,
                 metadata["num_slices"],
                 metadata["image_shape"][0],
                 metadata["image_shape"][1],
@@ -188,44 +186,18 @@ class DatasetBase(ABC):
             ),
         )
 
-    def insert_dataset_data(self, cursor, dataset_name, series_id, metadata):
-        dataset_name = f'"{dataset_name}"'
-        series_id = f'"{series_id}"'
-        dataset_table_columns = ", ".join(
-            f'"{column}"' for column in self.other_headers.keys()
-        )
-        dataset_table_values = [
-            metadata["other"].get(column, None) for column in self.other_headers.keys()
-        ]
-        dataset_table_values = [
-            f'"{value}"' if isinstance(value, str) else value
-            for value in dataset_table_values
-        ]
-
-        cursor.execute(
-            f"""
-            INSERT INTO {dataset_name} (
-                series_id, {dataset_table_columns}
-            )
-            VALUES ({", ".join(["?"] * (len(self.other_headers) + 1))})
-            """,
-            (
-                series_id,
-                *dataset_table_values,
-            ),
-        )
-
-    def insert_statistics_data(self, cursor, dataset, statistics):
+    def insert_statistics_data(
+        self, cursor: sqlite3.Cursor, dataset_name: str, statistics: dict
+    ) -> None:
         cursor.execute(
             """
-            INSERT INTO "statistics" (dataset, mean, std_dev, total_voxels, total_slices, total_series)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO "statistics" (dataset, mean, std_dev, total_slices, total_series)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
-                dataset,
+                dataset_name,
                 statistics["mean"],
                 statistics["std_dev"],
-                statistics["total_voxels"],
                 statistics["total_slices"],
                 statistics["total_series"],
             ),
@@ -261,7 +233,6 @@ class StatisticsManager:
         return {
             "mean": mean,
             "std_dev": std_dev,
-            "total_voxels": self.total_voxels,
             "total_slices": self.total_slices,
             "total_series": self.total_series,
         }

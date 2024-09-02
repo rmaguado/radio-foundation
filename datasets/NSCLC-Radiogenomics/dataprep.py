@@ -36,24 +36,14 @@ class NsclcRadiogenomics(DatasetBase):
     def __init__(self, config):
         super().__init__(config)
 
-        self.datapath = config["datapath"]
-        self.df = pd.read_csv(config["dfpath"])
-        self.other_headers.update(
-            [
-                ("sex", "TEXT"),
-                ("age", "INT"),
-                ("smoking_status", "TEXT"),
-                ("pack_years", "INT"),
-            ]
-        )
-
     def get_series_paths(self):
+        datapath = self.config["dataset_path"]
         series_paths = []
         reader = sitk.ImageSeriesReader()
 
         filter_words = ["thin lung window", "thorax", "chest", "lung", "in reach"]
 
-        for data_folder, dirs, files in os.walk(self.datapath):
+        for data_folder, dirs, files in os.walk(datapath):
             series_ids = reader.GetGDCMSeriesIDs(data_folder)
             for series_id in series_ids:
                 series_file_names = reader.GetGDCMSeriesFileNames(
@@ -76,35 +66,12 @@ class NsclcRadiogenomics(DatasetBase):
 
         return series_paths
 
-    def extend_metadata(self, metadata):
-        series_path = metadata["other"]["series_path"]
-        patient_id = series_path.split("NSCLC-Radiomics/")[1].split("/")[0]
-        patient_row = self.df[self.df["Case ID"] == patient_id].iloc[0]
-
-        age = round(float(patient_row["Age at Histological Diagnosis"]))
-        sex = {"Female": "F", "Male": "M"}[patient_row["Gender"]]
-        smoking_status = patient_row["Smoking status"]
-
-        pack_years = patient_row["Pack Years"]
-        if pack_years == float("nan") or pack_years == "Not Collected":
-            pack_years = "NA"
-
-        metadata["other"].update(
-            {
-                "sex": sex,
-                "age": age,
-                "smoking_status": smoking_status,
-                "pack_years": pack_years,
-            }
-        )
-
 
 def main():
     config = {
-        "dataset": "NSCLC-Radiogenomics",
-        "datapath": "/home/rmaguado/ruben/radio-foundation/datasets/NSCLC-Radiogenomics/source",
-        "dfpath": "/home/rmaguado/ruben/radio-foundation/datasets/NSCLC-Radiogenomics/NSCLCR01Radiogenomic_DATA_LABELS_2018-05-22_1500-shifted.csv",
-        "database_path": "radiomics_datasets.db",
+        "dataset_name": "NSCLC-Radiogenomics",
+        "dataset_path": "/home/rmaguado/rdt/DeepRDT/datasets/NSCLC-Radiogenomics",
+        "target_path": "datasets/radiomics_datasets.db",
     }
 
     dataprep = NsclcRadiogenomics(config)
