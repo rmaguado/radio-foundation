@@ -35,7 +35,7 @@ class NsclcRadiomics(DatasetBase):
                 if series_file_names:
                     first_file = series_file_names[0]
                     dcm = pydicom.dcmread(first_file)
-                    modality = dcm.GetMetaData("0008|0060")
+                    modality = dcm.get((0x0008,0x0060))
                     if modality == "CT":
                         series_paths.append((series_id, data_folder))
 
@@ -62,7 +62,7 @@ class NsclcRadiomics(DatasetBase):
 def main():
     config = {
         "dataset": "NSCLC-Radiomics",
-        "datapath": "/home/rmaguado/rdt/DeepRDT/manifest-1722177583547/NSCLC-Radiomics",
+        "datapath": "/home/rmaguado/rdt/DeepRDT/datasets/NSCLC-Radiomics",
         "dfpath": "/home/rmaguado/ruben/radio-foundation/datasets/NSCLC-Radiomics/NSCLC-Radiomics-Lung1.clinical-version3-Oct-2019.csv",
         "database_path": "radiomics_datasets.db",
     }

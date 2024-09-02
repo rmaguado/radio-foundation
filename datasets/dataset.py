@@ -10,6 +10,8 @@ from collections import OrderedDict
 
 class DatasetBase(ABC):
     def __init__(self, config: dict):
+        sitk.ProcessObject_SetGlobalWarningDisplay(False)
+        
         self.config = config
         self.statistics = StatisticsManager()
         self.other_headers = OrderedDict([("series_path", "TEXT")])
@@ -88,8 +90,8 @@ class DatasetBase(ABC):
     def prepare_dataset(self) -> None:
         assert hasattr(
             self, "get_series_paths"
-        ), "The method 'get_patient_ids' must be implemented."
-
+        ), "The method 'get_series_paths' must be implemented."
+        
         dataset_name = self.config["dataset"]
 
         conn = sqlite3.connect(self.config["database_path"])
@@ -100,6 +102,7 @@ class DatasetBase(ABC):
         self.create_statistics_table(cursor)
 
         series_paths = self.get_series_paths()
+        print(f"Processing {len(series_paths)} series.")
         for series_id, series_path in tqdm(series_paths):
             metadata, dicom_paths = self.process_series(series_path, series_id)
 
