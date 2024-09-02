@@ -11,7 +11,6 @@ from collections import OrderedDict
 class DatasetBase(ABC):
     def __init__(self, config: dict):
         self.config = config
-        self.target_path = config["target_path"]
         self.statistics = StatisticsManager()
         self.other_headers = OrderedDict([("series_path", "TEXT")])
 
