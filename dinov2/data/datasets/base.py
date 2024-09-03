@@ -7,6 +7,7 @@ from typing import Any, Tuple, Optional
 import torch
 import numpy as np
 import os
+import sqlite3
 
 import torch.distributed as dist
 
@@ -20,6 +21,9 @@ class BaseDataset:
         self.root_path = "RootPathNotGiven"
         self.output_path = "OutputPathNotGiven"
         self.entries_path = "path/to/entries"
+        
+        self.conn = None
+        self.cursor = None
 
     def get_entries(self) -> np.ndarray:
         os.makedirs(self.entries_path, exist_ok=True)
@@ -36,6 +40,14 @@ class BaseDataset:
             dist.barrier()
 
         return np.load(entries_dataset_path, mmap_mode="r")
+
+    def open_db(self):
+        self.conn = sqlite3.connect(self.index_path, uri=True)
+        self.cursor = self.conn.cursor()
+
+    def __del__(self):
+        if isinstance(self.conn, sqlite3.Connection):
+            self.conn.close()
 
     def create_entries(self) -> np.ndarray:
         raise NotImplementedError

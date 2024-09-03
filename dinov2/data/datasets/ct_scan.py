@@ -35,6 +35,7 @@ class CtDataset(BaseDataset):
         self.index_path = index_path
         self.root_path = root_path
         self.output_path = output_path
+        self.open_db()
 
         self.channels = options.get("channels", 1)
         self.lower_window = options.get("lower_window", -1000)
@@ -42,9 +43,6 @@ class CtDataset(BaseDataset):
 
         self.transform = transform
         self.target_transform = target_transform
-
-        self.conn = sqlite3.connect(self.index_path, uri=True)
-        self.cursor = self.conn.cursor()
         
         self.entries_path = os.path.join(self.output_path, "entries")
         self.entries = self.get_entries()
@@ -132,12 +130,6 @@ class CtDataset(BaseDataset):
             stack_data.append(self.process_ct(dcm))
 
         return torch.stack(stack_data)
-
-    def close_db(self):
-        if self.conn:
-            self.conn.close()
-        self.conn = None
-        self.cursor = None
 
     def __len__(self) -> int:
         return len(self.entries)
