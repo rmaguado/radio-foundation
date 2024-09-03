@@ -87,8 +87,11 @@ class CtDataset(BaseDataset):
 
         entries_array = np.array(entries, dtype=np.uint32)
 
-        np.save(self.entries_path, entries_array)
-        return np.load(self.entries_path, mmap_mode="r")
+        entries_dataset_path = os.path.join(
+            self.entries_path, f"{self.dataset_name}.npy"
+        )
+        np.save(entries_dataset_path, entries_array)
+        return np.load(entries_dataset_path, mmap_mode="r")
 
     def process_ct(self, dcm) -> torch.tensor:
         if dcm.RescaleType == "HU":
