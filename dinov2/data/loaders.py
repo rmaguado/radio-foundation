@@ -76,7 +76,7 @@ def make_dataset(
             "dataset_name": dataset_config.name,
             "index_path": dataset_config.index_path,
             "output_path": config.train.output_dir,
-            "options": dataset_config.options,
+            "options": dataset_config.get("options", {}),
             "transform": transform,
             "target_transform": target_transform,
         }

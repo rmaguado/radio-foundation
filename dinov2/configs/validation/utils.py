@@ -15,6 +15,10 @@ class Errors:
     VIT_SMALL_DROP_PATH = "Drop path rate should be 0.0 for vit_small."
     INVALID_TRAIN_SETUP = "Train setup is invalid. Check epoch num and warmup configs."
     INVALID_VALUE_PAIR = "Invalid pair of values: {} and {}."
+    INVALID_CHANNELS = (
+        "Channels for dataset {} should be an integer greater than 0. Found {}."
+    )
+    INVALID_DATASET_TYPE = "Invalid dataset type: {}."
 
 
 class ValueRange:
