@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger("dataprep")
 logger.setLevel(logging.INFO)
 
-file_handler = logging.FileHandler("dataprep.log")
+file_handler = logging.FileHandler("data/log.txt")
 file_handler.setLevel(logging.INFO)
 
 formatter = logging.Formatter("%(levelname)s - %(message)s")
