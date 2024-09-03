@@ -16,6 +16,8 @@ class BaseDataset:
         self.transform = lambda _: _
         self.target_transform = lambda _: _
         self.dataset_name = "DatasetNotGiven"
+        self.index_path = "IndexPathNotGiven"
+        self.root_path = "RootPathNotGiven"
         self.output_path = "OutputPathNotGiven"
         self.entries_path = "path/to/entries"
 

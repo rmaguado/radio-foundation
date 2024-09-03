@@ -11,7 +11,7 @@ from omegaconf import DictConfig
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import CtDataset, VolumeDataset, MultiDataset
+from .datasets import CtDataset, MultiDataset
 from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 
 
@@ -49,7 +49,7 @@ def make_dataset(
     config: DictConfig,
     transform: Callable,
     target_transform: Optional[Callable] = lambda _: _,
-) -> Union[CtDataset, VolumeDataset, MultiDataset]:
+) -> Union[CtDataset, MultiDataset]:
     """
     Parse the dataset from the given OmegaConf configuration.
 
@@ -59,7 +59,7 @@ def make_dataset(
         target_transform (Optional[Callable]): Function to be applied to targets.
 
     Returns:
-        Union[ImageDataset, VolumeDataset, MultiDataset]: The corresponding dataset object(s).
+        Union[ImageDataset, MultiDataset]: The corresponding dataset object(s).
     """
 
     dataset_types_mapping = {
@@ -76,6 +76,7 @@ def make_dataset(
         dataset_kwargs = {
             "dataset_name": dataset_config.name,
             "index_path": dataset_config.index_path,
+            "root_path": config.data.root_path,
             "output_path": config.train.output_dir,
             "options": dataset_options,
             "transform": transform,

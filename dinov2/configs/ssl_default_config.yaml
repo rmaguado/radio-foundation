@@ -76,14 +76,15 @@ train:
 evaluation:
   eval_period_iterations: 10000
 data:
+  root_path: .
   datasets:
     - name: "radiomics_datasets"
       index_path: data/radiomics_datasets.db
       type: "ct"
       options:
         channels: 1
-        lower_window: -1000
-        upper_window: 2000
+        lower_window: -1000.0
+        upper_window: 2000.0
 student:
   arch: vit_large
   patch_size: 14

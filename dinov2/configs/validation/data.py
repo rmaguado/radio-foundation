@@ -1,4 +1,3 @@
-import os
 from omegaconf import DictConfig, ListConfig
 import logging
 
@@ -6,20 +5,13 @@ from .utils import (
     test_has_section,
     test_attributes_dtypes,
     test_attributes_range,
+    test_path_exists,
     ValueRange,
     Errors,
 )
 
 
 logger = logging.getLogger("dinov2")
-
-
-def test_index_path_exists(dataset_config: DictConfig) -> None:
-    datasets_index = dataset_config.index_path
-    if not os.path.exists(datasets_index):
-        logger.error(Errors.PATH_NOT_FOUND.format(datasets_index))
-        return False
-    return True
 
 
 def test_has_dataset(data_config: DictConfig) -> None:
@@ -30,27 +22,32 @@ def test_has_dataset(data_config: DictConfig) -> None:
 
 
 def test_dataset_options_is_valid(dataset_config: DictConfig) -> None:
-    if not test_has_section(dataset_config, "options"):
-        return True
+    dataset_name = dataset_config.name
     options_config = dataset_config.options
     dataset_type = dataset_config.type
 
     if dataset_type == "ct":
         if hasattr(options_config, "channels"):
-            if not isinstance(options_config.channels, int):
+            channels = options_config.channels
+            if not isinstance(channels, int):
+                logger.error(
+                    Errors.INVALID_CHANNELS.format(
+                        dataset_config.name, channels
+                    )
+                )
                 return False
             if options_config.channels < 1:
                 logger.error(
                     Errors.INVALID_CHANNELS.format(
-                        dataset_config.name, options_config.channels
+                        dataset_config.name, channels
                     )
                 )
                 return False
         if hasattr(options_config, "lower_window"):
-            if not isinstance(options_config.lower_window, float):
+            if not test_attributes_dtypes(options_config, [("lower_window", float)], dataset_name):
                 return False
         if hasattr(options_config, "upper_window"):
-            if not isinstance(options_config.upper_window, float):
+            if not test_attributes_dtypes(options_config, [("upper_window", float)], dataset_name):
                 return False
         if hasattr(options_config, "lower_window") and hasattr(
             options_config, "upper_window"
@@ -86,9 +83,11 @@ def test_dataset_is_valid(dataset_config: DictConfig) -> None:
         logger.error(Errors.INVALID_DATASET_TYPE.format(dataset_config.type))
         return False
     if hasattr(dataset_config, "options"):
-        pass
-    if not test_index_path_exists(dataset_config):
+        if not test_dataset_options_is_valid(dataset_config):
+            return False
+    if not test_path_exists(dataset_config.index_path):
         return False
+    return True
 
 
 def validate_data(config: DictConfig) -> None:
@@ -96,14 +95,19 @@ def validate_data(config: DictConfig) -> None:
         return False
     data_config = config.data
     required_attributes = [
+        ("root_path", str),
         ("datasets", ListConfig),
     ]
     if not test_attributes_dtypes(data_config, required_attributes, "data"):
         return False
     if not test_has_dataset(data_config):
         return False
-    for dataset_config in data_config.datasets:
-        test_dataset_is_valid(dataset_config)
+    if not all(
+        [
+            test_dataset_is_valid(dataset_config) for dataset_config in data_config.datasets
+        ]
+    ):
+        return False
 
     logger.debug("'data' config is valid.")
 

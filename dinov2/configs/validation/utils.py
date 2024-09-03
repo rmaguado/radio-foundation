@@ -1,3 +1,4 @@
+import os
 from omegaconf import DictConfig
 import logging
 from typing import List, Tuple
@@ -103,5 +104,11 @@ def test_attributes_range(
                     config_section, attr, value_range.__repr__()
                 )
             )
+        return False
+    return True
+
+def test_path_exists(path) -> None:
+    if not os.path.exists(path):
+        logger.error(Errors.PATH_NOT_FOUND.format(path))
         return False
     return True

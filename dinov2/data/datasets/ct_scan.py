@@ -23,6 +23,7 @@ class CtDataset(BaseDataset):
         self,
         dataset_name: str,
         index_path: str,
+        root_path: str,
         output_path: str,
         options: Optional[dict] = None,
         transform: Optional[Callable] = lambda _: _,
@@ -32,6 +33,7 @@ class CtDataset(BaseDataset):
 
         self.dataset_name = dataset_name
         self.index_path = index_path
+        self.root_path = root_path
         self.output_path = output_path
 
         self.channels = options.get("channels", 1)
@@ -41,16 +43,14 @@ class CtDataset(BaseDataset):
         self.transform = transform
         self.target_transform = target_transform
 
+        self.conn = sqlite3.connect(self.index_path, uri=True)
+        self.cursor = self.conn.cursor()
+        
         self.entries_path = os.path.join(self.output_path, "entries")
-        self.conn = None
-        self.cursor = None
         self.entries = self.get_entries()
 
     def create_entries(self) -> np.ndarray:
         slice_stack_num = self.channels
-
-        self.conn = sqlite3.connect(self.index_path, uri=True)
-        self.cursor = self.conn.cursor()
 
         self.cursor.execute(f"SELECT dataset, series_id, slice_index FROM global")
         global_rows = self.cursor.fetchall()
@@ -86,7 +86,7 @@ class CtDataset(BaseDataset):
             entries.append([x[0] for x in stack_rows])
 
         entries_array = np.array(entries, dtype=np.uint32)
-
+        
         entries_dataset_path = os.path.join(
             self.entries_path, f"{self.dataset_name}.npy"
         )
@@ -109,10 +109,10 @@ class CtDataset(BaseDataset):
         return None
 
     def get_image_data(self, index: int) -> torch.tensor:
-        stack_rowids = self.entries[index]
+        stack_rowids = [int(x) for x in self.entries[index]]
         self.cursor.execute(
             """
-            SELECT rowid, slice_index, dicom_path
+            SELECT rowid, slice_index, dataset, dicom_path
             FROM global 
             WHERE rowid IN ({})
             """.format(
@@ -122,10 +122,13 @@ class CtDataset(BaseDataset):
         )
         stack_rows = self.cursor.fetchall()
         stack_rows.sort(key=lambda x: x[1])
+        
+        
 
         stack_data = []
-        for _, _, dicom_path in stack_rows:
-            dcm = pydicom.dcmread(dicom_path)
+        for _, _, dataset, rel_dicom_path in stack_rows:
+            abs_dicom_path = os.path.join(self.root_path, dataset, rel_dicom_path)
+            dcm = pydicom.dcmread(abs_dicom_path)
             stack_data.append(self.process_ct(dcm))
 
         return torch.stack(stack_data)
