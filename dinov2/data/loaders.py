@@ -11,7 +11,7 @@ from omegaconf import DictConfig
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import ImageDataset, VolumeDataset, MultiDataset
+from .datasets import CtDataset, VolumeDataset, MultiDataset
 from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 
 
@@ -49,7 +49,7 @@ def make_dataset(
     config: DictConfig,
     transform: Callable,
     target_transform: Optional[Callable] = lambda _: _,
-) -> Union[ImageDataset, VolumeDataset, MultiDataset]:
+) -> Union[CtDataset, VolumeDataset, MultiDataset]:
     """
     Parse the dataset from the given OmegaConf configuration.
 
@@ -62,36 +62,29 @@ def make_dataset(
         Union[ImageDataset, VolumeDataset, MultiDataset]: The corresponding dataset object(s).
     """
 
-    def create_volume_dataset(dataset_config, **kwargs):
-        return VolumeDataset(**kwargs, channels=dataset_config.get("channels", 1))
-
-    dataset_mapping = {
-        "ct": create_volume_dataset,
-        "mri": create_volume_dataset,
-        "xray": ImageDataset,
+    dataset_types_mapping = {
+        "ct": CtDataset,
     }
 
-    root_path = config.data.root_path
     datasets = config.data.datasets
     dataset_objects = []
 
     for dataset_config in datasets:
-        dataset_name = dataset_config.name
         dataset_type = dataset_config.type
 
         dataset_kwargs = {
-            "root_path": root_path,
-            "dataset_name": dataset_name,
+            "dataset_name": dataset_config.name,
+            "index_path": dataset_config.index_path,
             "output_path": config.train.output_dir,
-            "split": dataset_config.split,
+            "options": dataset_config.options,
             "transform": transform,
             "target_transform": target_transform,
         }
 
-        if dataset_type not in dataset_mapping:
+        if dataset_type not in dataset_types_mapping:
             raise ValueError(f"Unknown dataset type: {dataset_type}")
 
-        dataset_object = dataset_mapping[dataset_type](dataset_config, **dataset_kwargs)
+        dataset_object = dataset_types_mapping[dataset_type](dataset_kwargs)
         dataset_objects.append(dataset_object)
 
     return (

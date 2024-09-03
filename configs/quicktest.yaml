@@ -10,14 +10,13 @@ train:
     grad_accum_steps: 4
 data:
   datasets:
-  - name: LIDC-IDRI
-    type: ct
-    split: train
-    channels: 4
-  - name: NSCLC-Radiomics
-    type: ct
-    split: train
-    channels: 4
+    - name: "radiomics_datasets"
+      index_path: data/radiomics_datasets.db
+      type: "ct"
+      options:
+        channels: 1
+        lower_window: -1000
+        upper_window: 2000
 evaluation:
   eval_period_iterations: 10
 student:

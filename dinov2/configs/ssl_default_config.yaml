@@ -76,12 +76,14 @@ train:
 evaluation:
   eval_period_iterations: 10000
 data:
-  root_path: ./datasets
   datasets:
-  - name: LIDC-IDRI
-    type: ct
-    split: train
-    channels: 1
+    - name: "radiomics_datasets"
+      index_path: data/radiomics_datasets.db
+      type: "ct"
+      options:
+        channels: 1
+        lower_window: -1000
+        upper_window: 2000
 student:
   arch: vit_large
   patch_size: 14
