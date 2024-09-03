@@ -59,7 +59,7 @@ class CtDataset(BaseDataset):
 
         for dataset, series_id, slice_index in global_rows:
             self.cursor.execute(
-                f"SELECT num_slices FROM datasets WHERE series_id = '{series_id}' AND dataset = '{dataset}'"
+                f"SELECT num_slices FROM '{dataset}' WHERE series_id = '{series_id}'"
             )
             num_slices = self.cursor.fetchone()[0]
             if slice_index > num_slices - slice_stack_num:
