@@ -15,8 +15,6 @@ class NsclcRadiomics(DatasetBase):
         datapath = self.config["dataset_path"]
         series_paths = []
         reader = sitk.ImageSeriesReader()
-
-        print("Scanning data folder for dicom series paths.")
         for data_folder, dirs, files in tqdm(os.walk(datapath)):
             series_ids = reader.GetGDCMSeriesIDs(data_folder)
             for series_id in series_ids:
@@ -27,7 +25,9 @@ class NsclcRadiomics(DatasetBase):
                     first_file = series_file_names[0]
                     dcm = pydicom.dcmread(first_file)
                     modality = dcm.get((0x0008, 0x0060))
-                    if modality == "CT":
+                    if modality is None:
+                        break
+                    if modality.value == "CT":
                         series_paths.append((series_id, data_folder))
 
         return series_paths
