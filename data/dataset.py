@@ -193,18 +193,22 @@ def validate_ct_dicom(dicom_file_path: str) -> bool:
     ]:
         return False
 
-    if not is_axial_orientation(orientation_patient.value):
+    if modality != "CT":
+        print(f"{series_id}: Modality is not CT. Skipping.")
         return False
-    if not float(slice_thickness.value) < 5.0:
+    if not is_axial_orientation(orientation_patient):
+        print(f"{series_id}: Orientation is not axial. Skipping.")
+        return False
+    if not float(slice_thickness) < 5.0:
         print(f"{series_id}: Slice thickness is too high. Skipping.")
         return False
-    if image_type.value[0] != "ORIGINAL":
+    if image_type[0] != "ORIGINAL":
         print(f"{series_id}: Image type is not ORIGINAL. Skipping.")
         return False
-    if image_type.value[1] != "PRIMARY":
+    if image_type[1] != "PRIMARY":
         print(f"{series_id}: Image type is not PRIMARY. Skipping.")
         return False
-    if image_type.value[2] == "LOCALIZER":
+    if image_type[2] == "LOCALIZER":
         print(f"{series_id}: Image type is LOCALIZER. Skipping.")
         return False
     return True
