@@ -71,12 +71,13 @@ def make_dataset(
 
     for dataset_config in datasets:
         dataset_type = dataset_config.type
+        dataset_options = dataset_config.get("options", {})
 
         dataset_kwargs = {
             "dataset_name": dataset_config.name,
             "index_path": dataset_config.index_path,
             "output_path": config.train.output_dir,
-            "options": dataset_config.get("options", {}),
+            "options": dataset_options,
             "transform": transform,
             "target_transform": target_transform,
         }
@@ -84,7 +85,7 @@ def make_dataset(
         if dataset_type not in dataset_types_mapping:
             raise ValueError(f"Unknown dataset type: {dataset_type}")
 
-        dataset_object = dataset_types_mapping[dataset_type](dataset_kwargs)
+        dataset_object = dataset_types_mapping[dataset_type](**dataset_kwargs)
         dataset_objects.append(dataset_object)
 
     return (
