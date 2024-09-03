@@ -43,7 +43,7 @@ class CtDataset(BaseDataset):
 
         self.transform = transform
         self.target_transform = target_transform
-        
+
         self.entries_path = os.path.join(self.output_path, "entries")
         self.entries = self.get_entries()
 
@@ -84,7 +84,7 @@ class CtDataset(BaseDataset):
             entries.append([x[0] for x in stack_rows])
 
         entries_array = np.array(entries, dtype=np.uint32)
-        
+
         entries_dataset_path = os.path.join(
             self.entries_path, f"{self.dataset_name}.npy"
         )
@@ -92,10 +92,11 @@ class CtDataset(BaseDataset):
         return np.load(entries_dataset_path, mmap_mode="r")
 
     def process_ct(self, dcm) -> torch.tensor:
-        if dcm.RescaleType == "HU":
-            array_data = dcm.pixel_array
-        else:
-            array_data = dcm.RescaleSlope * dcm.pixel_array + dcm.RescaleIntercept
+        slope = getattr(dcm, "RescaleSlope", 1)
+        intercept = getattr(dcm, "RescaleIntercept", 0)
+
+        array_data = dcm.pixel_array * slope + intercept
+
         array_data = np.clip(array_data, self.lower_window, self.upper_window)
         array_data = (array_data - self.lower_window) / (
             self.upper_window - self.lower_window
@@ -120,8 +121,6 @@ class CtDataset(BaseDataset):
         )
         stack_rows = self.cursor.fetchall()
         stack_rows.sort(key=lambda x: x[1])
-        
-        
 
         stack_data = []
         for _, _, dataset, rel_dicom_path in stack_rows:
