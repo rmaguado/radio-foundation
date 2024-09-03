@@ -9,6 +9,20 @@ import os
 from abc import ABC, abstractmethod
 
 
+import logging
+
+logger = logging.getLogger("dataprep")
+logger.setLevel(logging.INFO)
+
+file_handler = logging.FileHandler("dataprep.log")
+file_handler.setLevel(logging.INFO)
+
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+file_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+
+
 class DatasetBase(ABC):
     def __init__(self, config: dict):
         sitk.ProcessObject_SetGlobalWarningDisplay(False)
@@ -82,7 +96,7 @@ class DatasetBase(ABC):
         self.create_dataset_table(cursor, dataset_name)
 
         series_paths = self.get_series_paths()
-        print(f"Processing {len(series_paths)} series.")
+        logger.info(f"Processing {len(series_paths)} series.")
         for series_id, series_path in tqdm(series_paths):
             metadata, dicom_paths = self.process_series(series_path, series_id)
 
@@ -194,21 +208,21 @@ def validate_ct_dicom(dicom_file_path: str) -> bool:
         return False
 
     if modality != "CT":
-        print(f"{series_id}: Modality is not CT. Skipping.")
+        logger.info(f"{series_id}: Modality is not CT. Skipping.")
         return False
     if not is_axial_orientation(orientation_patient):
-        print(f"{series_id}: Orientation is not axial. Skipping.")
+        logger.info(f"{series_id}: Orientation is not axial. Skipping.")
         return False
     if not float(slice_thickness) < 5.0:
-        print(f"{series_id}: Slice thickness is too high. Skipping.")
+        logger.info(f"{series_id}: Slice thickness is too high. Skipping.")
         return False
     if image_type[0] != "ORIGINAL":
-        print(f"{series_id}: Image type is not ORIGINAL. Skipping.")
+        logger.info(f"{series_id}: Image type is not ORIGINAL. Skipping.")
         return False
     if image_type[1] != "PRIMARY":
-        print(f"{series_id}: Image type is not PRIMARY. Skipping.")
+        logger.info(f"{series_id}: Image type is not PRIMARY. Skipping.")
         return False
     if image_type[2] == "LOCALIZER":
-        print(f"{series_id}: Image type is LOCALIZER. Skipping.")
+        logger.info(f"{series_id}: Image type is LOCALIZER. Skipping.")
         return False
     return True
