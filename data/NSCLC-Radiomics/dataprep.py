@@ -4,7 +4,7 @@ import pydicom
 from tqdm import tqdm
 from typing import List, Tuple
 
-from datasets import DatasetBase
+from data import DatasetBase
 
 
 class NsclcRadiomics(DatasetBase):
@@ -15,7 +15,10 @@ class NsclcRadiomics(DatasetBase):
         datapath = self.config["dataset_path"]
         series_paths = []
         reader = sitk.ImageSeriesReader()
-        for data_folder, dirs, files in tqdm(os.walk(datapath)):
+        
+        print("Walking dataset directories.")
+        total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(datapath))
+        for data_folder, dirs, files in tqdm(os.walk(datapath), total=total_dirs):
             series_ids = reader.GetGDCMSeriesIDs(data_folder)
             for series_id in series_ids:
                 series_file_names = reader.GetGDCMSeriesFileNames(
@@ -37,7 +40,7 @@ def main():
     config = {
         "dataset_name": "NSCLC-Radiomics",
         "dataset_path": "/home/rmaguado/rdt/DeepRDT/datasets/NSCLC-Radiomics",
-        "target_path": "datasets/radiomics_datasets.db",
+        "target_path": "data/radiomics_datasets.db",
     }
 
     dataprep = NsclcRadiomics(config)

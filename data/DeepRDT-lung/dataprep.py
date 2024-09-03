@@ -3,7 +3,7 @@ import pandas as pd
 import SimpleITK as sitk
 import pydicom
 
-from datasets import DatasetBase
+from data import DatasetBase
 
 
 class DeepRDTlung(DatasetBase):
@@ -35,7 +35,7 @@ def main():
     config = {
         "dataset_name": "DeepRDT-lung",
         "dataset_path": "/home/rmaguado/ruben/datasets/DeepRDT_lung",
-        "target_path": "datasets/radiomics_datasets.db",
+        "target_path": "data/radiomics_datasets.db",
         "series_ids_path": "/home/rmaguado/cuda/AI/alba/deepRDT_lung/data/dfs",
     }
 

@@ -4,7 +4,7 @@ import pylidc as pl
 import SimpleITK as sitk
 from typing import List, Tuple
 
-from datasets import DatasetBase
+from data import DatasetBase
 
 
 np.int = int
@@ -38,7 +38,7 @@ def main():
     config = {
         "dataset_name": "LIDC-IDRI",
         "dataset_path": "/home/rmaguado/rdt/DeepRDT/datasets/LIDC-IDRI",
-        "target_path": "datasets/radiomics_datasets.db",
+        "target_path": "data/radiomics_datasets.db",
     }
 
     dataprep = LidcIdri(config)

@@ -4,15 +4,14 @@ from tqdm import tqdm
 import SimpleITK as sitk
 from tqdm import tqdm
 from typing import List, Tuple
+import os
 from abc import ABC, abstractmethod
 
 
 class DatasetBase(ABC):
     def __init__(self, config: dict):
         sitk.ProcessObject_SetGlobalWarningDisplay(False)
-
         self.config = config
-        self.statistics = StatisticsManager()
 
     @abstractmethod
     def get_series_paths(self) -> List[Tuple[str, str]]:
@@ -30,7 +29,7 @@ class DatasetBase(ABC):
 
     def get_shape(self, image: sitk.Image) -> Tuple[Tuple[int, int], int]:
         image_array = sitk.GetArrayFromImage(image)
-        return image_array.shape[1, 2], image_array.shape[0]
+        return image_array.shape[1:], image_array.shape[0]
 
     def load_image(self, dicom_paths: List[str]) -> sitk.Image:
         reader = sitk.ImageSeriesReader()
@@ -65,8 +64,6 @@ class DatasetBase(ABC):
             "spacing": image_spacing,
         }
 
-        self.statistics.update_statistics(sitk.GetArrayFromImage(image))
-
         return metadata, dicom_paths
 
     def prepare_dataset(self) -> None:
@@ -75,13 +72,13 @@ class DatasetBase(ABC):
         ), "The method 'get_series_paths' must be implemented."
 
         dataset_name = self.config["dataset_name"]
-
+        absolute_dataset_path = os.path.abspath(self.config["dataset_path"])
+        
         conn = sqlite3.connect(self.config["target_path"])
         cursor = conn.cursor()
 
         self.create_global_table(cursor)
         self.create_dataset_table(cursor, dataset_name)
-        self.create_statistics_table(cursor)
 
         series_paths = self.get_series_paths()
         print(f"Processing {len(series_paths)} series.")
@@ -89,13 +86,11 @@ class DatasetBase(ABC):
             metadata, dicom_paths = self.process_series(series_path, series_id)
 
             for slice_index, dicom_path in enumerate(dicom_paths):
+                relative_path = os.path.relpath(dicom_path, absolute_dataset_path)
                 self.insert_global_data(
-                    cursor, dicom_path, series_id, dataset_name, slice_index
+                    cursor, dataset_name, series_id, slice_index, relative_path
                 )
             self.insert_dataset_data(cursor, dataset_name, series_id, metadata)
-
-        statistics = self.statistics.gather_statistics()
-        self.insert_statistics_data(cursor, dataset_name, statistics)
 
         conn.commit()
         conn.close()
@@ -104,10 +99,11 @@ class DatasetBase(ABC):
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS global (
-                dicom_path TEXT PRIMARY KEY,
-                series_id TEXT,
                 dataset TEXT,
-                slice_index REAL
+                series_id TEXT,
+                slice_index INT,
+                dicom_path TEXT,
+                PRIMARY KEY (dataset, series_id, slice_index)
             )
             """
         )
@@ -121,7 +117,6 @@ class DatasetBase(ABC):
                 num_slices INTEGER,
                 image_shape_x INTEGER,
                 image_shape_y INTEGER,
-                image_shape_z INTEGER,
                 spacing_x REAL,
                 spacing_y REAL,
                 spacing_z REAL
@@ -129,109 +124,43 @@ class DatasetBase(ABC):
             """
         )
 
-    def create_statistics_table(self, cursor: sqlite3.Cursor) -> None:
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS "statistics" (
-                dataset TEXT PRIMARY KEY,
-                mean REAL,
-                std_dev REAL,
-                total_slices INTEGER,
-                total_series INTEGER
-            )
-            """
-        )
-
     def insert_global_data(
         self,
         cursor: sqlite3.Cursor,
-        dicom_path: str,
-        series_id: str,
         dataset_name: str,
+        series_id: str,
         slice_index: int,
+        dicom_path: str,
     ) -> None:
         cursor.execute(
             """
             INSERT INTO "global" (
-                dicom_path, series_id, dataset, slice_index
+                dataset, series_id, slice_index, dicom_path
             )
             VALUES (?, ?, ?, ?)
             """,
-            (dicom_path, series_id, dataset_name, slice_index),
+            (dataset, series_id, slice_index, dicom_path),
         )
 
     def insert_dataset_data(
         self, cursor: sqlite3.Cursor, dataset_name: str, series_id: str, metadata: dict
     ) -> None:
-
+        dataset_name = f'"{dataset_name}"'
         cursor.execute(
             f"""
-            INSERT INTO (?) (
-                series_id, series_id, num_slices, image_shape_x, image_shape_y, image_shape_z,
+            INSERT INTO {dataset_name} (
+                series_id, num_slices, image_shape_x, image_shape_y,
                 spacing_x, spacing_y, spacing_z
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                dataset_name,
                 series_id,
                 metadata["num_slices"],
                 metadata["image_shape"][0],
                 metadata["image_shape"][1],
-                metadata["image_shape"][2],
                 metadata["spacing"][0],
                 metadata["spacing"][1],
                 metadata["spacing"][2],
             ),
         )
-
-    def insert_statistics_data(
-        self, cursor: sqlite3.Cursor, dataset_name: str, statistics: dict
-    ) -> None:
-        cursor.execute(
-            """
-            INSERT INTO "statistics" (dataset, mean, std_dev, total_slices, total_series)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                dataset_name,
-                statistics["mean"],
-                statistics["std_dev"],
-                statistics["total_slices"],
-                statistics["total_series"],
-            ),
-        )
-
-
-class StatisticsManager:
-    def __init__(self):
-        self.total_voxels: int = 0
-        self.sum_voxels: float = 0.0
-        self.sum_squares_voxels: float = 0.0
-        self.total_slices: int = 0
-        self.total_series: int = 0
-
-    def update_statistics(self, image_array: np.ndarray) -> None:
-        """
-        Update the running sum and sum of squares of voxel intensities.
-        """
-        self.total_voxels += image_array.size
-        self.sum_voxels += np.sum(image_array)
-        self.sum_squares_voxels += np.sum(np.square(image_array))
-        self.total_slices += image_array.shape[0]
-        self.total_series += 1
-
-    def gather_statistics(self) -> Tuple[float, float]:
-        """
-        Calculate and the global mean and standard deviation and return the collected statistics.
-        """
-        mean = self.sum_voxels / self.total_voxels
-        variance = (self.sum_squares_voxels / self.total_voxels) - (mean**2)
-        std_dev = np.sqrt(variance)
-
-        return {
-            "mean": mean,
-            "std_dev": std_dev,
-            "total_slices": self.total_slices,
-            "total_series": self.total_series,
-        }
