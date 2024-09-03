@@ -5,32 +5,15 @@ import pydicom
 import SimpleITK as sitk
 from tqdm import tqdm
 
-from data import DatasetBase
+from data import DatasetBase, validate_ct_dicom
 
 
-def get_series_data(dicom_file_path):
-    try:
-        ds = pydicom.dcmread(dicom_file_path)
-        description = ds.get("SeriesDescription", "No Series Description")
-        orientation = ds.get("ImageOrientationPatient", None)
-        slice_thickness = ds.get("SliceThickness", None)
-        return description, orientation, slice_thickness
-    except Exception as e:
-        return "", None, None
-
-
-def is_axial_orientation(orientation):
-    if orientation is None:
-        return False
-    axial_orientation = [1, 0, 0, 0, 1, 0]
-    return all(abs(orientation[i] - axial_orientation[i]) < 0.01 for i in range(6))
-
-
-def is_thin_slice(slice_thickness):
-    try:
-        return slice_thickness is not None and float(slice_thickness) < 5.0
-    except ValueError:
-        return False
+def get_description(dicom_file_path: str) -> str:
+    ds = pydicom.dcmread(dicom_file_path)
+    description = ds.get("SeriesDescription", None)
+    if description:
+        return description.value
+    return ""
 
 
 class NsclcRadiogenomics(DatasetBase):
@@ -57,14 +40,10 @@ class NsclcRadiogenomics(DatasetBase):
                     dcm = pydicom.dcmread(first_file)
                     modality = dcm.get("Modality", None)
                     if modality == "CT":
-                        description, orientation, slice_thickness = get_series_data(
-                            first_file
-                        )
-                        if (
-                            any([x in description.lower() for x in filter_words])
-                            and is_axial_orientation(orientation)
-                            and is_thin_slice(slice_thickness)
-                        ):
+                        description = get_description(first_file)
+                        if any(
+                            [x in description.lower() for x in filter_words]
+                        ) and validate_ct_dicom(first_file):
                             if series_id not in [x[0] for x in series_paths]:
                                 series_paths.append((series_id, data_folder))
 

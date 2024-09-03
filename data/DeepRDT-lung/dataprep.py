@@ -2,10 +2,9 @@ import os
 from os.path import basename, normpath
 import pandas as pd
 import SimpleITK as sitk
-import pydicom
 from tqdm import tqdm
 
-from data import DatasetBase
+from data import DatasetBase, validate_ct_dicom
 
 
 class DeepRDTlung(DatasetBase):
@@ -24,7 +23,7 @@ class DeepRDTlung(DatasetBase):
         datapath = self.config["dataset_path"]
         series_paths = []
         reader = sitk.ImageSeriesReader()
-        
+
         print("Walking dataset directories.")
         total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(datapath))
         for data_folder, dirs, files in tqdm(os.walk(datapath), total=total_dirs):
@@ -33,12 +32,20 @@ class DeepRDTlung(DatasetBase):
                 patient_id = basename(normpath(data_folder))
                 if patient_id not in patient_ids_list:
                     continue
-                df = pd.read_csv(os.path.join(df_path, f"ct_df_filtered_{patient_id}.csv"))
-                good_series_id = df['SeriesInstanceUID'].iloc[0]
-                
+                df = pd.read_csv(
+                    os.path.join(df_path, f"ct_df_filtered_{patient_id}.csv")
+                )
+                good_series_id = df["SeriesInstanceUID"].iloc[0]
+
             for series_id in series_ids:
                 if series_id == good_series_id:
-                    series_paths.append((series_id, data_folder))
+                    series_file_names = reader.GetGDCMSeriesFileNames(
+                        data_folder, series_id
+                    )
+                    if series_file_names:
+                        first_file = series_file_names[0]
+                        if validate_ct_dicom(first_file):
+                            series_paths.append((series_id, data_folder))
 
         return series_paths
 

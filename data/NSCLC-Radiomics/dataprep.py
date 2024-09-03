@@ -4,7 +4,7 @@ import pydicom
 from tqdm import tqdm
 from typing import List, Tuple
 
-from data import DatasetBase
+from data import DatasetBase, validate_ct_dicom
 
 
 class NsclcRadiomics(DatasetBase):
@@ -15,7 +15,7 @@ class NsclcRadiomics(DatasetBase):
         datapath = self.config["dataset_path"]
         series_paths = []
         reader = sitk.ImageSeriesReader()
-        
+
         print("Walking dataset directories.")
         total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(datapath))
         for data_folder, dirs, files in tqdm(os.walk(datapath), total=total_dirs):
@@ -26,11 +26,7 @@ class NsclcRadiomics(DatasetBase):
                 )
                 if series_file_names:
                     first_file = series_file_names[0]
-                    dcm = pydicom.dcmread(first_file)
-                    modality = dcm.get((0x0008, 0x0060))
-                    if modality is None:
-                        break
-                    if modality.value == "CT":
+                    if validate_ct_dicom(first_file):
                         series_paths.append((series_id, data_folder))
 
         return series_paths

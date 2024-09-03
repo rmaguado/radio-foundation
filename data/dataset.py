@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 import SimpleITK as sitk
 from tqdm import tqdm
+import pydicom
 from typing import List, Tuple
 import os
 from abc import ABC, abstractmethod
@@ -73,7 +74,7 @@ class DatasetBase(ABC):
 
         dataset_name = self.config["dataset_name"]
         absolute_dataset_path = os.path.abspath(self.config["dataset_path"])
-        
+
         conn = sqlite3.connect(self.config["target_path"])
         cursor = conn.cursor()
 
@@ -164,3 +165,46 @@ class DatasetBase(ABC):
                 metadata["spacing"][2],
             ),
         )
+
+
+def validate_ct_dicom(dicom_file_path: str) -> bool:
+    def is_axial_orientation(orientation):
+        axial_orientation = [1, 0, 0, 0, 1, 0]
+        return all(abs(orientation[i] - axial_orientation[i]) < 0.01 for i in range(6))
+
+    ds = pydicom.dcmread(dicom_file_path)
+
+    series_id = ds.get("SeriesInstanceUID", None)
+
+    modality = ds.get("Modality", None)
+    orientation_patient = ds.get("ImageOrientationPatient", None)
+    slice_thickness = ds.get("SliceThickness", None)
+    image_type = ds.get("ImageType", None)
+    rescale_slope = ds.get("RescaleSlope", None)
+    rescale_intercept = ds.get("RescaleIntercept", None)
+    if None in [
+        series_id,
+        modality,
+        orientation_patient,
+        slice_thickness,
+        image_type,
+        rescale_slope,
+        rescale_intercept,
+    ]:
+        return False
+
+    if not is_axial_orientation(orientation_patient.value):
+        return False
+    if not float(slice_thickness.value) < 5.0:
+        print(f"{series_id}: Slice thickness is too high. Skipping.")
+        return False
+    if image_type.value[0] != "ORIGINAL":
+        print(f"{series_id}: Image type is not ORIGINAL. Skipping.")
+        return False
+    if image_type.value[1] != "PRIMARY":
+        print(f"{series_id}: Image type is not PRIMARY. Skipping.")
+        return False
+    if image_type.value[2] == "LOCALIZER":
+        print(f"{series_id}: Image type is LOCALIZER. Skipping.")
+        return False
+    return True
