@@ -139,7 +139,7 @@ class DatasetBase(ABC):
             )
             VALUES (?, ?, ?, ?)
             """,
-            (dataset, series_id, slice_index, dicom_path),
+            (dataset_name, series_id, slice_index, dicom_path),
         )
 
     def insert_dataset_data(

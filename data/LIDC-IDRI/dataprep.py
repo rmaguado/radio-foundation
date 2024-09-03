@@ -37,7 +37,7 @@ class LidcIdri(DatasetBase):
 def main():
     config = {
         "dataset_name": "LIDC-IDRI",
-        "dataset_path": "/home/rmaguado/rdt/DeepRDT/datasets/LIDC-IDRI",
+        "dataset_path": "/home/rmaguado/rdt/DeepRDT/datasets/LIDC",
         "target_path": "data/radiomics_datasets.db",
     }
 

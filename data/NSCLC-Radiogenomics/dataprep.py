@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import pydicom
 import SimpleITK as sitk
+from tqdm import tqdm
 
 from data import DatasetBase
 
@@ -43,7 +44,9 @@ class NsclcRadiogenomics(DatasetBase):
 
         filter_words = ["thin lung window", "thorax", "chest", "lung", "in reach"]
 
-        for data_folder, dirs, files in os.walk(datapath):
+        print("Walking dataset directories.")
+        total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(datapath))
+        for data_folder, dirs, files in tqdm(os.walk(datapath), total=total_dirs):
             series_ids = reader.GetGDCMSeriesIDs(data_folder)
             for series_id in series_ids:
                 series_file_names = reader.GetGDCMSeriesFileNames(
@@ -62,7 +65,8 @@ class NsclcRadiogenomics(DatasetBase):
                             and is_axial_orientation(orientation)
                             and is_thin_slice(slice_thickness)
                         ):
-                            series_paths.append((series_id, data_folder))
+                            if series_id not in [x[0] for x in series_paths]:
+                                series_paths.append((series_id, data_folder))
 
         return series_paths
 
