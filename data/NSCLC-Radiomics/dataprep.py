@@ -4,7 +4,7 @@ import pydicom
 from tqdm import tqdm
 from typing import List, Tuple
 
-from datasets import DatasetBase
+from data import DatasetBase
 
 
 class NsclcRadiomics(DatasetBase):
@@ -37,7 +37,7 @@ def main():
     config = {
         "dataset_name": "NSCLC-Radiomics",
         "dataset_path": "/home/rmaguado/rdt/DeepRDT/datasets/NSCLC-Radiomics",
-        "target_path": "datasets/radiomics_datasets.db",
+        "target_path": "data/radiomics_datasets.db",
     }
 
     dataprep = NsclcRadiomics(config)

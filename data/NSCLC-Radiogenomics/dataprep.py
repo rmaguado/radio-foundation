@@ -4,7 +4,7 @@ import pandas as pd
 import pydicom
 import SimpleITK as sitk
 
-from datasets import DatasetBase
+from data import DatasetBase
 
 
 def get_series_data(dicom_file_path):
@@ -71,7 +71,7 @@ def main():
     config = {
         "dataset_name": "NSCLC-Radiogenomics",
         "dataset_path": "/home/rmaguado/rdt/DeepRDT/datasets/NSCLC-Radiogenomics",
-        "target_path": "datasets/radiomics_datasets.db",
+        "target_path": "data/radiomics_datasets.db",
     }
 
     dataprep = NsclcRadiogenomics(config)
