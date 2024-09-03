@@ -2,12 +2,8 @@ import os
 import pydicom
 import SimpleITK as sitk
 from tqdm import tqdm
-import logging
 
 from data import DatasetBase, validate_ct_dicom
-
-
-logger = logging.getLogger("dataprep")
 
 
 def get_description(dicom_file_path: str) -> str:
@@ -29,7 +25,7 @@ class NsclcRadiogenomics(DatasetBase):
 
         filter_words = ["thin lung window", "thorax", "chest", "lung", "in reach"]
 
-        logger.info("Walking dataset directories.")
+        print("Walking dataset directories.")
         total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(datapath))
         for data_folder, dirs, files in tqdm(os.walk(datapath), total=total_dirs):
             series_ids = reader.GetGDCMSeriesIDs(data_folder)

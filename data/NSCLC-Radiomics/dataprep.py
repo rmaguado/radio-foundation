@@ -1,6 +1,5 @@
 import os
 import SimpleITK as sitk
-import pydicom
 from tqdm import tqdm
 from typing import List, Tuple
 

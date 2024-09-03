@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import pylidc as pl
 import SimpleITK as sitk
