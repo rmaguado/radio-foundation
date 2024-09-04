@@ -7,6 +7,7 @@ from .student import validate_student
 from .teacher import validate_teacher
 from .optim import validate_optim
 from .train import validate_train
+from .augmentations import validate_augmentations
 
 
 def validate_config(config: DictConfig) -> bool:
@@ -19,5 +20,6 @@ def validate_config(config: DictConfig) -> bool:
             validate_teacher(config),
             validate_optim(config),
             validate_train(config),
+            validate_augmentations(config),
         ]
     )
