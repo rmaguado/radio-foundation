@@ -1,5 +1,5 @@
 import sqlite3
-import numpy as np
+import argparse
 from tqdm import tqdm
 import SimpleITK as sitk
 from tqdm import tqdm
@@ -23,6 +23,50 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 
+def validate_ct_dicom(dcm, dicom_file_path: str) -> bool:
+    def is_axial_orientation(orientation):
+        axial_orientation = [1, 0, 0, 0, 1, 0]
+        return all(abs(orientation[i] - axial_orientation[i]) < 0.01 for i in range(6))
+
+    series_id = dcm.get("SeriesInstanceUID", None)
+    modality = dcm.get("Modality", None)
+    orientation_patient = dcm.get("ImageOrientationPatient", None)
+    slice_thickness = dcm.get("SliceThickness", None)
+    image_type = dcm.get("ImageType", None)
+    rescale_slope = dcm.get("RescaleSlope", None)
+    rescale_intercept = dcm.get("RescaleIntercept", None)
+    if None in [
+        series_id,
+        modality,
+        orientation_patient,
+        slice_thickness,
+        image_type,
+        rescale_slope,
+        rescale_intercept,
+    ]:
+        return False
+
+    if modality != "CT":
+        logger.info(f"{dicom_file_path}: Modality is not CT. Skipping.")
+        return False
+    if not is_axial_orientation(orientation_patient):
+        logger.info(f"{dicom_file_path}: Orientation is not axial. Skipping.")
+        return False
+    if not float(slice_thickness) < 4.0:
+        logger.info(f"{dicom_file_path}: Slice thickness is too high. Skipping.")
+        return False
+    if image_type[0] != "ORIGINAL":
+        logger.info(f"{dicom_file_path}: Image type is not ORIGINAL. Skipping.")
+        return False
+    if image_type[1] != "PRIMARY":
+        logger.info(f"{dicom_file_path}: Image type is not PRIMARY. Skipping.")
+        return False
+    if image_type[2] == "LOCALIZER":
+        logger.info(f"{dicom_file_path}: Image type is LOCALIZER. Skipping.")
+        return False
+    return True
+
+
 class DatasetBase(ABC):
     def __init__(self, config: dict):
         sitk.ProcessObject_SetGlobalWarningDisplay(False)
@@ -36,7 +80,32 @@ class DatasetBase(ABC):
         Returns:
             List[Tuple[str, str]]: A list of tuples with series_id and path to series.
         """
-        pass
+        datapath = self.config["dataset_path"]
+        series_paths = []
+
+        print("Walking dataset directories.")
+        total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(datapath))
+        print("Total dicom directories: ", total_dirs)
+        for data_folder, dirs, files in tqdm(os.walk(datapath), total=total_dirs):
+
+            dcm_files = [f for f in files if f.endswith(".dcm")]
+            if not dcm_files:
+                continue
+
+            first_dcm = os.path.join(data_folder, dcm_files[0])
+            dcm = pydicom.dcmread(first_dcm, stop_before_pixels=True)
+
+            if not validate_ct_dicom(dcm, data_folder):
+                continue
+
+            series_id = dcm.get("SeriesInstanceUID", None)
+
+            if series_id in [s[0] for s in series_paths]:
+                logger.info(f"{data_folder}: Series ID already in list. Skipping.")
+                continue
+            series_paths.append((series_id, data_folder))
+
+        return series_paths
 
     def get_spacing(self, image: sitk.Image) -> List[float]:
         spacing = image.GetSpacing()
@@ -181,48 +250,30 @@ class DatasetBase(ABC):
         )
 
 
-def validate_ct_dicom(dicom_file_path: str) -> bool:
-    def is_axial_orientation(orientation):
-        axial_orientation = [1, 0, 0, 0, 1, 0]
-        return all(abs(orientation[i] - axial_orientation[i]) < 0.01 for i in range(6))
+def get_argpase():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset_name", type=str, required=True)
+    parser.add_argument("--root_path", type=str, required=True)
+    parser.add_argument(
+        "--db_path", type=str, default="data/datasets.db", required=False
+    )
+    return parser
 
-    ds = pydicom.dcmread(dicom_file_path)
 
-    series_id = ds.get("SeriesInstanceUID", None)
+def main(dataset_name: str, root_path: str, db_path: str):
+    dataset_path = os.path.join(root_path, dataset_name)
+    if not os.path.exists(dataset_path):
+        raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
+    config = {
+        "dataset_name": dataset_name,
+        "dataset_path": dataset_path,
+        "target_path": db_path,
+    }
+    dataset = DatasetBase(config)
+    dataset.prepare_dataset()
 
-    modality = ds.get("Modality", None)
-    orientation_patient = ds.get("ImageOrientationPatient", None)
-    slice_thickness = ds.get("SliceThickness", None)
-    image_type = ds.get("ImageType", None)
-    rescale_slope = ds.get("RescaleSlope", None)
-    rescale_intercept = ds.get("RescaleIntercept", None)
-    if None in [
-        series_id,
-        modality,
-        orientation_patient,
-        slice_thickness,
-        image_type,
-        rescale_slope,
-        rescale_intercept,
-    ]:
-        return False
 
-    if modality != "CT":
-        logger.info(f"{series_id}: Modality is not CT. Skipping.")
-        return False
-    if not is_axial_orientation(orientation_patient):
-        logger.info(f"{series_id}: Orientation is not axial. Skipping.")
-        return False
-    if not float(slice_thickness) < 5.0:
-        logger.info(f"{series_id}: Slice thickness is too high. Skipping.")
-        return False
-    if image_type[0] != "ORIGINAL":
-        logger.info(f"{series_id}: Image type is not ORIGINAL. Skipping.")
-        return False
-    if image_type[1] != "PRIMARY":
-        logger.info(f"{series_id}: Image type is not PRIMARY. Skipping.")
-        return False
-    if image_type[2] == "LOCALIZER":
-        logger.info(f"{series_id}: Image type is LOCALIZER. Skipping.")
-        return False
-    return True
+if __name__ == "__main__":
+    parser = get_argpase()
+    args = parser.parse_args()
+    main(args.dataset_name, args.root_path, args.db_path)
