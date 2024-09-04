@@ -48,16 +48,16 @@ def validate_ct_dicom(dcm, dicom_file_path: str) -> bool:
 
     issues = []
 
-    modality = fields["modality"]
+    modality = fields["Modality"]
     if modality != "CT":
         issues.append(f"Modality is not CT: ({modality}).")
-    orientation = fields["orientation_patient"]
+    orientation = fields["ImageOrientationPatient"]
     if not is_axial_orientation(orientation):
         issues.append(f"Orientation is not axial: ({orientation}).")
-    slice_thickness = float(fields["slice_thickness"])
+    slice_thickness = float(fields["SliceThickness"])
     if not slice_thickness <= 4.0:
         issues.append(f"Slice thickness is too high: ({slice_thickness}).")
-    image_type = fields["image_type"]
+    image_type = fields["ImageType"]
     if len(image_type) < 2:
         issues.append(f"Image type is too short: ({image_type}).")
     else:
