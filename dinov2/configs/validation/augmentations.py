@@ -50,8 +50,8 @@ def test_transforms_list(
 
 def test_has_crops(augmentations_config: DictConfig) -> bool:
     required_transforms = {
-        "global1": "globalcrop",
-        "global2": "globalcrop",
+        "global_1": "globalcrop",
+        "global_2": "globalcrop",
         "local": "localcrop",
     }
     for augmentations_group, transforms_list in augmentations_config.items():
