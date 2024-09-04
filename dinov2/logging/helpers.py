@@ -79,9 +79,7 @@ class MetricLogger(object):
 
         MB = 1024.0 * 1024.0
         meters = str(self)
-        time = iter_time.avg()
-        data = data_time.avg()
-        msg_values = [i, n_iterations, eta, meters, time, data]
+        msg_values = [i, n_iterations, eta, meters, iter_time, data_time]
         if torch.cuda.is_available():
             msg_values.append(torch.cuda.max_memory_allocated() / MB)
 
