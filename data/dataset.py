@@ -70,7 +70,8 @@ def validate_ct_dicom(dcm, dicom_file_path: str) -> bool:
             issues.append(f"Image type is LOCALIZER.")
 
     if issues:
-        logger.info(f"{dicom_file_path}:\n\t{'\n\t'.join(issues)} Skipping.")
+        issues_message = "\n\t".join(issues)
+        logger.info(f"Skipping {dicom_file_path}:\n\t{issues_message}")
         return False
     return True
 
