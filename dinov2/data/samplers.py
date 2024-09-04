@@ -122,33 +122,6 @@ class InfiniteSampler(Sampler):
             yield from itertools.islice(iterable, self._start, None, self._step)
 
 
-# The following function is somewhat equivalent to _new_shuffle_tensor_slice below,
-# but avoids a full in-place random permutation generation.
-def _shuffle_tensor_slice(
-    *, tensor: torch.Tensor, start: int = 0, step: int = 1, generator: torch.Generator
-) -> np.ndarray:
-    stop = len(tensor)
-    count = stop // step
-    drop_count = stop - step * count
-    if drop_count:
-        warnings.warn(f"# of dropped samples: {drop_count}")
-
-    dtype = _get_numpy_dtype(stop)
-    result = np.empty(count, dtype=dtype)
-
-    for i in range(count):
-        j = (
-            torch.randint(0, i + 1, size=(1,), generator=generator).item()
-            if i > 0
-            else 0
-        )
-
-        result[i] = result[j]
-        result[j] = tensor[start + i * step].item()
-
-    return result
-
-
 def _new_shuffle_tensor_slice(
     *, tensor: torch.Tensor, start: int = 0, step: int = 1, generator: torch.Generator
 ) -> np.ndarray:
@@ -178,7 +151,6 @@ class ShardedInfiniteSampler(Sampler):
         start: Optional[int] = None,
         step: Optional[int] = None,
         advance: int = 0,
-        use_new_shuffle_tensor_slice: bool = False,
     ):
         self._sample_count = sample_count
         self._seed = seed
@@ -187,11 +159,7 @@ class ShardedInfiniteSampler(Sampler):
         self._step = distributed.get_global_size() if step is None else step
         self._advance = advance
         self._iter_count = 0
-        self._shuffle_tensor_slice_fn = (
-            _new_shuffle_tensor_slice
-            if use_new_shuffle_tensor_slice
-            else _shuffle_tensor_slice
-        )
+        self._shuffle_tensor_slice_fn = _new_shuffle_tensor_slice
 
     def __iter__(self):
         iter_count = self._advance // self._sample_count

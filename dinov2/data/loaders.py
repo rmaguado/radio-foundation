@@ -22,7 +22,6 @@ class SamplerType(Enum):
     DISTRIBUTED = 0
     EPOCH = 1
     INFINITE = 2
-    SHARDED_INFINITE = 3
     SHARDED_INFINITE_NEW = 4
 
 
@@ -80,7 +79,7 @@ def make_dataset(
 def _make_sampler(
     *,
     dataset,
-    type: Optional[SamplerType] = None,
+    sampler_type: Optional[SamplerType] = None,
     shuffle: bool = False,
     seed: int = 0,
     size: int = -1,
@@ -90,7 +89,7 @@ def _make_sampler(
     Creates a sampler with the specified parameters.
     A sampler is a strategy for sampling data from a dataset.
     Supported sampler types includes:
-        - EPOCH, INFINITE, SHARDED_INFINITE, SHARDED_INFINITE_NEW, DISTRIBUTED.
+        - EPOCH, INFINITE, SHARDED_INFINITE_NEW, DISTRIBUTED.
 
     Args:
         dataset: The dataset to create the sampler for.
@@ -105,7 +104,7 @@ def _make_sampler(
     """
     sample_count = len(dataset)
 
-    if type == SamplerType.INFINITE:
+    if sampler_type == SamplerType.INFINITE:
         logger.info("sampler: infinite")
         if size > 0:
             raise ValueError("sampler size > 0 is invalid")
@@ -115,20 +114,14 @@ def _make_sampler(
             seed=seed,
             advance=advance,
         )
-    elif type in (SamplerType.SHARDED_INFINITE, SamplerType.SHARDED_INFINITE_NEW):
+    elif sampler_type == SamplerType.SHARDED_INFINITE_NEW:
         logger.info("sampler: sharded infinite")
         if size > 0:
             raise ValueError("sampler size > 0 is invalid")
-        # TODO: Remove support for old shuffling
-        use_new_shuffle_tensor_slice = type == SamplerType.SHARDED_INFINITE_NEW
         return ShardedInfiniteSampler(
-            sample_count=sample_count,
-            shuffle=shuffle,
-            seed=seed,
-            advance=advance,
-            use_new_shuffle_tensor_slice=use_new_shuffle_tensor_slice,
+            sample_count=sample_count, shuffle=shuffle, seed=seed, advance=advance
         )
-    elif type == SamplerType.EPOCH:
+    elif sampler_type == SamplerType.EPOCH:
         logger.info("sampler: epoch")
         if advance > 0:
             raise NotImplementedError("sampler advance > 0 is not supported")
@@ -140,7 +133,7 @@ def _make_sampler(
             shuffle=shuffle,
             seed=seed,
         )
-    elif type == SamplerType.DISTRIBUTED:
+    elif sampler_type == SamplerType.DISTRIBUTED:
         logger.info("sampler: distributed")
         if size > 0:
             raise ValueError("sampler size > 0 is invalid")
@@ -193,7 +186,7 @@ def make_data_loader(
 
     sampler = _make_sampler(
         dataset=dataset,
-        type=sampler_type,
+        sampler_type=sampler_type,
         shuffle=shuffle,
         seed=seed,
         size=sampler_size,
