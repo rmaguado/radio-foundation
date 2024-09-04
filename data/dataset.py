@@ -27,41 +27,50 @@ def validate_ct_dicom(dcm, dicom_file_path: str) -> bool:
         axial_orientation = [1, 0, 0, 0, 1, 0]
         return all(abs(orientation[i] - axial_orientation[i]) < 0.01 for i in range(6))
 
-    series_id = dcm.get("SeriesInstanceUID", None)
-    modality = dcm.get("Modality", None)
-    orientation_patient = dcm.get("ImageOrientationPatient", None)
-    slice_thickness = dcm.get("SliceThickness", None)
-    image_type = dcm.get("ImageType", None)
-    rescale_slope = dcm.get("RescaleSlope", None)
-    rescale_intercept = dcm.get("RescaleIntercept", None)
-    if None in [
-        series_id,
-        modality,
-        orientation_patient,
-        slice_thickness,
-        image_type,
-        rescale_slope,
-        rescale_intercept,
-    ]:
+    required_fields = [
+        "SeriesInstanceUID",
+        "Modality",
+        "ImageOrientationPatient",
+        "SliceThickness",
+        "ImageType",
+        "RescaleSlope",
+        "RescaleIntercept",
+    ]
+
+    fields = {field: dcm.get(field, None) for field in required_fields}
+
+    missing_fields = [field for field, value in fields.items() if value is None]
+    if missing_fields:
+        logger.info(
+            f"{dicom_file_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
+        )
         return False
 
+    issues = []
+
+    modality = fields["modality"]
     if modality != "CT":
-        logger.info(f"{dicom_file_path}: Modality is not CT. Skipping.")
-        return False
-    if not is_axial_orientation(orientation_patient):
-        logger.info(f"{dicom_file_path}: Orientation is not axial. Skipping.")
-        return False
-    if not float(slice_thickness) < 4.0:
-        logger.info(f"{dicom_file_path}: Slice thickness is too high. Skipping.")
-        return False
-    if image_type[0] != "ORIGINAL":
-        logger.info(f"{dicom_file_path}: Image type is not ORIGINAL. Skipping.")
-        return False
-    if image_type[1] != "PRIMARY":
-        logger.info(f"{dicom_file_path}: Image type is not PRIMARY. Skipping.")
-        return False
-    if image_type[2] == "LOCALIZER":
-        logger.info(f"{dicom_file_path}: Image type is LOCALIZER. Skipping.")
+        issues.append(f"Modality is not CT: ({modality}).")
+    orientation = fields["orientation_patient"]
+    if not is_axial_orientation(orientation):
+        issues.append(f"Orientation is not axial: ({orientation}).")
+    slice_thickness = float(fields["slice_thickness"])
+    if not slice_thickness <= 4.0:
+        issues.append(f"Slice thickness is too high: ({slice_thickness}).")
+    image_type = fields["image_type"]
+    if len(image_type) < 2:
+        issues.append(f"Image type is too short: ({image_type}).")
+    else:
+        if image_type[0] != "ORIGINAL":
+            issues.append(f"Image type is not ORIGINAL: ({image_type[0]}).")
+        if image_type[1] != "PRIMARY":
+            issues.append(f"Image type is not PRIMARY: ({image_type[1]}).")
+    if len(image_type) > 2:
+        if image_type[2] == "LOCALIZER":
+            issues.append(f"Image type is LOCALIZER.")
+
+    if issues:
+        logger.info(f"{dicom_file_path}:\n\t{'\n\t'.join(issues)} Skipping.")
         return False
     return True
 
