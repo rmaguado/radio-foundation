@@ -84,14 +84,12 @@ class InfiniteSampler(Sampler):
         seed: int = 0,
         start: Optional[int] = None,
         step: Optional[int] = None,
-        advance: int = 0,
     ):
         self._sample_count = sample_count
         self._seed = seed
         self._shuffle = shuffle
         self._start = distributed.get_global_rank() if start is None else start
         self._step = distributed.get_global_size() if step is None else step
-        self._advance = advance
 
     def __iter__(self):
         if self._shuffle:
@@ -99,7 +97,7 @@ class InfiniteSampler(Sampler):
         else:
             iterator = self._iterator()
 
-        yield from itertools.islice(iterator, self._advance, None)
+        yield from itertools.islice(iterator, 0, None)
 
     def _iterator(self):
         assert not self._shuffle
@@ -150,29 +148,22 @@ class ShardedInfiniteSampler(Sampler):
         seed: int = 0,
         start: Optional[int] = None,
         step: Optional[int] = None,
-        advance: int = 0,
     ):
         self._sample_count = sample_count
         self._seed = seed
         self._shuffle = shuffle
         self._start = distributed.get_global_rank() if start is None else start
         self._step = distributed.get_global_size() if step is None else step
-        self._advance = advance
         self._iter_count = 0
         self._shuffle_tensor_slice_fn = _new_shuffle_tensor_slice
 
     def __iter__(self):
-        iter_count = self._advance // self._sample_count
-        if iter_count > 0:
-            self._advance -= iter_count * self._sample_count
-            self._iter_count += iter_count
-
         if self._shuffle:
             iterator = self._shuffled_iterator()
         else:
             iterator = self._iterator()
 
-        yield from itertools.islice(iterator, self._advance, None)
+        yield from itertools.islice(iterator, 0, None)
 
     def _iterator(self):
         assert not self._shuffle

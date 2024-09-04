@@ -102,7 +102,6 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         shuffle=True,
         seed=cfg.train.seed,
         sampler_type=sampler_type,
-        sampler_advance=0,  # TODO(qas): fix this -- start_iter * cfg.train.batch_size_per_gpu,
         drop_last=True,
         collate_fn=collate_fn,
     )

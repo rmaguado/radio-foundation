@@ -83,7 +83,6 @@ def _make_sampler(
     shuffle: bool = False,
     seed: int = 0,
     size: int = -1,
-    advance: int = 0,
 ) -> Optional[Sampler]:
     """
     Creates a sampler with the specified parameters.
@@ -97,7 +96,6 @@ def _make_sampler(
         shuffle (bool): Whether to shuffle the samples. Defaults to False.
         seed (int): The random seed for shuffling. Defaults to 0.
         size (int): The size of the sampler. Defaults to -1.
-        advance (int): The number of samples to advance. Defaults to 0.
 
     Returns:
         Optional[Sampler]: The created sampler or None if no sampler is created.
@@ -108,23 +106,16 @@ def _make_sampler(
         logger.info("sampler: infinite")
         if size > 0:
             raise ValueError("sampler size > 0 is invalid")
-        return InfiniteSampler(
-            sample_count=sample_count,
-            shuffle=shuffle,
-            seed=seed,
-            advance=advance,
-        )
+        return InfiniteSampler(sample_count=sample_count, shuffle=shuffle, seed=seed)
     elif sampler_type == SamplerType.SHARDED_INFINITE:
         logger.info("sampler: sharded infinite")
         if size > 0:
             raise ValueError("sampler size > 0 is invalid")
         return ShardedInfiniteSampler(
-            sample_count=sample_count, shuffle=shuffle, seed=seed, advance=advance
+            sample_count=sample_count, shuffle=shuffle, seed=seed
         )
     elif sampler_type == SamplerType.EPOCH:
         logger.info("sampler: epoch")
-        if advance > 0:
-            raise NotImplementedError("sampler advance > 0 is not supported")
         size = size if size > 0 else sample_count
         logger.info(f"# of samples / epoch: {size:,d}")
         return EpochSampler(
@@ -137,8 +128,6 @@ def _make_sampler(
         logger.info("sampler: distributed")
         if size > 0:
             raise ValueError("sampler size > 0 is invalid")
-        if advance > 0:
-            raise ValueError("sampler advance > 0 is invalid")
         return torch.utils.data.DistributedSampler(
             dataset=dataset,
             shuffle=shuffle,
@@ -162,7 +151,6 @@ def make_data_loader(
     seed: int = 0,
     sampler_type: Optional[SamplerType] = SamplerType.INFINITE,
     sampler_size: int = -1,
-    sampler_advance: int = 0,
     drop_last: bool = True,
     persistent_workers: bool = False,
     collate_fn: Optional[Callable[[List[T]], Any]] = None,
@@ -178,7 +166,6 @@ def make_data_loader(
         seed: The random seed to use.
         sampler_type: Which sampler to use: EPOCH, INFINITE, SHARDED_INFINITE, DISTRIBUTED or None.
         sampler_size: The number of images per epoch (when applicable) or -1 for the entire dataset.
-        sampler_advance: How many samples to skip (when applicable).
         drop_last: Whether the last non-full batch of data should be dropped.
         persistent_workers: maintain the workers Dataset instances alive after a dataset has been consumed once.
         collate_fn: Function that performs batch collation
@@ -190,7 +177,6 @@ def make_data_loader(
         shuffle=shuffle,
         seed=seed,
         size=sampler_size,
-        advance=sampler_advance,
     )
 
     logger.info("using PyTorch data loader")
