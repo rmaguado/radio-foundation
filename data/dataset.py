@@ -6,7 +6,6 @@ from tqdm import tqdm
 import pydicom
 from typing import List, Tuple
 import os
-from abc import ABC, abstractmethod
 
 
 import logging
@@ -67,12 +66,11 @@ def validate_ct_dicom(dcm, dicom_file_path: str) -> bool:
     return True
 
 
-class DatasetBase(ABC):
+class DatasetBase:
     def __init__(self, config: dict):
         sitk.ProcessObject_SetGlobalWarningDisplay(False)
         self.config = config
 
-    @abstractmethod
     def get_series_paths(self) -> List[Tuple[str, str]]:
         """
         Return a list of tuples with series_id and path to series.
