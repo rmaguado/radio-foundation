@@ -263,7 +263,7 @@ def get_argpase():
     parser.add_argument("--dataset_name", type=str, required=True)
     parser.add_argument("--root_path", type=str, required=True)
     parser.add_argument(
-        "--db_path", type=str, default="data/datasets.db", required=False
+        "--db_path", type=str, default="data/radiomics_dataset.db", required=False
     )
     return parser
 
