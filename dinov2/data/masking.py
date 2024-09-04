@@ -6,18 +6,18 @@
 import random
 import math
 import numpy as np
-import torch
+from typing import Optional
 
 
 class MaskingGenerator:
     def __init__(
         self,
         input_size: int,
-        num_masking_patches: int | None = None,
+        num_masking_patches: Optional[int] = None,
         min_num_patches: int = 4,
         max_num_patches: int = None,
         min_aspect: float = 0.3,
-        max_aspect: float | None = None,
+        max_aspect: Optional[float] = None,
     ):
         """
         Masking generator for DINO. This generator creates a mask for the input image.

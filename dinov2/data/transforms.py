@@ -6,10 +6,13 @@
 import random
 import torch
 from torchvision import transforms
+from typing import Union
+
+Param = Union[str, float]
 
 
 class RandomRotation:
-    def __init__(self, p: str | float, degrees: str | float):
+    def __init__(self, p: Param, degrees: Param):
         """
         Initializes a RandomRotation transform object.
         Applies random rotation to an image about the center. Applied with a given probability.
@@ -33,11 +36,11 @@ class RandomRotation:
 class RandomColorJitter:
     def __init__(
         self,
-        p: str | float,
-        brightness: str | float,
-        contrast: str | float,
-        saturation: str | float,
-        hue: str | float,
+        p: Param,
+        brightness: Param,
+        contrast: Param,
+        saturation: Param,
+        hue: Param,
     ):
         """
         Initializes a RandomColorJitter transform object.
@@ -65,7 +68,7 @@ class RandomColorJitter:
 
 
 class RandomContrast:
-    def __init__(self, p: str | float, contrast: str | float):
+    def __init__(self, p: Param, contrast: Param):
         """
         Initializes a RandomContrast transform object.
         Applies random contrast adjustment to an image. Applied with a given probability.
@@ -87,7 +90,7 @@ class RandomContrast:
 
 
 class RandomBrightness:
-    def __init__(self, p: str | float, brightness: str | float):
+    def __init__(self, p: Param, brightness: Param):
         """
         Initializes a RandomBrightness transform object.
         Applies random brightness adjustment to an image. Applied with a given probability.
@@ -108,7 +111,7 @@ class RandomBrightness:
 
 
 class RandomSharpness:
-    def __init__(self, p: str | float, sharpness: str | float):
+    def __init__(self, p: Param, sharpness: Param):
         """
         Initializes a RandomSharpness transform object.
         Convolves a sharpening kernel to an image. Applied with a given probability.
@@ -145,7 +148,7 @@ class RandomSharpness:
 
 
 class RandomGaussianBlur:
-    def __init__(self, p: str | float):
+    def __init__(self, p: Param):
         """
         Initializes a RandomGaussianBlur transform object.
         Applies Gaussian blur to an image. Applied with a given probability.
@@ -163,7 +166,7 @@ class RandomGaussianBlur:
 
 
 class RandomSolarize:
-    def __init__(self, p: str | float, threshold: str | float, max_value: str | float):
+    def __init__(self, p: Param, threshold: Param, max_value: Param):
         """
         Initializes a RandomSolarize transform object.
         Inverts the image if the pixel value is above a threshold. Applied with a given probability.
@@ -187,7 +190,7 @@ class RandomSolarize:
 
 
 class RandomGrayscale:
-    def __init__(self, p: str | float):
+    def __init__(self, p: Param):
         """
         Initializes a RandomGrayscale transform object.
         Converts the image to grayscale. Applied with a given probability.
@@ -203,9 +206,7 @@ class RandomGrayscale:
 
 
 class RandomNoise:
-    def __init__(
-        self, p: str | float, noise_level: str | float, max_value: str | float
-    ):
+    def __init__(self, p: Param, noise_level: Param, max_value: Param):
         """
         Initializes a RandomNoise transform object.
         Applies normaly distributed noise to an image. Applied with a given probability.
@@ -227,7 +228,7 @@ class RandomNoise:
 
 
 class RandomFlip:
-    def __init__(self, p: str | float):
+    def __init__(self, p: Param):
         """
         Initializes a RandomFlip transform object.
         Flips the image horizontally. Applied with a given probability.
@@ -243,7 +244,7 @@ class RandomFlip:
 
 
 class RandomGamma:
-    def __init__(self, p: str | float, gamma: str | float):
+    def __init__(self, p: Param, gamma: Param):
         """
         Initializes a RandomGamma transform object.
         Applies gamma transformation to an image. Applied with a given probability.
@@ -263,7 +264,7 @@ class RandomGamma:
 
 
 class RandomWindow:
-    def __init__(self, p: str | float, height: str | float, width: str | float):
+    def __init__(self, p: Param, height: Param, width: Param):
         """
         Initializes a RandomWindow transform object.
         Increases the contrast of the image based on height (minimum intensity value) and width of the window.

@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import time
+from typing import Optional
 
 import torch
 
@@ -28,7 +29,7 @@ class MetricLogger(object):
     def __init__(
         self,
         delimiter: str = "    ",
-        output_file: str | None = None,
+        output_file: Optional[str] = None,
         window_size: int = 20,
     ):
         """
@@ -176,8 +177,8 @@ class MetricLogger(object):
     def log_every(
         self,
         print_freq: int,
-        header: str | None = None,
-        n_iterations: int | None = None,
+        header: Optional[str] = None,
+        n_iterations: Optional[int] = None,
         start_iteration: int = 0,
     ):
         """
