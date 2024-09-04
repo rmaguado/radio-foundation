@@ -94,7 +94,7 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         else cfg.train.batch_size_per_gpu
     )
 
-    sampler_type = SamplerType.SHARDED_INFINITE_NEW
+    sampler_type = SamplerType.SHARDED_INFINITE
     data_loader = make_data_loader(
         dataset=dataset,
         batch_size=batch_size,

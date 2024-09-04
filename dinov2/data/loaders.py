@@ -22,7 +22,7 @@ class SamplerType(Enum):
     DISTRIBUTED = 0
     EPOCH = 1
     INFINITE = 2
-    SHARDED_INFINITE_NEW = 4
+    SHARDED_INFINITE = 3
 
 
 def make_dataset(
@@ -89,7 +89,7 @@ def _make_sampler(
     Creates a sampler with the specified parameters.
     A sampler is a strategy for sampling data from a dataset.
     Supported sampler types includes:
-        - EPOCH, INFINITE, SHARDED_INFINITE_NEW, DISTRIBUTED.
+        - EPOCH, INFINITE, SHARDED_INFINITE, DISTRIBUTED.
 
     Args:
         dataset: The dataset to create the sampler for.
@@ -114,7 +114,7 @@ def _make_sampler(
             seed=seed,
             advance=advance,
         )
-    elif sampler_type == SamplerType.SHARDED_INFINITE_NEW:
+    elif sampler_type == SamplerType.SHARDED_INFINITE:
         logger.info("sampler: sharded infinite")
         if size > 0:
             raise ValueError("sampler size > 0 is invalid")
@@ -176,7 +176,7 @@ def make_data_loader(
         num_workers: The number of workers to use.
         shuffle: Whether to shuffle samples.
         seed: The random seed to use.
-        sampler_type: Which sampler to use: EPOCH, INFINITE, SHARDED_INFINITE, SHARDED_INFINITE_NEW, DISTRIBUTED or None.
+        sampler_type: Which sampler to use: EPOCH, INFINITE, SHARDED_INFINITE, DISTRIBUTED or None.
         sampler_size: The number of images per epoch (when applicable) or -1 for the entire dataset.
         sampler_advance: How many samples to skip (when applicable).
         drop_last: Whether the last non-full batch of data should be dropped.
