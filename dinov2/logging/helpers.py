@@ -64,7 +64,7 @@ class MetricLogger(object):
 
         log_list = [
             header,
-            "[{0" + space_fmt + "}/{1}]",
+            "[{i" + space_fmt + "}/{total}]",
             "eta: {eta}",
             "{meters}",
             "time: {time:.4f}",
@@ -79,11 +79,18 @@ class MetricLogger(object):
 
         MB = 1024.0 * 1024.0
         meters = str(self)
-        msg_values = [i, n_iterations, eta, meters, iter_time, data_time]
+        msg_values = {
+            "i": i,
+            "total": n_iterations,
+            "eta": eta,
+            "meters": meters,
+            "time": iter_time,
+            "data": data_time
+        }
         if torch.cuda.is_available():
-            msg_values.append(torch.cuda.max_memory_allocated() / MB)
+            msg_values["memory"] = torch.cuda.max_memory_allocated() / MB
 
-        logger.info(self.log_msg.format(msg_values))
+        logger.info(self.log_msg.format(**msg_values))
 
     def log_every(self, print_freq, header=None, n_iterations=None, start_iteration=0):
         iterable = self.dataloader
