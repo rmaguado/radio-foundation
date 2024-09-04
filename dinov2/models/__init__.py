@@ -11,12 +11,7 @@ from . import vision_transformer as vits
 logger = logging.getLogger("dinov2")
 
 
-err_drop_path = "Drop path is not supported for ViT-Small. \
-Please set drop_path_rate to 0 in the config."
-
-
-def build_model(args, only_teacher=False, img_size=224):
-    args.arch = args.arch.removesuffix("_memeff")
+def build_model(args, only_teacher, img_size):
     if "vit" in args.arch:
         vit_kwargs = dict(
             img_size=img_size,
@@ -35,8 +30,6 @@ def build_model(args, only_teacher=False, img_size=224):
         teacher = vits.__dict__[args.arch](**vit_kwargs)
         if only_teacher:
             return teacher, teacher.embed_dim
-        if args.arch == "vit_small" and args.drop_path_rate != 0:
-            raise ValueError(err_drop_path)
         student = vits.__dict__[args.arch](
             **vit_kwargs,
             drop_path_rate=args.drop_path_rate,

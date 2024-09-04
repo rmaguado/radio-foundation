@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Tuple
 import numpy as np
+import torch
 
 logger = logging.getLogger("dinov2")
 
@@ -9,8 +10,10 @@ class MultiDataset:
 
     def __init__(self, datasets: list) -> None:
         """
+        Initializes a MultiDataset object for collating various dataset objects.
+
         Args:
-            datasets (list): List of dataset instances.
+            datasets (list): A list of datasets.
         """
         self.datasets = datasets
         self.cumulative_sizes = np.cumsum([len(d) for d in datasets])
@@ -18,7 +21,16 @@ class MultiDataset:
     def __len__(self) -> int:
         return self.cumulative_sizes[-1]
 
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
+        """
+        Retrieves the item at the given index from the multidataset.
+
+        Args:
+            index (int): The index of the item to retrieve.
+
+        Returns:
+            Tuple[torch.Tensor, Any]: The retrieved item from the multidataset.
+        """
         dataset_idx = self._find_dataset_idx(index)
 
         if dataset_idx > 0:
@@ -26,12 +38,16 @@ class MultiDataset:
         else:
             dataset_index = index
 
-        data = self.datasets[dataset_idx][dataset_index]
-
-        return data
+        return self.datasets[dataset_idx][dataset_index]
 
     def _find_dataset_idx(self, index: int) -> int:
         """
         Find the dataset index based on the global index.
+
+        Args:
+            index (int): The global index.
+
+        Returns:
+            int: The dataset index.
         """
         return np.searchsorted(self.cumulative_sizes, index, side="right")

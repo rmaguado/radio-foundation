@@ -26,25 +26,6 @@ class SamplerType(Enum):
     SHARDED_INFINITE_NEW = 4
 
 
-def _make_bool_str(b: bool) -> str:
-    return "yes" if b else "no"
-
-
-def _make_sample_transform(
-    image_transform: Optional[Callable] = None,
-    target_transform: Optional[Callable] = None,
-):
-    def transform(sample):
-        image, target = sample
-        if image_transform is not None:
-            image = image_transform(image)
-        if target_transform is not None:
-            target = target_transform(target)
-        return image, target
-
-    return transform
-
-
 def make_dataset(
     config: DictConfig,
     transform: Callable,
@@ -105,6 +86,23 @@ def _make_sampler(
     size: int = -1,
     advance: int = 0,
 ) -> Optional[Sampler]:
+    """
+    Creates a sampler with the specified parameters.
+    A sampler is a strategy for sampling data from a dataset.
+    Supported sampler types includes:
+        - EPOCH, INFINITE, SHARDED_INFINITE, SHARDED_INFINITE_NEW, DISTRIBUTED.
+
+    Args:
+        dataset: The dataset to create the sampler for.
+        type (Optional[SamplerType]): The type of sampler to create. Defaults to None.
+        shuffle (bool): Whether to shuffle the samples. Defaults to False.
+        seed (int): The random seed for shuffling. Defaults to 0.
+        size (int): The size of the sampler. Defaults to -1.
+        advance (int): The number of samples to advance. Defaults to 0.
+
+    Returns:
+        Optional[Sampler]: The created sampler or None if no sampler is created.
+    """
     sample_count = len(dataset)
 
     if type == SamplerType.INFINITE:

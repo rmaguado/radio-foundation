@@ -6,15 +6,38 @@
 import torch
 import random
 
+from typing import List, Tuple, Dict, Callable, Any
+
 
 def collate_data_and_cast(
-    samples_list,
-    mask_ratio_tuple,
-    mask_probability,
-    dtype,
-    n_tokens=None,
-    mask_generator=None,
-):
+    samples_list: List[Any],
+    mask_ratio_tuple: Tuple[float, float],
+    mask_probability: float,
+    dtype: torch.dtype,
+    n_tokens: int,
+    mask_generator: Callable[[int], Any],
+) -> Dict[str, Any]:
+    """
+    Collates data and casts it to the specified data type.
+
+    Args:
+        samples_list (list): A list of samples.
+        mask_ratio_tuple (tuple): A tuple containing the minimum and maximum mask ratios.
+        mask_probability (float): The probability of masking.
+        dtype (torch.dtype): The data type to cast the collated crops to.
+        n_tokens (int): The number of tokens.
+        mask_generator (function): A function that generates masks.
+
+    Returns:
+        dict: A dictionary containing the collated data.
+            - collated_global_crops (torch.Tensor): The collated global crops.
+            - collated_local_crops (torch.Tensor): The collated local crops.
+            - collated_masks (torch.Tensor): The collated masks.
+            - mask_indices_list (torch.Tensor): The mask indices list.
+            - masks_weight (torch.Tensor): The masks weight.
+            - upperbound (int): The upperbound.
+            - n_masked_patches (torch.Tensor): The number of masked patches.
+    """
     n_global_crops = len(samples_list[0][0]["global_crops"])
     n_local_crops = len(samples_list[0][0]["local_crops"])
 

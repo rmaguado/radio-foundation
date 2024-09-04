@@ -22,7 +22,18 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 
-def validate_ct_dicom(dcm, dicom_file_path: str) -> bool:
+def validate_ct_dicom(dcm: pydicom.dataset.FileDataset, dicom_folder_path: str) -> bool:
+    """
+    Validates a DICOM file for CT scans.
+
+    Args:
+        dcm: The DICOM object to validate.
+        dicom_folder_path: The folder path of the DICOM file.
+
+    Returns:
+        bool: True if the DICOM file is valid for CT scans, False otherwise.
+    """
+
     def is_axial_orientation(orientation):
         axial_orientation = [1, 0, 0, 0, 1, 0]
         return all(abs(orientation[i] - axial_orientation[i]) < 0.01 for i in range(6))
@@ -42,7 +53,7 @@ def validate_ct_dicom(dcm, dicom_file_path: str) -> bool:
     missing_fields = [field for field, value in fields.items() if value is None]
     if missing_fields:
         logger.info(
-            f"{dicom_file_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
+            f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
         )
         return False
 
@@ -71,7 +82,7 @@ def validate_ct_dicom(dcm, dicom_file_path: str) -> bool:
 
     if issues:
         issues_message = "\n\t".join(issues)
-        logger.info(f"Skipping {dicom_file_path}:\n\t{issues_message}")
+        logger.info(f"Skipping {dicom_folder_path}:\n\t{issues_message}")
         return False
     return True
 
@@ -116,14 +127,43 @@ class DatasetBase:
         return series_paths
 
     def get_spacing(self, image: sitk.Image) -> List[float]:
+        """
+        Get the spacing of the given image.
+
+        Parameters:
+            image (sitk.Image): The input image.
+
+        Returns:
+            List[float]: The spacing of the image in the order [z, x, y].
+        """
         spacing = image.GetSpacing()
         return [spacing[i] for i in [2, 0, 1]]
 
     def get_shape(self, image: sitk.Image) -> Tuple[Tuple[int, int], int]:
+        """
+        Returns the shape of the image array and the number of slices.
+
+        Parameters:
+            image (sitk.Image): The input image.
+
+        Returns:
+            Tuple[Tuple[int, int], int]: A tuple containing the shape of the image array and the number of slices.
+        """
         image_array = sitk.GetArrayFromImage(image)
         return image_array.shape[1:], image_array.shape[0]
 
     def load_image(self, dicom_paths: List[str]) -> sitk.Image:
+        """
+        Loads and returns a SimpleITK image from a list of DICOM file paths.
+
+        Args:
+            dicom_paths (List[str]): A list of file paths to DICOM files.
+
+        Returns:
+            sitk.Image: The loaded SimpleITK image.
+
+        """
+
         reader = sitk.ImageSeriesReader()
         reader.SetFileNames(dicom_paths)
         image = reader.Execute()
@@ -159,6 +199,15 @@ class DatasetBase:
         return metadata, dicom_paths
 
     def prepare_dataset(self) -> None:
+        """
+        Prepares the dataset by creating necessary tables in the database and inserting data.
+
+        Raises:
+            AssertionError: If the method 'get_series_paths' is not implemented.
+
+        Returns:
+            None
+        """
         assert hasattr(
             self, "get_series_paths"
         ), "The method 'get_series_paths' must be implemented."
@@ -188,6 +237,15 @@ class DatasetBase:
         conn.close()
 
     def create_global_table(self, cursor: sqlite3.Cursor) -> None:
+        """
+        Creates a global table in the database if it doesn't already exist.
+
+        Parameters:
+            cursor (sqlite3.Cursor): The cursor object used to execute SQL statements.
+
+        Returns:
+            None
+        """
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS global (
@@ -201,6 +259,16 @@ class DatasetBase:
         )
 
     def create_dataset_table(self, cursor: sqlite3.Cursor, dataset_name: str) -> None:
+        """
+        Create a dataset table in the database.
+
+        Args:
+            cursor (sqlite3.Cursor): The cursor object to execute SQL statements.
+            dataset_name (str): The name of the dataset.
+
+        Returns:
+            None
+        """
         dataset_name = f'"{dataset_name}"'
         cursor.execute(
             f"""
@@ -224,6 +292,19 @@ class DatasetBase:
         slice_index: int,
         dicom_path: str,
     ) -> None:
+        """
+        Insert global data into the database.
+
+        Parameters:
+            cursor (sqlite3.Cursor): The cursor object to execute SQL queries.
+            dataset_name (str): The name of the dataset.
+            series_id (str): The ID of the series.
+            slice_index (int): The index of the slice.
+            dicom_path (str): The path to the DICOM file.
+
+        Returns:
+            None
+        """
         cursor.execute(
             """
             INSERT INTO "global" (
@@ -237,6 +318,18 @@ class DatasetBase:
     def insert_dataset_data(
         self, cursor: sqlite3.Cursor, dataset_name: str, series_id: str, metadata: dict
     ) -> None:
+        """
+        Insert dataset data into the specified table.
+
+        Args:
+            cursor (sqlite3.Cursor): The cursor object for executing SQL statements.
+            dataset_name (str): The name of the dataset table.
+            series_id (str): The series ID.
+            metadata (dict): The metadata dictionary containing information about the dataset.
+
+        Returns:
+            None
+        """
         dataset_name = f'"{dataset_name}"'
         cursor.execute(
             f"""
