@@ -64,6 +64,7 @@ def test_has_crops(augmentations_config: DictConfig) -> bool:
                 )
             )
             return False
+    return True
 
 
 def validate_augmentations(config: DictConfig) -> bool:
