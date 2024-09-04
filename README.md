@@ -4,11 +4,6 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- Add docstrings and type hints
-- Remove support for old shuffling (dinov2/data/loaders.py)
-- Use cross_entropy_distribution (dinov2/loss/dino_clstoken_loss.py)
-- Fix or Remove advance for dataloaders
-
 - eval using entire volume
 - script for running benchmark tests (after I have many datasets)
 
