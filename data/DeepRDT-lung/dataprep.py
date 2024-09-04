@@ -2,9 +2,10 @@ import os
 from os.path import basename, normpath
 import pandas as pd
 import SimpleITK as sitk
+import pydicom
 from tqdm import tqdm
 
-from data import DatasetBase, validate_ct_dicom
+from data.dataset import DatasetBase, validate_ct_dicom, get_argpase
 
 
 class DeepRDTlung(DatasetBase):
@@ -28,39 +29,44 @@ class DeepRDTlung(DatasetBase):
         total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(datapath))
         for data_folder, dirs, files in tqdm(os.walk(datapath), total=total_dirs):
             series_ids = reader.GetGDCMSeriesIDs(data_folder)
-            if series_ids:
-                patient_id = basename(normpath(data_folder))
-                if patient_id not in patient_ids_list:
-                    continue
-                df = pd.read_csv(
-                    os.path.join(df_path, f"ct_df_filtered_{patient_id}.csv")
-                )
-                good_series_id = df["SeriesInstanceUID"].iloc[0]
+            if not series_ids:
+                continue
 
-            for series_id in series_ids:
-                if series_id == good_series_id:
-                    series_file_names = reader.GetGDCMSeriesFileNames(
-                        data_folder, series_id
-                    )
-                    if series_file_names:
-                        first_file = series_file_names[0]
-                        if validate_ct_dicom(first_file):
-                            series_paths.append((series_id, data_folder))
+            patient_id = basename(normpath(data_folder))
+            if patient_id not in patient_ids_list:
+                continue
+            df = pd.read_csv(os.path.join(df_path, f"ct_df_filtered_{patient_id}.csv"))
+            dosisplan_series_id = df["SeriesInstanceUID"].iloc[0]
+
+            series_file_names = reader.GetGDCMSeriesFileNames(
+                data_folder, dosisplan_series_id
+            )
+            if not series_file_names:
+                continue
+
+            first_file = series_file_names[0]
+            dcm = pydicom.dcmread(first_file, stop_before_pixels=True)
+            if validate_ct_dicom(dcm, data_folder):
+                series_paths.append((dosisplan_series_id, data_folder))
 
         return series_paths
 
 
-def main():
+def main(dataset_name: str, root_path: str, db_path: str):
+    dataset_path = os.path.join(root_path, dataset_name)
+    if not os.path.exists(dataset_path):
+        raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
     config = {
-        "dataset_name": "DeepRDT-lung",
-        "dataset_path": "/home/rmaguado/ruben/datasets/DeepRDT_lung",
-        "target_path": "data/radiomics_datasets.db",
+        "dataset_name": dataset_name,
+        "dataset_path": dataset_path,
+        "target_path": db_path,
         "df_path": "/home/rmaguado/cuda/AI/alba/deepRDT_lung/data/dfs",
     }
-
-    dataprep = DeepRDTlung(config)
-    dataprep.prepare_dataset()
+    dataset = DeepRDTlung(config)
+    dataset.prepare_dataset()
 
 
 if __name__ == "__main__":
-    main()
+    parser = get_argpase()
+    args = parser.parse_args()
+    main(args.dataset_name, args.root_path, args.db_path)
