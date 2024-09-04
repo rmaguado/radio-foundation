@@ -110,7 +110,7 @@ def test_attributes_range(
     return True
 
 
-def test_path_exists(path) -> None:
+def test_path_exists(path) -> bool:
     if not os.path.exists(path):
         logger.error(Errors.PATH_NOT_FOUND.format(path))
         return False

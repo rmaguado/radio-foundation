@@ -9,7 +9,7 @@ from .optim import validate_optim
 from .train import validate_train
 
 
-def validate_config(config: DictConfig):
+def validate_config(config: DictConfig) -> bool:
     return all(
         [
             validate_data(config),

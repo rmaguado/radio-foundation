@@ -14,14 +14,14 @@ from .utils import (
 logger = logging.getLogger("dinov2")
 
 
-def test_has_dataset(data_config: DictConfig) -> None:
+def test_has_dataset(data_config: DictConfig) -> bool:
     if len(data_config.datasets) == 0:
         logger.error(Errors.NO_DATASETS_FOUND)
         return False
     return True
 
 
-def test_ct_channels_is_valid(options_config: DictConfig, dataset_name: str) -> None:
+def test_ct_channels_is_valid(options_config: DictConfig, dataset_name: str) -> bool:
     channels = options_config.channels
     error = Errors.INVALID_CHANNELS.format(dataset_name, channels)
     if not isinstance(channels, int):
@@ -30,11 +30,12 @@ def test_ct_channels_is_valid(options_config: DictConfig, dataset_name: str) -> 
     if channels < 1:
         logger.error(error)
         return False
+    return True
 
 
 def test_ct_windows_is_valid(
     lower_window: float, upper_window: float, dataset_name: str
-) -> None:
+) -> bool:
     if lower_window >= upper_window:
         logger.error(
             Errors.INVALID_VALUE_PAIR.format(dataset_name, lower_window, upper_window)
@@ -43,7 +44,7 @@ def test_ct_windows_is_valid(
     return True
 
 
-def test_ct_options_is_valid(options_config: DictConfig, dataset_name: str) -> None:
+def test_ct_options_is_valid(options_config: DictConfig, dataset_name: str) -> bool:
     if hasattr(options_config, "channels"):
         if not test_ct_channels_is_valid(options_config, dataset_name):
             return False
@@ -66,7 +67,7 @@ def test_ct_options_is_valid(options_config: DictConfig, dataset_name: str) -> N
     return True
 
 
-def test_dataset_options_is_valid(dataset_config: DictConfig) -> None:
+def test_dataset_options_is_valid(dataset_config: DictConfig) -> bool:
     dataset_name = dataset_config.name
     options_config = dataset_config.options
     dataset_type = dataset_config.type
@@ -77,7 +78,7 @@ def test_dataset_options_is_valid(dataset_config: DictConfig) -> None:
     return True
 
 
-def test_dataset_is_valid(dataset_config: DictConfig) -> None:
+def test_dataset_is_valid(dataset_config: DictConfig) -> bool:
     dataset_required_attributes = [
         ("name", str),
         ("index_path", str),
@@ -105,7 +106,7 @@ def test_dataset_is_valid(dataset_config: DictConfig) -> None:
     return True
 
 
-def validate_data(config: DictConfig) -> None:
+def validate_data(config: DictConfig) -> bool:
     if not test_has_section(config, "data"):
         return False
     data_config = config.data
