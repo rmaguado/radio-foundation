@@ -131,6 +131,11 @@ class Database:
         self.conn = sqlite3.connect(config["target_path"])
         self.cursor = self.conn.cursor()
 
+        self.dataset_name_str = f'"{config["dataset_name"]}"'
+
+        self.create_global_table()
+        self.create_dataset_table()
+
     def create_global_table(self) -> None:
         """
         Creates a global table in the database if it doesn't already exist.
@@ -147,17 +152,13 @@ class Database:
             """
         )
 
-    def create_dataset_table(self, dataset_name: str) -> None:
+    def create_dataset_table(self) -> None:
         """
         Create a dataset table in the database.
-
-        Args:
-            dataset_name (str): The name of the dataset.
         """
-        dataset_name = f'"{dataset_name}"'
         self.cursor.execute(
             f"""
-            CREATE TABLE IF NOT EXISTS {dataset_name} (
+            CREATE TABLE IF NOT EXISTS {self.dataset_name_str} (
                 series_id TEXT PRIMARY KEY,
                 num_slices INTEGER,
                 image_shape_x INTEGER,
@@ -198,24 +199,22 @@ class Database:
             (dataset_name, series_id, slice_index, dicom_path),
         )
 
-    def insert_dataset_data(self, dataset_name: str, metadata: dict) -> None:
+    def insert_dataset_data(self, metadata: Tuple) -> None:
         """
         Insert dataset data into the specified table.
 
         Args:
-            dataset_name (str): The name of the dataset table.
             metadata (dict): The metadata dictionary containing information about the dataset.
         """
-        dataset_name = f'"{dataset_name}"'
         self.cursor.execute(
             f"""
-            INSERT INTO {dataset_name} (
+            INSERT INTO {self.dataset_name_str} (
                 series_id, num_slices, image_shape_x, image_shape_y,
                 slice_thickness, spacing_x, spacing_y
             )
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (*metadata.values(),),
+            metadata,
         )
 
     def close(self):
@@ -233,9 +232,11 @@ class Processor:
     def __init__(self, config: dict):
         self.dataset_name = config["dataset_name"]
         self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
+        self.validate_only = config["validate_only"]
 
         self.ct_validator = CtValidation(config)
-        self.database = Database(config)
+        if not self.validate_only:
+            self.database = Database(config)
 
     def get_shape(self, dcm: pydicom.dataset.FileDataset) -> Tuple[int, int]:
         """
@@ -309,15 +310,12 @@ class Processor:
                 self.dataset_name, series_id, slice_index, rel_dicom_path
             )
 
-        self.insert_dataset_data(self.dataset_name, metadata)
+        self.insert_dataset_data(metadata)
 
     def prepare_dataset(self) -> None:
         """
         Prepares the dataset by creating necessary tables in the database and inserting data.
         """
-        self.database.create_global_table()
-        self.database.create_dataset_table(self.dataset_name)
-
         included_series_ids = []
 
         print("Walking dataset directories.")
@@ -341,9 +339,10 @@ class Processor:
                 logger.info(f"{data_folder}: Series ID already in database. Skipping.")
                 continue
 
+            if self.validate_only:
+                continue
             self.process_series(dcm_paths, series_id)
-
-        self.database.close()
+            included_series_ids.append(series_id)
 
 
 def get_argpase():
@@ -383,12 +382,10 @@ def main(args):
         "dataset_path": dataset_path,
         "target_path": args.db_path,
         "derived_okay": args.derived_okay,
+        "validate_only": args.validate_only,
     }
     processor = Processor(config)
-    if args.validate_only:
-        processor.get_series_paths()
-    else:
-        processor.prepare_dataset()
+    processor.prepare_dataset()
 
 
 if __name__ == "__main__":
