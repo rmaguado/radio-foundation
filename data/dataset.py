@@ -356,16 +356,12 @@ def get_argpase():
     )
     parser.add_argument(
         "--derived_okay",
-        type=bool,
-        default=False,
-        required=False,
+        action="store_true",
         help="Specify if derived images are allowed.",
     )
     parser.add_argument(
         "--validate_only",
-        type=bool,
-        default=False,
-        required=False,
+        action="store_true",
         help="Specify if only validation should be performed.",
     )
     parser.add_argument(
