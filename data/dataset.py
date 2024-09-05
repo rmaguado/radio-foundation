@@ -231,7 +231,7 @@ class Database:
 
 class Processor:
     def __init__(self, config: dict):
-        self.dataset_name = self.config["dataset_name"]
+        self.dataset_name = config["dataset_name"]
         self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
 
         self.ct_validator = CtValidation(config)
