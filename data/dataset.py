@@ -348,12 +348,32 @@ class Processor:
 
 def get_argpase():
     parser = argparse.ArgumentParser(add_help=True)
-    parser.add_argument("--root_path", type=str, required=True)
-    parser.add_argument("--dataset_name", type=str, required=True)
-    parser.add_argument("--derived_okay", type=bool, default=False, required=False)
-    parser.add_argument("--validate_only", type=bool, default=False, required=False)
     parser.add_argument(
-        "--db_path", type=str, default="data/radiomics_datasets.db", required=False
+        "--root_path", type=str, required=True, help="The root path of the dataset."
+    )
+    parser.add_argument(
+        "--dataset_name", type=str, required=True, help="The name of the dataset."
+    )
+    parser.add_argument(
+        "--derived_okay",
+        type=bool,
+        default=False,
+        required=False,
+        help="Specify if derived images are allowed.",
+    )
+    parser.add_argument(
+        "--validate_only",
+        type=bool,
+        default=False,
+        required=False,
+        help="Specify if only validation should be performed.",
+    )
+    parser.add_argument(
+        "--db_path",
+        type=str,
+        default="data/radiomics_datasets.db",
+        required=False,
+        help="The path to the database.",
     )
     return parser
 
