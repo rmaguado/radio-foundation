@@ -105,10 +105,7 @@ class CtValidation:
         """
         fields, missing_fields = self.get_fields(dcm)
         if missing_fields:
-            logger.info(
-                f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
-            )
-            return False
+            raise f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
 
         issues = ""
         issues += self.test_modality(fields)
@@ -117,9 +114,7 @@ class CtValidation:
         issues += self.test_image_type(fields)
 
         if issues:
-            logger.info(f"Skipping {dicom_folder_path}:\n{issues}")
-            return False
-        return True
+            raise f"Skipping {dicom_folder_path}:\n{issues}"
 
 
 def walk(root_dir):
@@ -315,6 +310,7 @@ class Processor:
             )
 
         self.insert_dataset_data(metadata)
+        logger.info(f"Processed series {series_id}.")
 
     def prepare_dataset(self) -> None:
         """
@@ -324,7 +320,7 @@ class Processor:
 
         print("Walking dataset directories.")
         total_dirs = sum(len(dirs) for _, dirs, _ in walk(self.absolute_dataset_path))
-        print("Total dicom directories: ", total_dirs)
+        logger.info(f"{self.dataset_name} total directories: {total_dirs}")
         for data_folder, dirs, files in tqdm(
             walk(self.absolute_dataset_path), total=total_dirs
         ):
@@ -335,7 +331,10 @@ class Processor:
                 continue
 
             first_dcm = pydicom.dcmread(dcm_paths[0], stop_before_pixels=True)
-            if not self.ct_validator(first_dcm, data_folder):
+            try:
+                self.ct_validator(first_dcm, data_folder)
+            except Exception as e:
+                logger.error(f"Error validating {data_folder}: {e}")
                 continue
             series_id = first_dcm.get("SeriesInstanceUID", None)
 
@@ -347,6 +346,9 @@ class Processor:
                 continue
             self.process_series(dcm_paths, series_id)
             included_series_ids.append(series_id)
+        logger.info(
+            f"Finished processing {self.dataset_name}. {len(included_series_ids)} series included."
+        )
 
 
 def get_argpase():
@@ -395,4 +397,8 @@ def main(args):
 if __name__ == "__main__":
     parser = get_argpase()
     args = parser.parse_args()
-    main(args)
+    try:
+        main(args)
+    except Exception as e:
+        logger.error(e)
+        raise e
