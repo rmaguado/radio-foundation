@@ -5,6 +5,7 @@ import SimpleITK as sitk
 from tqdm import tqdm
 import pydicom
 from typing import List, Tuple
+import ast
 import os
 
 
@@ -69,6 +70,8 @@ def validate_ct_dicom(dcm: pydicom.dataset.FileDataset, dicom_folder_path: str) 
     if not slice_thickness <= 4.0:
         issues.append(f"Slice thickness is too high: ({slice_thickness}).")
     image_type = fields["ImageType"]
+    if isinstance(image_type, str):
+        image_type = ast.literal_eval(image_type)
     if len(image_type) < 2:
         issues.append(f"Image type is too short: ({image_type}).")
     else:
@@ -364,7 +367,7 @@ def get_argpase():
     parser.add_argument("--dataset_name", type=str, required=True)
     parser.add_argument("--root_path", type=str, required=True)
     parser.add_argument(
-        "--db_path", type=str, default="data/radiomics_dataset.db", required=False
+        "--db_path", type=str, default="data/radiomics_datasets.db", required=False
     )
     return parser
 
