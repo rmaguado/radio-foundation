@@ -350,10 +350,13 @@ class Processor:
                 logger.info(f"{data_folder}: Series ID already in database. Skipping.")
                 continue
 
-            if self.validate_only:
-                continue
-            self.process_series(dcm_paths, series_id)
-            included_series_ids.append(series_id)
+            if not self.validate_only:
+                try:
+                    self.process_series(dcm_paths, series_id)
+                    included_series_ids.append(series_id)
+                except Exception as e:
+                    logger.error(f"Error processing series {series_id}: {e}")
+
         logger.info(
             f"Finished processing {self.dataset_name}. {len(included_series_ids)} series included."
         )
@@ -408,5 +411,5 @@ if __name__ == "__main__":
     try:
         main(args)
     except Exception as e:
-        logger.error(e)
+        logger.exception(e)
         raise e
