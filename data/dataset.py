@@ -353,9 +353,10 @@ class Processor:
             if not self.validate_only:
                 try:
                     self.process_series(dcm_paths, series_id)
-                    included_series_ids.append(series_id)
                 except Exception as e:
                     logger.error(f"Error processing series {series_id}: {e}")
+                    continue
+            included_series_ids.append(series_id)
 
         logger.info(
             f"Finished processing {self.dataset_name}. {len(included_series_ids)} series included."
