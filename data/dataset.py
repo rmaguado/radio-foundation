@@ -108,7 +108,9 @@ class CtValidation:
         """
         fields, missing_fields = self.get_fields(dcm)
         if missing_fields:
-            raise Exception(f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping.")
+            raise Exception(
+                f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
+            )
 
         issues = ""
         issues += self.test_modality(fields)
@@ -278,7 +280,10 @@ class Processor:
         Returns:
             List[Tuple[str, pydicom.dataset.FileDataset]]: A list of tuples containing the file path and the dicom object.
         """
-        dicoms = [(path, pydicom.dcmread(path)) for path in dicom_paths]
+        dicoms = [
+            (path, pydicom.dcmread(path, stop_before_pixels=True))
+            for path in dicom_paths
+        ]
         dicoms.sort(key=lambda x: x[1].ImagePositionPatient[2])
         return dicoms
 
