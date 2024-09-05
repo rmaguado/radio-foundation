@@ -7,6 +7,7 @@ import pydicom
 import ast
 import os
 
+import warnings
 import logging
 
 
@@ -20,6 +21,8 @@ formatter = logging.Formatter("%(levelname)s - %(message)s")
 file_handler.setFormatter(formatter)
 
 logger.addHandler(file_handler)
+
+warnings.filterwarnings("ignore")
 
 
 class CtValidation:
@@ -105,7 +108,7 @@ class CtValidation:
         """
         fields, missing_fields = self.get_fields(dcm)
         if missing_fields:
-            raise f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
+            raise Exception(f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping.")
 
         issues = ""
         issues += self.test_modality(fields)
@@ -114,7 +117,7 @@ class CtValidation:
         issues += self.test_image_type(fields)
 
         if issues:
-            raise f"Skipping {dicom_folder_path}:\n{issues}"
+            raise Exception(f"Skipping {dicom_folder_path}:\n{issues}")
 
 
 def walk(root_dir):
