@@ -87,6 +87,14 @@ def validate_ct_dicom(dcm: pydicom.dataset.FileDataset, dicom_folder_path: str) 
     return True
 
 
+def walk(root_dir):
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        if "ignore" in filenames:
+            dirnames[:] = []
+
+        yield dirpath, dirnames, filenames
+
+
 class DatasetBase:
     def __init__(self, config: dict):
         sitk.ProcessObject_SetGlobalWarningDisplay(False)
@@ -103,9 +111,9 @@ class DatasetBase:
         series_paths = []
 
         print("Walking dataset directories.")
-        total_dirs = sum(len(dirs) for _, dirs, _ in os.walk(datapath))
+        total_dirs = sum(len(dirs) for _, dirs, _ in walk(datapath))
         print("Total dicom directories: ", total_dirs)
-        for data_folder, dirs, files in tqdm(os.walk(datapath), total=total_dirs):
+        for data_folder, dirs, files in tqdm(walk(datapath), total=total_dirs):
 
             dcm_files = [f for f in files if f.endswith(".dcm")]
             if not dcm_files:
