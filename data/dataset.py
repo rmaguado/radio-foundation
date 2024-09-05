@@ -49,8 +49,12 @@ class CtValidation:
         return fields, missing_fields
 
     def is_axial_orientation(self, orientation: list):
-        axial_orientation = [1, 0, 0, 0, 1, 0]
-        return all(abs(orientation[i] - axial_orientation[i]) < 0.01 for i in range(6))
+        orientation = [round(float(x), 1) for x in orientation]
+        if len(orientation) != 6:
+            return False
+        if orientation[2] != 0 and orientation[2] != -1:
+            return False
+        return True
 
     def test_modality(self, fields: Dict[str, Any]) -> str:
         modality = fields["Modality"]
