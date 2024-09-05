@@ -119,7 +119,7 @@ class CtValidation:
         issues += self.test_image_type(fields)
 
         if issues:
-            raise Exception(f"Skipping {dicom_folder_path}:\n{issues}")
+            raise Exception(issues)
 
 
 def walk(root_dir):
@@ -327,7 +327,7 @@ class Processor:
         included_series_ids = []
 
         print("Walking dataset directories.")
-        total_dirs = sum(len(dirs) for _, dirs, _ in walk(self.absolute_dataset_path))
+        total_dirs = sum(1 for _ in walk(self.absolute_dataset_path))
         logger.info(f"{self.dataset_name} total directories: {total_dirs}")
         for data_folder, dirs, files in tqdm(
             walk(self.absolute_dataset_path), total=total_dirs
