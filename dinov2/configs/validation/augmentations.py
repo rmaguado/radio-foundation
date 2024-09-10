@@ -15,13 +15,8 @@ from .utils import (
 logger = logging.getLogger("dinov2")
 
 
-def test_has_crops(augmentations_list: DictConfig) -> bool:
-    if not any(
-        [
-            "localcrop" in transform.name or "globalcrop" in transform.name
-            for transform in augmentations_list
-        ]
-    ):
+def test_has_crops(augmentations_list: DictConfig, required_crop: str) -> bool:
+    if not any([transform.name == required_crop for transform in augmentations_list]):
         logger.error(Errors.NO_CROP)
         return False
     return True
