@@ -1,6 +1,6 @@
 augmentations:
   global_1:
-  - name: rotation
+  - name: rotate
     p: 0.8
     degrees: 90
   - name: globalcrop
@@ -12,7 +12,7 @@ augmentations:
   - name: brightness
     p: 0.8
     brightness: 0.4
-  - name: blur
+  - name: gaussian_blur
     p: 1.0
   global_2:
   - name: globalcrop
@@ -32,7 +32,7 @@ augmentations:
     p: 0.5
     noise_level: 0.02
     max_value: 1.0
-  - name: blur
+  - name: gaussian_blur
     p: 0.1
   local:
   - name: localcrop
@@ -44,5 +44,5 @@ augmentations:
   - name: brightness
     p: 0.8
     brightness: 0.4
-  - name: blur
+  - name: gaussian_blur
     p: 0.5
