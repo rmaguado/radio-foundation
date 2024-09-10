@@ -89,6 +89,7 @@ student:
   qkv_bias: true
   proj_bias: true
   ffn_bias: true
+  embed_layer: "patch"
   num_register_tokens: 4
   interpolate_antialias: true
   interpolate_offset: 0.0
