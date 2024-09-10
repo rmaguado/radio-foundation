@@ -52,7 +52,12 @@ def test_transforms_list(
     augmentations_list: DictConfig,
     augmentation_group: str,
 ) -> bool:
-    if not all([test_transform_is_valid(transform_obj, augmentations_list)]):
+    if not all(
+        [
+            test_transform_is_valid(transform_obj, kwargs)
+            for kwargs in augmentations_list
+        ]
+    ):
         return False
 
     required_crop = (
