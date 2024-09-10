@@ -27,10 +27,15 @@ warnings.filterwarnings("ignore")
 
 
 def get_image(
-    root_path: str, dcm_path: str, lower: float = -1000, upper: float = 1900
+    root_path: str,
+    dataset_name: str,
+    dcm_path: str,
+    lower: float = -1000,
+    upper: float = 1900,
 ) -> np.ndarray:
     try:
-        dcm = pydicom.dcmread(dcm_path)
+        abs_path = os.path.join(root_path, dataset_name, dcm_path)
+        dcm = pydicom.dcmread(abs_path)
         rescale_slope = dcm.RescaleSlope
         rescale_intercept = dcm.RescaleIntercept
         array_data = dcm.pixel_array * rescale_slope + rescale_intercept
@@ -50,9 +55,12 @@ def get_mean_std(pixel_array: np.ndarray) -> tuple:
 def sample_dcm_paths(db_path: str, n: int) -> list:
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT dicom_path FROM global ORDER BY RANDOM() LIMIT ?", (n,))
+
+    cursor.execute(
+        "SELECT dataset, dicom_path FROM global ORDER BY RANDOM() LIMIT ?", (n,)
+    )
     paths = cursor.fetchall()
-    paths = [path[0] for path in paths]
+
     conn.close()
     return paths
 
@@ -89,8 +97,8 @@ def main(args):
     means = []
     stds = []
 
-    for dcm_path in tqdm(dcm_paths):
-        pixel_array = get_image(root_path, dcm_path)
+    for dataset, dcm_path in tqdm(dcm_paths):
+        pixel_array = get_image(root_path, dataset, dcm_path)
         if pixel_array is not None:
             mean, std = get_mean_std(pixel_array)
             means.append(mean)
