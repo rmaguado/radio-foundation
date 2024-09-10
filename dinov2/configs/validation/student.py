@@ -65,7 +65,7 @@ def validate_student(config: DictConfig) -> bool:
         ("qkv_bias", bool),
         ("proj_bias", bool),
         ("ffn_bias", bool),
-        ("embed_layer", bool),
+        ("embed_layer", str),
         ("num_register_tokens", int),
         ("interpolate_antialias", bool),
         ("interpolate_offset", float),
