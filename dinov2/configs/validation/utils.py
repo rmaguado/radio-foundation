@@ -21,6 +21,7 @@ class Errors:
     UNRECOGNIZED_TRANSFORM = "Transform '{}' is not recognized. See dinov2/data/transforms.py for recognized transforms for implemented transforms."
     TRANSFORM_INIT_ERROR = "Error initializing transform '{}': {}"
     NO_CROP = "No crop found in augmentations list."
+    NO_TRANSFORM_NAME = "Transform name not found in augmentations list."
 
 
 class ValueRange:
