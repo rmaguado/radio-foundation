@@ -133,8 +133,8 @@ data:
         lower: -1000.0
         upper: 1900.0
       norm:
-        mean: 0.124
-        std: 0.121
+        mean: -573.8
+        std: 461.3
       augmentations:
         global_1:
         - name: rotation
