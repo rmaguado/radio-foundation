@@ -6,8 +6,8 @@ from fvcore.common.checkpoint import PeriodicCheckpointer
 
 from dinov2.fsdp import FSDPCheckpointer
 from dinov2.utils.utils import CosineScheduler
-from dinov2.data import collate_data_and_cast, DataAugmentationDINO, MaskingGenerator
-from dinov2.data import SamplerType, make_data_loader, make_dataset
+from dinov2.data import collate_data_and_cast, MaskingGenerator
+from dinov2.data import SamplerType, make_data_loader, make_train_dataset
 
 
 def build_optimizer(cfg, params_groups):
@@ -75,8 +75,6 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         max_num_patches=0.5 * image_size // patch_size * image_size // patch_size,
     )
 
-    data_transform = DataAugmentationDINO(cfg, use_full_image)
-
     collate_fn = partial(
         collate_data_and_cast,
         mask_ratio_tuple=cfg.ibot.mask_ratio_min_max,
@@ -86,7 +84,7 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         dtype=inputs_dtype,
     )
 
-    dataset = make_dataset(cfg, transform=data_transform)
+    dataset = make_train_dataset(cfg, use_full_image)
 
     batch_size = (
         cfg.train.full_image.batch_size_per_gpu

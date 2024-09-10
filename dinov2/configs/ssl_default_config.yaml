@@ -75,16 +75,6 @@ train:
     grad_accum_steps: 4
 evaluation:
   eval_period_iterations: 10000
-data:
-  root_path: .
-  datasets:
-    - name: "radiomics_datasets"
-      index_path: data/radiomics_datasets.db
-      type: "ct"
-      options:
-        channels: 1
-        lower_window: -1000.0
-        upper_window: 2000.0
 student:
   arch: vit_large
   patch_size: 14
@@ -132,54 +122,64 @@ crops:
   - 0.32
   global_crops_size: 224
   local_crops_size: 98
-norm:
-  mean: 0.124
-  std: 0.121
-augmentations:
-  global_1:
-  - name: rotation
-    p: 0.8
-    degrees: 90
-  - name: globalcrop
-  - name: flip
-    p: 0.5
-  - name: contrast
-    p: 0.8
-    contrast: 0.4
-  - name: brightness
-    p: 0.8
-    brightness: 0.4
-  - name: blur
-    p: 1.0
-  global_2:
-  - name: globalcrop
-  - name: flip
-    p: 0.5
-  - name: contrast
-    p: 0.8
-    contrast: 0.4
-  - name: brightness
-    p: 0.8
-    brightness: 0.4
-  - name: solarize
-    p: 0.2
-    threshold: 0.5
-    max_value: 1.0
-  - name: noise
-    p: 0.5
-    noise_level: 0.02
-    max_value: 1.0
-  - name: blur
-    p: 0.1
-  local:
-  - name: localcrop
-  - name: flip
-    p: 0.5
-  - name: contrast
-    p: 0.8
-    contrast: 0.4
-  - name: brightness
-    p: 0.8
-    brightness: 0.4
-  - name: blur
-    p: 0.5
+data:
+  root_path: .
+  datasets:
+    - name: "radiomics_datasets"
+      index_path: data/radiomics_datasets.db
+      type: "ct"
+      channels: 1
+      pixel_range:
+        lower: -1000.0
+        upper: 1900.0
+      norm:
+        mean: 0.124
+        std: 0.121
+      augmentations:
+        global_1:
+        - name: rotation
+          p: 0.8
+          degrees: 90
+        - name: globalcrop
+        - name: flip
+          p: 0.5
+        - name: contrast
+          p: 0.8
+          contrast: 0.4
+        - name: brightness
+          p: 0.8
+          brightness: 0.4
+        - name: blur
+          p: 1.0
+        global_2:
+        - name: globalcrop
+        - name: flip
+          p: 0.5
+        - name: contrast
+          p: 0.8
+          contrast: 0.4
+        - name: brightness
+          p: 0.8
+          brightness: 0.4
+        - name: solarize
+          p: 0.2
+          threshold: 0.5
+          max_value: 1.0
+        - name: noise
+          p: 0.5
+          noise_level: 0.02
+          max_value: 1.0
+        - name: blur
+          p: 0.1
+        local:
+        - name: localcrop
+        - name: flip
+          p: 0.5
+        - name: contrast
+          p: 0.8
+          contrast: 0.4
+        - name: brightness
+          p: 0.8
+          brightness: 0.4
+        - name: blur
+          p: 0.5

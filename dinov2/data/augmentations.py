@@ -6,21 +6,17 @@
 import logging
 
 import torch
-from torchvision import transforms
 from omegaconf import DictConfig
+import copy
 
-from .transforms import transformkeys
+from .transforms import ImageTransforms
 
 
 logger = logging.getLogger("dinov2")
 
 
-err_not_recognized = "Transform '{s}' is not recognized. \
-Please check the config file under augmentations."
-
-
 class DataAugmentationDINO(object):
-    def __init__(self, cfg: DictConfig, use_full_image: bool) -> None:
+    def __init__(self, dataset_config: DictConfig, use_full_image: bool) -> None:
         """
         Initializes an instance of the Augmentations class.
 
@@ -28,74 +24,19 @@ class DataAugmentationDINO(object):
             cfg (DictConfig): configuration object
             use_full_image (bool): whether to use the full image
         """
-
-        self.cfg = cfg
-        self.local_crops_number = cfg.crops.local_crops_number
-        self.local_crops_size = cfg.crops.local_crops_size
-        self.local_crops_scale = cfg.crops.local_crops_scale
+        self.dataset_config = dataset_config
+        self.local_crops_number = dataset_config.crops.local_crops_number
+        self.local_crops_size = dataset_config.crops.local_crops_size
+        self.local_crops_scale = dataset_config.crops.local_crops_scale
 
         self.global_crops_size = (
-            cfg.student.full_image_size
+            dataset_config.student.full_image_size
             if use_full_image
-            else cfg.crops.global_crops_size
+            else dataset_config.crops.global_crops_size
         )
-        self.global_crops_scale = cfg.crops.global_crops_scale
-
-        self.localcrop = self.get_local_crop()
-        self.globalcrop = self.get_global_crop()
-        self.normalize = transforms.Normalize(mean=cfg.norm.mean, std=cfg.norm.std)
+        self.global_crops_scale = dataset_config.crops.global_crops_scale
 
         self.global1, self.global2, self.local1 = self.load_transforms_from_cfg()
-
-    def get_local_crop(self):
-        """
-        Returns a random resized crop transformation for local crops.
-
-        Returns:
-            transforms.RandomResizedCrop: A random resized crop transformation with the specified parameters.
-        """
-        return transforms.RandomResizedCrop(
-            self.local_crops_size,
-            scale=self.local_crops_scale,
-            interpolation=transforms.InterpolationMode.BICUBIC,
-            antialias=True,
-        )
-
-    def get_global_crop(self):
-        """
-        Returns a random resized crop transformation for global crops.
-
-        Returns:
-            transforms.RandomResizedCrop: A random resized crop transformation with the specified parameters.
-        """
-        return transforms.RandomResizedCrop(
-            self.global_crops_size,
-            scale=self.global_crops_scale,
-            interpolation=transforms.InterpolationMode.BICUBIC,
-            antialias=True,
-        )
-
-    def create_transform(self, transform_options: DictConfig):
-        """
-        Creates and returns a transform based on the given configuration.
-
-        Args:
-            transform_options (dict): A dictionary containing the configuration for the transform.
-
-        Returns:
-            transform: The created transform object.
-        """
-        name = transform_options["name"]
-        if name == "localcrop":
-            return self.localcrop
-        elif name == "globalcrop":
-            return self.globalcrop
-        elif name in transformkeys:
-            transform_cls = transformkeys[name]
-            params = {k: float(v) for k, v in transform_options.items() if k != "name"}
-            return transform_cls(**params)
-        else:
-            raise ValueError(err_not_recognized.format(s=name))
 
     def build_transform_group(self, transform_key):
         """
@@ -107,11 +48,29 @@ class DataAugmentationDINO(object):
         Returns:
             transforms.Compose: The composed transformation group.
         """
-        transforms_list = [
-            self.create_transform(tc) for tc in self.cfg.augmentations[transform_key]
-        ]
-        transforms_list.append(self.normalize)
-        return transforms.Compose(transforms_list)
+        image_transforms = ImageTransforms(
+            self.dataset_config.pixel_range.lower,
+            self.dataset_config.pixel_range.upper,
+            self.dataset_config.channels,
+        )
+        augmentations_list = copy.deepcopy(
+            self.dataset_config.augmentations[transform_key]
+        )
+        for tc in augmentations_list:
+            name = tc.pop("name")
+            if name == "localcrop":
+                image_transforms.add_crop(self.local_crops_size, self.local_crops_scale)
+            elif name == "globalcrop":
+                image_transforms.add_crop(
+                    self.global_crops_size, self.global_crops_scale
+                )
+            else:
+                image_transforms.add_transform(name, tc)
+
+        image_transforms.add_normalize(
+            self.dataset_config.norm.mean, self.dataset_config.norm.std
+        )
+        return image_transforms
 
     def load_transforms_from_cfg(self):
         """

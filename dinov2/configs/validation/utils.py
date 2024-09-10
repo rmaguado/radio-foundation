@@ -16,12 +16,11 @@ class Errors:
     VIT_SMALL_DROP_PATH = "Drop path rate should be 0.0 for vit_small."
     INVALID_TRAIN_SETUP = "Train setup is invalid. Check epoch num and warmup configs."
     INVALID_VALUE_PAIR = "Invalid pair of values for {}: {} and {}."
-    INVALID_CHANNELS = (
-        "Channels for dataset {} should be an integer greater than 0. Found {}."
-    )
+    INVALID_VALUE = "Invalid value {}"
     INVALID_DATASET_TYPE = "Invalid dataset type: {}."
     UNRECOGNIZED_TRANSFORM = "Transform '{}' is not recognized. See dinov2/data/transforms.py for recognized transforms for implemented transforms."
     TRANSFORM_INIT_ERROR = "Error initializing transform '{}': {}"
+    NO_CROP = "No crop found in augmentations list."
 
 
 class ValueRange:

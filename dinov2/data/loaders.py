@@ -13,6 +13,7 @@ from torch.utils.data import Sampler
 
 from .datasets import CtDataset, MultiDataset
 from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
+from .augmentations import DataAugmentationDINO
 
 
 logger = logging.getLogger("dinov2")
@@ -25,23 +26,20 @@ class SamplerType(Enum):
     SHARDED_INFINITE = 3
 
 
-def make_dataset(
+def make_train_dataset(
     config: DictConfig,
-    transform: Callable,
-    target_transform: Optional[Callable] = lambda _: _,
+    use_full_image: bool,
 ) -> Union[CtDataset, MultiDataset]:
     """
     Parse the dataset from the given OmegaConf configuration.
 
     Args:
         config (DictConfig): The OmegaConf dictionary configuration for the dataset.
-        transform (Optional[Callable]): Function to be applied to images.
-        target_transform (Optional[Callable]): Function to be applied to targets.
+        use_full_image (bool): Whether to set the global crop size to the full size.
 
     Returns:
         Union[ImageDataset, MultiDataset]: The corresponding dataset object(s).
     """
-
     dataset_types_mapping = {
         "ct": CtDataset,
     }
@@ -51,20 +49,15 @@ def make_dataset(
 
     for dataset_config in datasets:
         dataset_type = dataset_config.type
-        dataset_options = dataset_config.get("options", {})
+        transform = DataAugmentationDINO(dataset_config, use_full_image)
 
         dataset_kwargs = {
             "dataset_name": dataset_config.name,
             "index_path": dataset_config.index_path,
             "root_path": config.data.root_path,
             "output_path": config.train.output_dir,
-            "options": dataset_options,
             "transform": transform,
-            "target_transform": target_transform,
         }
-
-        if dataset_type not in dataset_types_mapping:
-            raise ValueError(f"Unknown dataset type: {dataset_type}")
 
         dataset_object = dataset_types_mapping[dataset_type](**dataset_kwargs)
         dataset_objects.append(dataset_object)
