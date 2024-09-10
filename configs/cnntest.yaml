@@ -1,0 +1,26 @@
+train:
+  grad_accum_steps: 2
+  batch_size_per_gpu: 4
+  OFFICIAL_EPOCH_LENGTH: 10
+  saveckp_iterations: 10
+  print_freq: 1
+  full_image:
+    epochs: 2
+    batch_size_per_gpu: 2
+    grad_accum_steps: 4
+evaluation:
+  eval_period_iterations: 10
+student:
+  arch: vit_small
+  ffn_layer: "mlp"
+  drop_path_rate: 0.0
+  channels: 1
+  embed_layer: "conv"
+teacher:
+  warmup_teacher_temp_epochs: 4  
+optim:
+  epochs: 8
+  warmup_epochs: 2
+  base_lr: 0.003
+data:
+  root_path: /home/rmaguado/rdt/DeepRDT/datasets/
