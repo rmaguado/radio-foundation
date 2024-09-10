@@ -8,16 +8,6 @@ train:
     epochs: 2
     batch_size_per_gpu: 2
     grad_accum_steps: 4
-data:
-  root_path: /home/rmaguado/rdt/DeepRDT/datasets/
-  datasets:
-    - name: "radiomics_datasets"
-      index_path: data/radiomics_datasets.db
-      type: "ct"
-      options:
-        channels: 1
-        lower_window: -1000.0
-        upper_window: 2000.0
 evaluation:
   eval_period_iterations: 10
 student:
@@ -31,3 +21,5 @@ optim:
   epochs: 8
   warmup_epochs: 2
   base_lr: 0.003
+data:
+  root_path: /home/rmaguado/rdt/DeepRDT/datasets/

@@ -3,14 +3,6 @@ train:
   batch_size_per_gpu: 64
 data:
   root_path: /home/rmaguado/rdt/DeepRDT/datasets/
-  datasets:
-    - name: "radiomics_datasets"
-      index_path: data/radiomics_datasets.db
-      type: "ct"
-      options:
-        channels: 1
-        lower_window: -1000.0
-        upper_window: 2000.0
 student:
   arch: vit_base
   ffn_layer: "mlp"
@@ -21,3 +13,5 @@ optim:
   epochs: 50
   warmup_epochs: 10
   base_lr: 0.003
+data:
+  root_path: /home/rmaguado/rdt/DeepRDT/datasets/
