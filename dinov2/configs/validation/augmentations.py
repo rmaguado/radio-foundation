@@ -30,7 +30,10 @@ def test_has_crops(augmentations_list: DictConfig) -> bool:
 def test_transform_is_valid(
     transform_obj: ImageTransforms, transform_kwargs: Dict
 ) -> bool:
-    transform_name = transform_kwargs.pop("name", "unnamed transform")
+    if not hasattr(transform_kwargs, "name"):
+        logger.error(Errors.NO_TRANSFORM_NAME)
+        return False
+    transform_name = transform_kwargs.pop("name")
     if transform_name in ["localcrop", "globalcrop"]:
         return True
     if transform_name not in transform_obj.keys():
