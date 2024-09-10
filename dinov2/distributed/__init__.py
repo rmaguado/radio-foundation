@@ -80,7 +80,7 @@ def _restrict_print_to_main_process() -> None:
     builtin_print = __builtin__.print
 
     def print(*args, **kwargs):
-        force = kwargs.pop("force")
+        force = kwargs.pop("force", False)
         if is_main_process() or force:
             builtin_print(*args, **kwargs)
 
