@@ -58,7 +58,7 @@ def test_transforms_list(
         return False
 
     required_crop = (
-        "global" if augmentation_group in ["global_1", "global_2"] else "local"
+        "globalcrop" if augmentation_group in ["global_1", "global_2"] else "localcrop"
     )
     if not test_has_crops(augmentations_list, required_crop):
         return False
