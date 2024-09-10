@@ -1,6 +1,7 @@
 from omegaconf import DictConfig, ListConfig
 from typing import Dict
 import logging
+import copy
 
 from dinov2.data import ImageTransforms
 
@@ -25,6 +26,7 @@ def test_has_crops(augmentations_list: DictConfig, required_crop: str) -> bool:
 def test_transform_is_valid(
     transform_obj: ImageTransforms, transform_kwargs: Dict
 ) -> bool:
+    transform_kwargs = copy.deepcopy(transform_kwargs)
     if not hasattr(transform_kwargs, "name"):
         logger.error(Errors.NO_TRANSFORM_NAME)
         return False
