@@ -24,7 +24,9 @@ class CtDataset(BaseDataset):
         index_path: str,
         root_path: str,
         output_path: str,
-        options: Optional[dict] = None,
+        channels: int,
+        lower_window: int,
+        upper_window: int,
         transform: Optional[Callable] = lambda _: _,
         target_transform: Optional[Callable] = lambda _: _,
     ) -> None:
@@ -36,7 +38,9 @@ class CtDataset(BaseDataset):
             index_path (str): The path to the index file.
             root_path (str): The root path of the dataset.
             output_path (str): The output path for the dataset.
-            options (Optional[dict], optional): Additional options for the CTScan object. Defaults to None.
+            channels (int): The number of channels to use.
+            lower_window (int): The lower window value.
+            upper_window (int): The upper window value.
             transform (Optional[Callable], optional): A function to apply to the data. Defaults to lambda _: _.
             target_transform (Optional[Callable], optional): A function to apply to the target. Defaults to lambda _: _.
         """
@@ -52,9 +56,9 @@ class CtDataset(BaseDataset):
         self.transform = transform
         self.target_transform = target_transform
 
-        self.channels = options.get("channels", 1)
-        self.lower_window = options.get("lower_window", -1000)
-        self.upper_window = options.get("upper_window", 2000)
+        self.channels = channels
+        self.lower_window = lower_window
+        self.upper_window = upper_window
 
         self.entries = self.get_entries()
 

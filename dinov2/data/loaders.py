@@ -40,9 +40,13 @@ def make_train_dataset(
     Returns:
         Union[ImageDataset, MultiDataset]: The corresponding dataset object(s).
     """
-    dataset_types_mapping = {
-        "ct": CtDataset,
-    }
+
+    def get_ct_kwargs(dataset_config):
+        return {
+            "channels": dataset_config.channels,
+            "lower_window": dataset_config.pixel_range.lower,
+            "upper_window": dataset_config.pixel_range.upper,
+        }
 
     datasets = config.data.datasets
     dataset_objects = []
@@ -59,7 +63,11 @@ def make_train_dataset(
             "transform": transform,
         }
 
-        dataset_object = dataset_types_mapping[dataset_type](**dataset_kwargs)
+        if dataset_type == "ct":
+            dataset_kwargs.update(get_ct_kwargs(dataset_config))
+            dataset_object = CtDataset(**dataset_kwargs)
+        else:
+            raise ValueError(f"Unsupported dataset type: {dataset_type}")
         dataset_objects.append(dataset_object)
 
     return (
