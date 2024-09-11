@@ -16,25 +16,28 @@ logger = logging.getLogger("dinov2")
 
 
 class DataAugmentationDINO(object):
-    def __init__(self, dataset_config: DictConfig, use_full_image: bool) -> None:
+    def __init__(
+        self, config: DictConfig, dataset_config: DictConfig, use_full_image: bool
+    ) -> None:
         """
         Initializes an instance of the Augmentations class.
 
         Args:
-            cfg (DictConfig): configuration object
-            use_full_image (bool): whether to use the full image
+            config (DictConfig): The primary configuration object.
+            dataset_config (DictConfig): The dataset configuration object.
+            use_full_image (bool): Whether to use the full image
         """
         self.dataset_config = dataset_config
-        self.local_crops_number = dataset_config.crops.local_crops_number
-        self.local_crops_size = dataset_config.crops.local_crops_size
-        self.local_crops_scale = dataset_config.crops.local_crops_scale
+        self.local_crops_number = config.crops.local_crops_number
+        self.local_crops_size = config.crops.local_crops_size
+        self.local_crops_scale = config.crops.local_crops_scale
 
         self.global_crops_size = (
-            dataset_config.student.full_image_size
+            config.student.full_image_size
             if use_full_image
-            else dataset_config.crops.global_crops_size
+            else config.crops.global_crops_size
         )
-        self.global_crops_scale = dataset_config.crops.global_crops_scale
+        self.global_crops_scale = config.crops.global_crops_scale
 
         self.global1, self.global2, self.local1 = self.load_transforms_from_cfg()
 

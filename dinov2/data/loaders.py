@@ -49,7 +49,7 @@ def make_train_dataset(
 
     for dataset_config in datasets:
         dataset_type = dataset_config.type
-        transform = DataAugmentationDINO(dataset_config, use_full_image)
+        transform = DataAugmentationDINO(config, dataset_config, use_full_image)
 
         dataset_kwargs = {
             "dataset_name": dataset_config.name,
