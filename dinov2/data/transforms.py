@@ -81,11 +81,13 @@ class ImageTransforms:
             crop_size (int): The size of the crop.
             crop_scale (Tuple): The range of scale of the crop.
         """
-        return transforms.RandomResizedCrop(
-            crop_size,
-            scale=crop_scale,
-            interpolation=transforms.InterpolationMode.BICUBIC,
-            antialias=True,
+        self.transform_list.append(
+            transforms.RandomResizedCrop(
+                crop_size,
+                scale=crop_scale,
+                interpolation=transforms.InterpolationMode.BICUBIC,
+                antialias=True,
+            )
         )
 
     def add_normalize(self, mean: float, std: float):
