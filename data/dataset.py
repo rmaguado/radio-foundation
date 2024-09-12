@@ -226,7 +226,7 @@ class Database:
         """
         Closes the database connection.
         """
-        if not self.is_open:
+        if self.is_open:
             self.conn.commit()
             self.conn.close()
             self.is_open = False
