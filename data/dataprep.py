@@ -3,7 +3,7 @@
 # calls dataset.py on each unprocessed datasets
 # calls statistics.py on final database
 
-from dataset import Processor
+from .dataset import Processor
 import sqlite3
 import argparse
 import os
@@ -13,17 +13,6 @@ import warnings
 
 
 logger = logging.getLogger("dataprep")
-logger.setLevel(logging.INFO)
-
-file_handler = logging.FileHandler("data/log/dataprep.log")
-file_handler.setLevel(logging.INFO)
-
-formatter = logging.Formatter("%(message)s")
-file_handler.setFormatter(formatter)
-
-logger.addHandler(file_handler)
-
-warnings.filterwarnings("ignore")
 
 
 def get_argpase():
@@ -59,14 +48,14 @@ def get_processed_datasets(db_path):
 
 def get_unprocessed_datasets(root_path, db_path):
     datasets_in_root = [
-        x for x in os.listdir(root_path) if os.path.isdir(os.path.join(root_path, x))
+        x for x in os.listdir(root_path) if os.path.isdir(os.path.join(root_path, x)) and not x.startswith(".")
     ]
     if not os.path.exists(db_path):
         return datasets_in_root
 
     processed_datasets = get_processed_datasets(db_path)
     if processed_datasets:
-        logger.info(f"Skipping already processed datasets: {processed_datasets}")
+        logger.info(f"Skipping already processed datasets: {', '.join(processed_datasets)}")
     unprocessed_datasets = [x for x in datasets_in_root if x not in processed_datasets]
 
     return unprocessed_datasets
@@ -78,7 +67,7 @@ def main(args):
     derived_okay = args.derived_okay
 
     unprocessed_datasets = get_unprocessed_datasets(root_path, db_path)
-    logger.info(f"Unprocessed datasets: {unprocessed_datasets}")
+    logger.info(f"Unprocessed datasets: {', '.join(unprocessed_datasets)}")
 
     for dataset in unprocessed_datasets:
         dataset_path = os.path.join(root_path, dataset)
@@ -87,9 +76,11 @@ def main(args):
             "dataset_path": dataset_path,
             "target_path": db_path,
             "derived_okay": derived_okay,
+            "validate_only": False
         }
         processor = Processor(config)
         processor.prepare_dataset()
+        processor.close_db()
 
 
 if __name__ == "__main__":

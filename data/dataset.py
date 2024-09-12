@@ -108,10 +108,7 @@ class CtValidation:
             bool: True if the DICOM file is valid for CT scans, False otherwise.
         """
         fields, missing_fields = self.get_fields(dcm)
-        if missing_fields:
-            raise Exception(
-                f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
-            )
+        assert not missing_fields, f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
 
         issues = ""
         issues += self.test_modality(fields)
@@ -226,8 +223,9 @@ class Database:
         """
         Closes the database connection.
         """
-        self.conn.commit()
-        self.conn.close()
+        if self.conn:
+            self.conn.commit()
+            self.conn.close()
 
     def __del__(self):
         self.close()
@@ -328,6 +326,7 @@ class Processor:
         """
         included_series_ids = []
 
+        logger.info(f"Processing dataset: {self.dataset_name}")
         print("Walking dataset directories.")
         total_dirs = sum(1 for _ in walk(self.absolute_dataset_path))
         logger.info(f"{self.dataset_name} total directories: {total_dirs}")
@@ -366,6 +365,9 @@ class Processor:
         logger.info(
             f"Finished processing {self.dataset_name}. {len(included_series_ids)} series included."
         )
+
+    def close_db(self):
+        self.database.close()
 
 
 def get_argpase():
