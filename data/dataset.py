@@ -315,7 +315,7 @@ class Processor:
 
         for slice_index, (dicom_path, dicom) in enumerate(sorted_dicoms):
             rel_dicom_path = os.path.relpath(dicom_path, self.absolute_dataset_path)
-            self.insert_global_data(
+            self.database.insert_global_data(
                 self.dataset_name, series_id, slice_index, rel_dicom_path
             )
 
