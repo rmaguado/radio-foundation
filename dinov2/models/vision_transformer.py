@@ -48,6 +48,25 @@ def named_apply(
         fn(module=module, name=name)
     return module
 
+def get_embedding_layer(embed_layer, img_size, patch_size, in_chans, embed_dim, conv_chanels):
+    if embed_layer == "patch":
+        return PatchEmbed(
+            img_size=img_size,
+            patch_size=patch_size,
+            in_chans=in_chans,
+            embed_dim=embed_dim,
+        )
+    elif embed_layer == "conv":
+        return CnnEmbed(
+            img_size=img_size,
+            patch_size=patch_size,
+            in_chans=in_chans,
+            embed_dim=embed_dim,
+            conv_chanels=conv_chanels,
+        )
+    else:
+        raise NotImplementedError
+
 
 class BlockChunk(nn.ModuleList):
     def forward(self, x):
@@ -73,6 +92,7 @@ class DinoVisionTransformer(nn.Module):
         drop_path_uniform=False,
         init_values=None,  # for layerscale: None or 0 => no layerscale
         embed_layer="patch",  # 'patch' or 'conv'
+        conv_chanels=0,
         act_layer=nn.GELU,
         block_fn=Block,
         ffn_layer="mlp",
@@ -98,6 +118,7 @@ class DinoVisionTransformer(nn.Module):
             weight_init (str): weight init scheme
             init_values (float): layer-scale init values
             embed_layer (str): patch embedding layer. 'patch' or 'conv'
+            conv_chanels (int): number of channels in conv layer or 0 for patch embedding
             act_layer (nn.Module): MLP activation layer
             block_fn (nn.Module): transformer block class
             ffn_layer (str): "mlp", "swiglu", "swiglufused" or "identity"
@@ -120,12 +141,8 @@ class DinoVisionTransformer(nn.Module):
         self.interpolate_antialias = interpolate_antialias
         self.interpolate_offset = interpolate_offset
 
-        embed_module = PatchEmbed if embed_layer == "patch" else CnnEmbed
-        self.patch_embed = embed_module(
-            img_size=img_size,
-            patch_size=patch_size,
-            in_chans=in_chans,
-            embed_dim=embed_dim,
+        self.patch_embed = get_embedding_layer(
+            embed_layer, img_size, patch_size, in_chans, embed_dim, conv_chanels
         )
         num_patches = self.patch_embed.num_patches
 
