@@ -4,9 +4,6 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- Script to sample dataset mean and std
-- CNN patchembed
-
 - Dataloader to eval using entire volume
 - script for running benchmark tests (after I have many datasets)
 
