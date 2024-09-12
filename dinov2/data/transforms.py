@@ -100,6 +100,7 @@ class ImageTransforms:
 
     def _get_random_transform(self, transform_name: str, kwargs: dict) -> Callable:
         kwargs = copy.deepcopy(kwargs)
+        kwargs.pop("name")
         p = kwargs.pop("p")
         transform_function = self._transforms[transform_name]
 
