@@ -8,6 +8,23 @@ import sqlite3
 import argparse
 import os
 
+import logging
+import warnings
+
+
+logger = logging.getLogger("dataprep")
+logger.setLevel(logging.INFO)
+
+file_handler = logging.FileHandler("data/log/dataprep.log")
+file_handler.setLevel(logging.INFO)
+
+formatter = logging.Formatter("%(levelname)s - %(message)s")
+file_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+
+warnings.filterwarnings("ignore")
+
 
 def get_argpase():
     parser = argparse.ArgumentParser(add_help=True)
@@ -59,6 +76,7 @@ def main(args):
     derived_okay = args.derived_okay
 
     unprocessed_datasets = get_unprocessed_datasets(root_path, db_path)
+    logger.info(f"Unprocessed datasets: {unprocessed_datasets}")
 
     for dataset in unprocessed_datasets:
         dataset_path = os.path.join(root_path, dataset)
@@ -74,4 +92,8 @@ def main(args):
 
 if __name__ == "__main__":
     args = get_argpase().parse_args()
-    main(args)
+    try:
+        main(args)
+    except Exception as e:
+        logger.exception(e)
+        raise e
