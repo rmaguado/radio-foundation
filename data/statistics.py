@@ -95,17 +95,17 @@ def main(args):
 
     dcm_paths = sample_dcm_paths(db_path, n)
     means = []
-    stds = []
+    variances = []
 
     for dataset, dcm_path in tqdm(dcm_paths):
         pixel_array = get_image(root_path, dataset, dcm_path)
         if pixel_array is not None:
             mean, std = get_mean_std(pixel_array)
             means.append(mean)
-            stds.append(std)
+            variances.append(std**2)
 
     mean = np.mean(means)
-    std = np.mean(stds)
+    std = np.mean(variances) ** 0.5
 
     logger.info(f"Mean: {mean}")
     logger.info(f"Standard Deviation: {std}")
