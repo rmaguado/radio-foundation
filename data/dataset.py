@@ -8,6 +8,7 @@ import ast
 import os
 
 import warnings
+import traceback
 import logging
 
 
@@ -169,7 +170,7 @@ class Database:
                 image_shape_y INTEGER,
                 slice_thickness REAL,
                 spacing_x REAL,
-                spacing_y REAL,
+                spacing_y REAL
             )
             """
         )
@@ -342,7 +343,7 @@ class Processor:
             try:
                 self.ct_validator(first_dcm, data_folder)
             except Exception as e:
-                logger.error(f"Error validating {data_folder}: {e}")
+                logger.exception(f"Error validating {data_folder}: {e}")
                 continue
             series_id = first_dcm.get("SeriesInstanceUID", None)
 
@@ -354,7 +355,7 @@ class Processor:
                 try:
                     self.process_series(dcm_paths, series_id)
                 except Exception as e:
-                    logger.error(f"Error processing series {series_id}: {e}")
+                    logger.exception(f"Error processing series {series_id}: {e}")
                     continue
             included_series_ids.append(series_id)
 
