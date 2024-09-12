@@ -65,6 +65,8 @@ def get_unprocessed_datasets(root_path, db_path):
         return datasets_in_root
 
     processed_datasets = get_processed_datasets(db_path)
+    if processed_datasets:
+        logger.info(f"Skipping already processed datasets: {processed_datasets}")
     unprocessed_datasets = [x for x in datasets_in_root if x not in processed_datasets]
 
     return unprocessed_datasets
