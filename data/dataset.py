@@ -108,7 +108,9 @@ class CtValidation:
             bool: True if the DICOM file is valid for CT scans, False otherwise.
         """
         fields, missing_fields = self.get_fields(dcm)
-        assert not missing_fields, f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
+        assert (
+            not missing_fields
+        ), f"{dicom_folder_path}: Missing fields: {', '.join(missing_fields)}. Skipping."
 
         issues = ""
         issues += self.test_modality(fields)
@@ -132,6 +134,7 @@ class Database:
     def __init__(self, config: dict):
         self.conn = sqlite3.connect(config["target_path"])
         self.cursor = self.conn.cursor()
+        self.is_open = True
 
         self.dataset_name_str = f'"{config["dataset_name"]}"'
 
@@ -223,9 +226,10 @@ class Database:
         """
         Closes the database connection.
         """
-        if self.conn:
+        if not self.is_open:
             self.conn.commit()
             self.conn.close()
+            self.is_open = False
 
     def __del__(self):
         self.close()
