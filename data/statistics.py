@@ -56,10 +56,18 @@ def sample_dcm_paths(db_path: str, n: int) -> list:
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT dataset, dicom_path FROM global ORDER BY RANDOM() LIMIT ?", (n,)
-    )
-    paths = cursor.fetchall()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    datasets = [table[0] for table in cursor.fetchall() if table[0] != "global"]
+
+    n_dataset = n // len(datasets)
+
+    paths = []
+    for dataset in datasets:
+        cursor.execute(
+            f"SELECT dicom_path FROM global WHERE dataset = '{dataset}' ORDER BY RANDOM() LIMIT {n_dataset}"
+        )
+        dcm_paths = cursor.fetchall()
+        paths += [(dataset, dcm_path[0]) for dcm_path in dcm_paths]
 
     conn.close()
     return paths
