@@ -20,7 +20,7 @@ from torch.nn.init import trunc_normal_
 from dinov2.layers import (
     Mlp,
     PatchEmbed,
-    CNNHead,
+    CnnEmbed,
     SwiGLUFFNFused,
     MemEffAttention,
     NestedTensorBlock as Block,
@@ -120,7 +120,7 @@ class DinoVisionTransformer(nn.Module):
         self.interpolate_antialias = interpolate_antialias
         self.interpolate_offset = interpolate_offset
 
-        embed_module = PatchEmbed if embed_layer == "patch" else CNNHead
+        embed_module = PatchEmbed if embed_layer == "patch" else CnnEmbed
         self.patch_embed = embed_module(
             img_size=img_size,
             patch_size=patch_size,

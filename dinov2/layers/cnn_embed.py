@@ -4,7 +4,7 @@ from torch import Tensor
 import torch.nn as nn
 
 
-class CNNHead(nn.Module):
+class CnnEmbed(nn.Module):
     """
     CNN head for a hybrid ViT.
 
@@ -21,53 +21,43 @@ class CNNHead(nn.Module):
         patch_size: Union[int, Tuple[int, int]] = 14,
         in_chans: int = 3,
         embed_dim: int = 384,
+        conv_chans: int = 96,
     ) -> None:
         super().__init__()
-        bottleneck_dim = embed_dim // 4
         embed_kernel_size = patch_size // 2
 
-        self.stem_layer = nn.Conv2d(
-            in_chans, bottleneck_dim, kernel_size=5, stride=2, padding=2
+        self.feature_layer = nn.Conv2d(
+            in_chans, conv_chans, kernel_size=5, stride=2, padding=2
         )
-
-        self.depthwise_conv = nn.Conv2d(
-            bottleneck_dim,
-            bottleneck_dim,
-            kernel_size=7,
-            padding="same",
-            groups=bottleneck_dim,
-        )
-
-        self.ln = nn.LayerNorm(bottleneck_dim)
-        self.gelu = nn.GELU()
-
-        self.conv1x1_384 = nn.Conv2d(bottleneck_dim, embed_dim, kernel_size=1)
-        self.conv1x1_96 = nn.Conv2d(embed_dim, bottleneck_dim, kernel_size=1)
 
         self.embed_layer = nn.Conv2d(
-            bottleneck_dim,
+            conv_chans,
             embed_dim,
             kernel_size=embed_kernel_size,
             stride=embed_kernel_size,
         )
 
+        self.ln = nn.LayerNorm(conv_chans)
+        self.gelu = nn.GELU()
+
     def forward(self, x: Tensor) -> Tensor:
+        _, _, H, W = x.shape
+        patch_H, patch_W = self.patch_size
 
-        x = self.stem_layer(x)
+        assert (
+            H % patch_H == 0
+        ), f"Input image height {H} is not a multiple of patch height {patch_H}"
+        assert (
+            W % patch_W == 0
+        ), f"Input image width {W} is not a multiple of patch width: {patch_W}"
 
-        residual = x
-        x = self.depthwise_conv(x)
+        x = self.feature_layer(x)
+        x = self.embed_layer(x)
 
         x = x.transpose(1, 3)
         x = self.ln(x)
         x = x.transpose(1, 3)
 
-        x = self.conv1x1_384(x)
         x = self.gelu(x)
-
-        x = self.conv1x1_96(x)
-        x += residual
-
-        x = self.embed_layer(x)
 
         return x.flatten(2).transpose(1, 2)
