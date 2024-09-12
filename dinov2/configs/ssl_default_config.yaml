@@ -157,11 +157,6 @@ data:
           p: 0.8
         - name: brightness
           p: 0.8
-        - name: solarize
-          p: 0.2
-          bounds:
-          - 200.0
-          - 1000.0
         - name: noise
           p: 0.5
           mean: 0.0

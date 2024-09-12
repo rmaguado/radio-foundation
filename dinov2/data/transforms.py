@@ -105,7 +105,7 @@ class ImageTransforms:
 
         def random_apply(img):
             if random.random() < p:
-                return transform_function(self, img, **kwargs)
+                return transform_function(img, **kwargs)
             return img
 
         return random_apply
