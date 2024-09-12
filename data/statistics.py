@@ -58,6 +58,7 @@ def sample_dcm_paths(db_path: str, n: int) -> list:
 
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     datasets = [table[0] for table in cursor.fetchall() if table[0] != "global"]
+    logger.info(f"Sampling from datasets: {", ".join(datasets)}")
 
     n_dataset = n // len(datasets)
 
