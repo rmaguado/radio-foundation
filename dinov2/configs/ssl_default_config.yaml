@@ -140,16 +140,13 @@ data:
         global_1:
         - name: rotate
           p: 0.8
-          degrees: 90
         - name: globalcrop
         - name: flip
           p: 0.5
         - name: contrast
           p: 0.8
-          contrast: 0.4
         - name: brightness
           p: 0.8
-          brightness: 0.4
         - name: gaussian_blur
           p: 1.0
         global_2:
@@ -158,18 +155,17 @@ data:
           p: 0.5
         - name: contrast
           p: 0.8
-          contrast: 0.4
         - name: brightness
           p: 0.8
-          brightness: 0.4
         - name: solarize
           p: 0.2
-          threshold: 0.5
-          max_value: 1.0
+          bounds:
+          - 200.0
+          - 1000.0
         - name: noise
           p: 0.5
-          noise_level: 0.02
-          max_value: 1.0
+          mean: 0.0
+          std: 10.0
         - name: gaussian_blur
           p: 0.1
         local:
@@ -178,9 +174,7 @@ data:
           p: 0.5
         - name: contrast
           p: 0.8
-          contrast: 0.4
         - name: brightness
           p: 0.8
-          brightness: 0.4
         - name: gaussian_blur
           p: 0.5
