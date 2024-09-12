@@ -267,7 +267,8 @@ class Processor:
         Returns:
             Tuple[float, float, float]: The spacing of the images and and slice thickness of the series.
         """
-        return *dcm.PixelSpacing, dcm.SliceThickness
+        spacing_x, spacing_y = dcm.PixelSpacing
+        return spacing_x, spacing_y, dcm.SliceThickness
 
     def load_series(
         self, dicom_paths: List[str]
@@ -300,7 +301,7 @@ class Processor:
         first_dicom = sorted_dicoms[0][1]
         num_slices = len(sorted_dicoms)
         image_shape = self.get_shape(first_dicom)
-        (spacing_x, spacing_y), slice_thickness = self.get_spacing(first_dicom)
+        spacing_x, spacing_y, slice_thickness = self.get_spacing(first_dicom)
 
         metadata = (
             series_id,
