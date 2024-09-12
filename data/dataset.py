@@ -319,7 +319,7 @@ class Processor:
                 self.dataset_name, series_id, slice_index, rel_dicom_path
             )
 
-        self.insert_dataset_data(metadata)
+        self.database.insert_dataset_data(metadata)
         logger.info(f"Processed series {series_id}.")
 
     def prepare_dataset(self) -> None:
@@ -343,6 +343,9 @@ class Processor:
             first_dcm = pydicom.dcmread(dcm_paths[0], stop_before_pixels=True)
             try:
                 self.ct_validator(first_dcm, data_folder)
+            except AssertionError as e:
+                logger.error(f"Error validating {data_folder}: {e}")
+                continue
             except Exception as e:
                 logger.exception(f"Error validating {data_folder}: {e}")
                 continue
