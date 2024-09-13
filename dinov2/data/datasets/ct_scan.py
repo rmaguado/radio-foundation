@@ -82,6 +82,8 @@ class CtDataset(BaseDataset):
                 f"SELECT num_slices FROM '{dataset}' WHERE series_id = '{series_id}'"
             )
             num_slices = self.cursor.fetchone()[0]
+            if num_slices < slice_stack_num:
+                continue
             if slice_index > num_slices - slice_stack_num:
                 continue
             stack_slice_indexes = [slice_index + x for x in range(slice_stack_num)]
