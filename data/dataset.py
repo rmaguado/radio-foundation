@@ -284,7 +284,7 @@ class Processor:
             List[Tuple[str, pydicom.dataset.FileDataset]]: A list of tuples containing the file path and the dicom object.
         """
         dicoms = [
-            (path, pydicom.dcmread(path, stop_before_pixels=True, force=True))
+            (path, pydicom.dcmread(path, stop_before_pixels=True))
             for path in dicom_paths
         ]
         dicoms.sort(key=lambda x: x[1].ImagePositionPatient[2])
@@ -343,9 +343,7 @@ class Processor:
                 continue
 
             try:
-                first_dcm = pydicom.dcmread(
-                    dcm_paths[0], stop_before_pixels=True, force=True
-                )
+                first_dcm = pydicom.dcmread(dcm_paths[0], stop_before_pixels=True)
             except Exception as e:
                 logger.exception(f"Error reading first dicom in {data_folder}: {e}")
                 continue
