@@ -9,7 +9,7 @@ student:
   drop_path_rate: 0.1
   embed_layer: "conv"
   conv_channels: 64
-  
+  channels: 4
 teacher:
   warmup_teacher_temp_epochs: 20
 optim:
