@@ -118,8 +118,7 @@ class CtValidation:
         issues += self.test_slice_thickness(fields)
         issues += self.test_image_type(fields)
 
-        if issues:
-            raise Exception(issues)
+        assert len(issues) == 0, issues
 
 
 def walk(root_dir):
