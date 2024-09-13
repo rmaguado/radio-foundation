@@ -1,0 +1,19 @@
+train:
+  grad_accum_steps: 8
+  batch_size_per_gpu: 64
+data:
+  root_path: /home/rmaguado/rdt/DeepRDT/datasets/
+student:
+  arch: vit_base
+  ffn_layer: "mlp"
+  drop_path_rate: 0.1
+  embed_layer: "conv"
+  conv_channels: 64
+teacher:
+  warmup_teacher_temp_epochs: 20
+optim:
+  epochs: 50
+  warmup_epochs: 10
+  base_lr: 0.003
+data:
+  root_path: /home/rmaguado/rdt/DeepRDT/datasets/
