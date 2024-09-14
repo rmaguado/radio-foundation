@@ -8,8 +8,6 @@ from dinov2.data import ImageTransforms
 from .utils import (
     test_has_section,
     test_attributes_dtypes,
-    test_attributes_range,
-    ValueRange,
     Errors,
 )
 
@@ -66,17 +64,35 @@ def test_transforms_list(
     return True
 
 
-def validate_augmentations(dataset_config: DictConfig) -> bool:
-    if not test_has_section(dataset_config, "augmentations"):
+def dataset_has_augmentation(
+    augmentations_config: DictConfig, augmentation_preset: str
+) -> bool:
+    if augmentation_preset not in augmentations_config:
+        logger.error(Errors.NO_AUGMENTATION_PRESET.format(augmentation_preset))
         return False
-    augmentations_config = dataset_config.augmentations
+    return True
+
+
+def validate_augmentations(config: DictConfig, dataset_config) -> bool:
+    if not test_has_section(config, "augmentations"):
+        return False
+
+    augmentations_config = config.augmentations
+    augmentations_preset = dataset_config.augmentation
+    if not dataset_has_augmentation(augmentations_config, augmentations_preset):
+        return False
+
+    selected_augmentations = augmentations_config[augmentations_preset]
+
     required_attributes = [
         ("global_1", ListConfig),
         ("global_2", ListConfig),
         ("local", ListConfig),
     ]
     if not test_attributes_dtypes(
-        augmentations_config, required_attributes, "augmentations"
+        selected_augmentations,
+        required_attributes,
+        f"augmentations: {augmentations_preset}",
     ):
         return False
     lower_bound = dataset_config.pixel_range.lower
@@ -84,7 +100,9 @@ def validate_augmentations(dataset_config: DictConfig) -> bool:
     channels = dataset_config.channels
     transforms_obj = ImageTransforms(lower_bound, upper_bound, channels)
     for group in ["global_1", "global_2", "local"]:
-        if not test_transforms_list(transforms_obj, augmentations_config[group], group):
+        if not test_transforms_list(
+            transforms_obj, selected_augmentations[group], group
+        ):
             return False
 
     logger.debug("'augmentations' config is valid.")

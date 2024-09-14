@@ -29,6 +29,7 @@ def test_root_path_exists(data_config: DictConfig) -> bool:
 def validate_data(config: DictConfig) -> bool:
     if not test_has_section(config, "data"):
         return False
+
     data_config = config.data
     required_attributes = [
         ("root_path", str),
@@ -36,10 +37,14 @@ def validate_data(config: DictConfig) -> bool:
     ]
     if not test_attributes_dtypes(data_config, required_attributes, "data"):
         return False
+
     if not all([test_root_path_exists(data_config), test_has_dataset(data_config)]):
         return False
     if not all(
-        [validate_dataset(dataset_config) for dataset_config in data_config.datasets]
+        [
+            validate_dataset(config, dataset_config)
+            for dataset_config in data_config.datasets
+        ]
     ):
         return False
 

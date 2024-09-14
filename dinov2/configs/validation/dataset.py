@@ -59,7 +59,7 @@ def test_norm_is_valid(norm: DictConfig) -> bool:
     return True
 
 
-def validate_dataset(dataset_config: DictConfig) -> bool:
+def validate_dataset(config: DictConfig, dataset_config: DictConfig) -> bool:
     dataset_required_attributes = [
         ("name", str),
         ("index_path", str),
@@ -67,7 +67,7 @@ def validate_dataset(dataset_config: DictConfig) -> bool:
         ("channels", int),
         ("pixel_range", DictConfig),
         ("norm", DictConfig),
-        ("augmentations", DictConfig),
+        ("augmentation", str),
     ]
     if not test_attributes_dtypes(
         dataset_config,
@@ -87,9 +87,11 @@ def validate_dataset(dataset_config: DictConfig) -> bool:
             test_channels_is_valid(dataset_config, dataset_config.name),
             test_pixel_range_is_valid(dataset_config.pixel_range),
             test_norm_is_valid(dataset_config.norm),
-            validate_augmentations(dataset_config),
         ]
     ):
+        return False
+
+    if not validate_augmentations(config, dataset_config):
         return False
 
     return True

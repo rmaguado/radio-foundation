@@ -28,6 +28,7 @@ class DataAugmentationDINO(object):
             use_full_image (bool): Whether to use the full image
         """
         self.dataset_config = dataset_config
+        self.augmentations_config = config.augmentations[dataset_config.augmentation]
         self.local_crops_number = config.crops.local_crops_number
         self.local_crops_size = config.crops.local_crops_size
         self.local_crops_scale = config.crops.local_crops_scale
@@ -56,9 +57,7 @@ class DataAugmentationDINO(object):
             self.dataset_config.pixel_range.upper,
             self.dataset_config.channels,
         )
-        augmentations_list = copy.deepcopy(
-            self.dataset_config.augmentations[transform_key]
-        )
+        augmentations_list = copy.deepcopy(self.augmentations_config[transform_key])
         for tc in augmentations_list:
             name = tc.pop("name")
             if name == "localcrop":
