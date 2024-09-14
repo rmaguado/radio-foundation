@@ -6,7 +6,6 @@
 from typing import Any, Tuple, Optional
 import torch
 import numpy as np
-from datetime import datetime
 import os
 import sqlite3
 
@@ -65,7 +64,7 @@ class BaseDataset:
                 self.create_entries()
 
         if is_enabled():
-            dist.monitored_barrier(timeout=datetime.timedelta(hours=2))
+            dist.barrier()
 
         return np.load(entries_dataset_path, mmap_mode="r")
 

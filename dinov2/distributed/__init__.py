@@ -7,6 +7,7 @@ import os
 import random
 import re
 import socket
+import datetime
 from typing import Dict, List
 
 import torch
@@ -272,7 +273,7 @@ def enable(
             _check_env_variable(key, value)
         os.environ[key] = value
 
-    dist.init_process_group(backend="nccl")
+    dist.init_process_group(backend="nccl", timeout=datetime.timedelta(hours=2))
     dist.barrier()
 
     # Finalize setup
