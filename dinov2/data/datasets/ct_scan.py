@@ -70,26 +70,31 @@ class CtDataset(BaseDataset):
         Returns:
             np.ndarray: The entries dataset (memmap).
         """
-        slice_stack_num = self.channels
+        logger.info(f"Creating entries for {self.dataset_name}.")
 
-        self.cursor.execute(f"SELECT dataset, series_id, slice_index FROM global")
-        global_rows = self.cursor.fetchall()
+        slice_stack_num = self.channels
+        entries_dataset_path = os.path.join(
+            self.entries_path, f"{slice_stack_num}_channels.npy"
+        )
+
+        dataset_names = self.cursor.execute(
+            "SELECT dataset FROM sqlite_master WHERE type='table' AND name != 'global'"
+        ).fetchall()
+
+        series_ids = []
+        for dataset_name in dataset_names:
+            dataset_name = dataset_name[0]
+            series_ids += self.cursor.execute(
+                f"SELECT dataset, series_id, num_slices FROM '{dataset_name}'"
+            ).fetchall()
+
+        logger.info(f"Total number of series: {len(series_ids)}.")
 
         entries = []
+        for dataset_name, series_id, num_slices in series_ids:
 
-        logger.info(f"Creating entries for {self.dataset_name}.")
-        logger.info(f"Total number of database rows: {len(global_rows)}.")
-
-        for dataset, series_id, slice_index in global_rows:
-            self.cursor.execute(
-                f"SELECT num_slices FROM '{dataset}' WHERE series_id = '{series_id}'"
-            )
-            num_slices = self.cursor.fetchone()[0]
             if num_slices < slice_stack_num:
                 continue
-            if slice_index > num_slices - slice_stack_num:
-                continue
-            stack_slice_indexes = [slice_index + x for x in range(slice_stack_num)]
 
             self.cursor.execute(
                 """
@@ -97,18 +102,20 @@ class CtDataset(BaseDataset):
                 FROM global 
                 WHERE series_id = ? 
                 AND dataset = ? 
-                AND slice_index IN ({})
-                """.format(
-                    ",".join("?" * len(stack_slice_indexes))
-                ),
-                (series_id, dataset, *stack_slice_indexes),
+                ORDER BY slice_index
+                """,
+                (series_id, dataset_name),
             )
-            stack_rows = self.cursor.fetchall()
-            if len(stack_rows) != slice_stack_num:
-                raise ValueError(f"Not right amount of slices in stack: {stack_rows}.")
+            slice_indexes = self.cursor.fetchall()
 
-            stack_rows.sort(key=lambda x: x[1])
-            entries.append([x[0] for x in stack_rows])
+            slice_indexes.sort(key=lambda x: x[1])
+
+            stack_rows = [
+                slice_indexes[i : i + slice_stack_num, 0]
+                for i in range(len(slice_indexes) - slice_stack_num + 1)
+            ]
+
+            entries += stack_rows
 
         entries_array = np.array(entries, dtype=np.uint32)
 
