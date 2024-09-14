@@ -77,16 +77,21 @@ class CtDataset(BaseDataset):
             self.entries_path, f"{slice_stack_num}_channels.npy"
         )
 
+        # get table names (these are the names of the datasets)
         dataset_names = self.cursor.execute(
-            "SELECT dataset FROM sqlite_master WHERE type='table' AND name != 'global'"
+            f"SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()
 
         series_ids = []
         for dataset_name in dataset_names:
             dataset_name = dataset_name[0]
-            series_ids += self.cursor.execute(
-                f"SELECT dataset, series_id, num_slices FROM '{dataset_name}'"
+            dataset_series = self.cursor.execute(
+                f"SELECT series_id, num_slices FROM '{dataset_name}'"
             ).fetchall()
+            series_ids += [
+                (dataset_name, series_id, num_slices)
+                for series_id, num_slices in dataset_series
+            ]
 
         logger.info(f"Total number of series: {len(series_ids)}.")
 
@@ -107,7 +112,6 @@ class CtDataset(BaseDataset):
                 (series_id, dataset_name),
             )
             slice_indexes = self.cursor.fetchall()
-
             slice_indexes.sort(key=lambda x: x[1])
 
             stack_rows = [
