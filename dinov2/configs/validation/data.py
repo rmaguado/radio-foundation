@@ -39,7 +39,10 @@ def validate_data(config: DictConfig) -> bool:
     if not all([test_root_path_exists(data_config), test_has_dataset(data_config)]):
         return False
     if not all(
-        [validate_dataset(dataset_config) for dataset_config in data_config.datasets]
+        [
+            validate_dataset(dataset_name, dataset_config)
+            for dataset_name, dataset_config in data_config.datasets.items()
+        ]
     ):
         return False
 

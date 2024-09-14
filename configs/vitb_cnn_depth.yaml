@@ -19,5 +19,5 @@ optim:
 data:
   root_path: /home/rmaguado/rdt/DeepRDT/datasets/
   datasets:
-    - name: "radiomics_datasets"
+    radiomics_datasets:
       channels: 4
