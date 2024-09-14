@@ -48,7 +48,10 @@ def named_apply(
         fn(module=module, name=name)
     return module
 
-def get_embedding_layer(embed_layer, img_size, patch_size, in_chans, embed_dim, conv_chanels):
+
+def get_embedding_layer(
+    embed_layer, img_size, patch_size, in_chans, embed_dim, conv_channels
+):
     if embed_layer == "patch":
         return PatchEmbed(
             img_size=img_size,
@@ -62,7 +65,7 @@ def get_embedding_layer(embed_layer, img_size, patch_size, in_chans, embed_dim, 
             patch_size=patch_size,
             in_chans=in_chans,
             embed_dim=embed_dim,
-            conv_chanels=conv_chanels,
+            conv_channels=conv_channels,
         )
     else:
         raise NotImplementedError
@@ -92,7 +95,7 @@ class DinoVisionTransformer(nn.Module):
         drop_path_uniform=False,
         init_values=None,  # for layerscale: None or 0 => no layerscale
         embed_layer="patch",  # 'patch' or 'conv'
-        conv_chanels=0,
+        conv_channels=0,
         act_layer=nn.GELU,
         block_fn=Block,
         ffn_layer="mlp",
@@ -118,7 +121,7 @@ class DinoVisionTransformer(nn.Module):
             weight_init (str): weight init scheme
             init_values (float): layer-scale init values
             embed_layer (str): patch embedding layer. 'patch' or 'conv'
-            conv_chanels (int): number of channels in conv layer or 0 for patch embedding
+            conv_channels (int): number of channels in conv layer or 0 for patch embedding
             act_layer (nn.Module): MLP activation layer
             block_fn (nn.Module): transformer block class
             ffn_layer (str): "mlp", "swiglu", "swiglufused" or "identity"
@@ -142,7 +145,7 @@ class DinoVisionTransformer(nn.Module):
         self.interpolate_offset = interpolate_offset
 
         self.patch_embed = get_embedding_layer(
-            embed_layer, img_size, patch_size, in_chans, embed_dim, conv_chanels
+            embed_layer, img_size, patch_size, in_chans, embed_dim, conv_channels
         )
         num_patches = self.patch_embed.num_patches
 

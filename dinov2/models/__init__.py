@@ -24,6 +24,7 @@ def build_model(args, only_teacher, img_size):
             proj_bias=args.proj_bias,
             ffn_bias=args.ffn_bias,
             embed_layer=args.embed_layer,
+            conv_channels=args.conv_channels,
             num_register_tokens=args.num_register_tokens,
             interpolate_offset=args.interpolate_offset,
             interpolate_antialias=args.interpolate_antialias,

@@ -4,6 +4,15 @@ from torch import Tensor
 import torch.nn as nn
 
 
+def make_2tuple(x):
+    if isinstance(x, tuple):
+        assert len(x) == 2
+        return x
+
+    assert isinstance(x, int)
+    return (x, x)
+
+
 class CnnEmbed(nn.Module):
     """
     CNN head for a hybrid ViT.
@@ -21,23 +30,38 @@ class CnnEmbed(nn.Module):
         patch_size: Union[int, Tuple[int, int]] = 14,
         in_chans: int = 3,
         embed_dim: int = 384,
-        conv_chans: int = 96,
+        conv_channels: int = 96,
     ) -> None:
         super().__init__()
+        image_HW = make_2tuple(img_size)
+        patch_HW = make_2tuple(patch_size)
+        patch_grid_size = (
+            image_HW[0] // patch_HW[0],
+            image_HW[1] // patch_HW[1],
+        )
+
+        self.img_size = image_HW
+        self.patch_size = patch_HW
+        self.patches_resolution = patch_grid_size
+        self.num_patches = patch_grid_size[0] * patch_grid_size[1]
+
+        self.in_chans = in_chans
+        self.embed_dim = embed_dim
+
         embed_kernel_size = patch_size // 2
 
         self.feature_layer = nn.Conv2d(
-            in_chans, conv_chans, kernel_size=5, stride=2, padding=2
+            in_chans, conv_channels, kernel_size=5, stride=2, padding=2
         )
 
         self.embed_layer = nn.Conv2d(
-            conv_chans,
+            conv_channels,
             embed_dim,
             kernel_size=embed_kernel_size,
             stride=embed_kernel_size,
         )
 
-        self.ln = nn.LayerNorm(conv_chans)
+        self.ln = nn.LayerNorm(conv_channels)
         self.gelu = nn.GELU()
 
     def forward(self, x: Tensor) -> Tensor:
