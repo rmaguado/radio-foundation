@@ -1,0 +1,28 @@
+train:
+  grad_accum_steps: 8
+  batch_size_per_gpu: 64
+student:
+  arch: vit_base
+  ffn_layer: "mlp"
+  drop_path_rate: 0.1
+  embed_layer: "patch"
+teacher:
+  warmup_teacher_temp_epochs: 20
+optim:
+  epochs: 50
+  warmup_epochs: 10
+  base_lr: 0.003
+data:
+  root_path: /home/rmaguado/rdt/DeepRDT/datasets/
+  datasets:
+    - name: "radiomics_datasets"
+      index_path: data/radiomics_datasets.db
+      type: "ct"
+      augmentation: default_ct
+      channels: 1
+      pixel_range:
+        lower: -1000.0
+        upper: 1900.0
+      norm:
+        mean: -573.8
+        std: 461.3

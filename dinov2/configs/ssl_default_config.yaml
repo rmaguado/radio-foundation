@@ -130,6 +130,7 @@ data:
     - name: "radiomics_datasets"
       index_path: data/radiomics_datasets.db
       type: "ct"
+      augmentation: default_ct
       channels: 1
       pixel_range:
         lower: -1000.0
@@ -137,40 +138,41 @@ data:
       norm:
         mean: -573.8
         std: 461.3
-      augmentations:
-        global_1:
-        - name: rotate
-          p: 0.8
-        - name: globalcrop
-        - name: flip
-          p: 0.5
-        - name: contrast
-          p: 0.8
-        - name: brightness
-          p: 0.8
-        - name: gaussian_blur
-          p: 1.0
-        global_2:
-        - name: globalcrop
-        - name: flip
-          p: 0.5
-        - name: contrast
-          p: 0.8
-        - name: brightness
-          p: 0.8
-        - name: noise
-          p: 0.5
-          mean: 0.0
-          std: 10.0
-        - name: gaussian_blur
-          p: 0.1
-        local:
-        - name: localcrop
-        - name: flip
-          p: 0.5
-        - name: contrast
-          p: 0.8
-        - name: brightness
-          p: 0.8
-        - name: gaussian_blur
-          p: 0.5
+augmentations:
+  default_ct:
+    global_1:
+    - name: rotate
+      p: 0.8
+    - name: globalcrop
+    - name: flip
+      p: 0.5
+    - name: contrast
+      p: 0.8
+    - name: brightness
+      p: 0.8
+    - name: gaussian_blur
+      p: 1.0
+    global_2:
+    - name: globalcrop
+    - name: flip
+      p: 0.5
+    - name: contrast
+      p: 0.8
+    - name: brightness
+      p: 0.8
+    - name: noise
+      p: 0.5
+      mean: 0.0
+      std: 10.0
+    - name: gaussian_blur
+      p: 0.1
+    local:
+    - name: localcrop
+    - name: flip
+      p: 0.5
+    - name: contrast
+      p: 0.8
+    - name: brightness
+      p: 0.8
+    - name: gaussian_blur
+      p: 0.5
