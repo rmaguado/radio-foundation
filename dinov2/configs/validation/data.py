@@ -32,7 +32,7 @@ def validate_data(config: DictConfig) -> bool:
     data_config = config.data
     required_attributes = [
         ("root_path", str),
-        ("datasets", ListConfig),
+        ("datasets", DictConfig),
     ]
     if not test_attributes_dtypes(data_config, required_attributes, "data"):
         return False
