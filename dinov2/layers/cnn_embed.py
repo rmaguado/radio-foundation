@@ -61,7 +61,7 @@ class CnnEmbed(nn.Module):
             stride=embed_kernel_size,
         )
 
-        self.ln = nn.LayerNorm(conv_channels)
+        self.ln = nn.LayerNorm(embed_dim)
         self.gelu = nn.GELU()
 
     def forward(self, x: Tensor) -> Tensor:
