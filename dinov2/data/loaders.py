@@ -51,12 +51,12 @@ def make_train_dataset(
     datasets = config.data.datasets
     dataset_objects = []
 
-    for dataset_name, dataset_config in datasets.items():
+    for dataset_config in datasets:
         dataset_type = dataset_config.type
         transform = DataAugmentationDINO(config, dataset_config, use_full_image)
 
         dataset_kwargs = {
-            "dataset_name": dataset_name,
+            "dataset_name": dataset_config.name,
             "index_path": dataset_config.index_path,
             "root_path": config.data.root_path,
             "output_path": config.train.output_dir,

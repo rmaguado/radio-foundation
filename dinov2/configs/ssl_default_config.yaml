@@ -127,7 +127,7 @@ crops:
 data:
   root_path: .
   datasets:
-    radiomics_datasets:
+    - name: "radiomics_datasets"
       index_path: data/radiomics_datasets.db
       type: "ct"
       channels: 1

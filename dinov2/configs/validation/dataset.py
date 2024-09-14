@@ -2,6 +2,7 @@ from omegaconf import DictConfig
 import logging
 
 from .utils import (
+    test_has_section,
     test_attributes_dtypes,
     test_path_exists,
     Errors,
@@ -58,8 +59,9 @@ def test_norm_is_valid(norm: DictConfig) -> bool:
     return True
 
 
-def validate_dataset(dataset_name, dataset_config: DictConfig) -> bool:
+def validate_dataset(dataset_config: DictConfig) -> bool:
     dataset_required_attributes = [
+        ("name", str),
         ("index_path", str),
         ("type", str),
         ("channels", int),
@@ -70,7 +72,11 @@ def validate_dataset(dataset_name, dataset_config: DictConfig) -> bool:
     if not test_attributes_dtypes(
         dataset_config,
         dataset_required_attributes,
-        dataset_name,
+        (
+            "unnamed dataset"
+            if not hasattr(dataset_config, "name")
+            else dataset_config.name
+        ),
     ):
         return False
 
@@ -78,7 +84,7 @@ def validate_dataset(dataset_name, dataset_config: DictConfig) -> bool:
         [
             test_path_exists(dataset_config.index_path),
             test_dataset_type_is_valid(dataset_config),
-            test_channels_is_valid(dataset_config, dataset_name),
+            test_channels_is_valid(dataset_config, dataset_config.name),
             test_pixel_range_is_valid(dataset_config.pixel_range),
             test_norm_is_valid(dataset_config.norm),
             validate_augmentations(dataset_config),
