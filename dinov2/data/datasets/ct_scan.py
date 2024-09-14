@@ -77,9 +77,9 @@ class CtDataset(BaseDataset):
             self.entries_path, f"{slice_stack_num}_channels.npy"
         )
 
-        # get table names (these are the names of the datasets)
+        # get table names (these are the names of the datasets) exclude table named global
         dataset_names = self.cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table'"
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name != 'global'"
         ).fetchall()
 
         series_ids = []
