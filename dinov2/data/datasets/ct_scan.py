@@ -50,7 +50,7 @@ class CtDataset(BaseDataset):
         self.index_path = index_path
         self.root_path = root_path
         self.output_path = output_path
-        self.entries_path = os.path.join(self.output_path, "entries")
+        self.entries_path = os.path.join(os.path.dirname(self.index_path), "entries")
         self.open_db()
 
         self.transform = transform
@@ -76,6 +76,9 @@ class CtDataset(BaseDataset):
         global_rows = self.cursor.fetchall()
 
         entries = []
+
+        logger.info(f"Creating entries for {self.dataset_name}.")
+        logger.info(f"Total number of database rows: {len(global_rows)}.")
 
         for dataset, series_id, slice_index in global_rows:
             self.cursor.execute(
@@ -110,8 +113,9 @@ class CtDataset(BaseDataset):
         entries_array = np.array(entries, dtype=np.uint32)
 
         entries_dataset_path = os.path.join(
-            self.entries_path, f"{self.dataset_name}.npy"
+            self.entries_path, f"{self.channels}_channels.npy"
         )
+        logger.info(f"Saving entries to {entries_dataset_path}.")
         np.save(entries_dataset_path, entries_array)
         return np.load(entries_dataset_path, mmap_mode="r")
 

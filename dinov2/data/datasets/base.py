@@ -6,6 +6,7 @@
 from typing import Any, Tuple, Optional
 import torch
 import numpy as np
+from datetime import datetime
 import os
 import sqlite3
 
@@ -35,6 +36,7 @@ class BaseDataset:
         self.root_path = "RootPathNotGiven"
         self.output_path = "OutputPathNotGiven"
         self.entries_path = "path/to/entries"
+        self.channels = 1
 
         self.transform = lambda _: _
         self.target_transform = lambda _: _
@@ -55,7 +57,7 @@ class BaseDataset:
         os.makedirs(self.entries_path, exist_ok=True)
 
         entries_dataset_path = os.path.join(
-            self.entries_path, f"{self.dataset_name}.npy"
+            self.entries_path, f"{self.channels}_channels.npy"
         )
 
         if is_main_process():
@@ -63,7 +65,7 @@ class BaseDataset:
                 self.create_entries()
 
         if is_enabled():
-            dist.barrier()
+            dist.monitored_barrier(timeout=datetime.timedelta(hours=2))
 
         return np.load(entries_dataset_path, mmap_mode="r")
 
