@@ -40,11 +40,11 @@ class SSLMetaArch(nn.Module):
         student_backbone, teacher_backbone, embed_dim = build_model_from_cfg(cfg)
         student_model_dict["backbone"] = student_backbone
         teacher_model_dict["backbone"] = teacher_backbone
-        logger.info(f"OPTIONS -- architecture : embed_dim: {embed_dim}")
+        logger.debug(f"OPTIONS -- architecture : embed_dim: {embed_dim}")
 
         if cfg.student.pretrained_weights:
             chkpt = torch.load(cfg.student.pretrained_weights)
-            logger.info(f"OPTIONS -- pretrained weights: loading from {cfg.student.pretrained_weights}")
+            logger.debug(f"OPTIONS -- pretrained weights: loading from {cfg.student.pretrained_weights}")
             student_backbone.load_state_dict(chkpt["model"], strict=False)
 
         self.embed_dim = embed_dim
@@ -55,12 +55,12 @@ class SSLMetaArch(nn.Module):
         self.do_ibot = cfg.ibot.loss_weight > 0
         self.ibot_separate_head = cfg.ibot.separate_head
 
-        logger.info("OPTIONS -- DINO")
+        logger.debug("OPTIONS -- DINO")
         if self.do_dino:
-            logger.info(f"OPTIONS -- DINO -- loss_weight: {cfg.dino.loss_weight}")
-            logger.info(f"OPTIONS -- DINO -- head_n_prototypes: {cfg.dino.head_n_prototypes}")
-            logger.info(f"OPTIONS -- DINO -- head_bottleneck_dim: {cfg.dino.head_bottleneck_dim}")
-            logger.info(f"OPTIONS -- DINO -- head_hidden_dim: {cfg.dino.head_hidden_dim}")
+            logger.debug(f"OPTIONS -- DINO -- loss_weight: {cfg.dino.loss_weight}")
+            logger.debug(f"OPTIONS -- DINO -- head_n_prototypes: {cfg.dino.head_n_prototypes}")
+            logger.debug(f"OPTIONS -- DINO -- head_bottleneck_dim: {cfg.dino.head_bottleneck_dim}")
+            logger.debug(f"OPTIONS -- DINO -- head_hidden_dim: {cfg.dino.head_hidden_dim}")
             self.dino_loss_weight = cfg.dino.loss_weight
             dino_head = partial(
                 DINOHead,
@@ -72,20 +72,20 @@ class SSLMetaArch(nn.Module):
             )
             self.dino_loss = DINOLoss(self.dino_out_dim)
             if self.do_koleo:
-                logger.info("OPTIONS -- DINO -- applying KOLEO regularization")
+                logger.debug("OPTIONS -- DINO -- applying KOLEO regularization")
                 self.koleo_loss = KoLeoLoss()
 
         else:
-            logger.info("OPTIONS -- DINO -- not using DINO")
+            logger.debug("OPTIONS -- DINO -- not using DINO")
 
         if self.do_dino or self.do_ibot:
             student_model_dict["dino_head"] = dino_head()
             teacher_model_dict["dino_head"] = dino_head()
 
-        logger.info("OPTIONS -- IBOT")
-        logger.info(f"OPTIONS -- IBOT -- loss_weight: {cfg.ibot.loss_weight}")
-        logger.info(f"OPTIONS -- IBOT masking -- ibot_mask_ratio_tuple: {cfg.ibot.mask_ratio_min_max}")
-        logger.info(f"OPTIONS -- IBOT masking -- ibot_mask_sample_probability: {cfg.ibot.mask_sample_probability}")
+        logger.debug("OPTIONS -- IBOT")
+        logger.debug(f"OPTIONS -- IBOT -- loss_weight: {cfg.ibot.loss_weight}")
+        logger.debug(f"OPTIONS -- IBOT masking -- ibot_mask_ratio_tuple: {cfg.ibot.mask_ratio_min_max}")
+        logger.debug(f"OPTIONS -- IBOT masking -- ibot_mask_sample_probability: {cfg.ibot.mask_sample_probability}")
         if self.do_ibot:
             self.ibot_loss_weight = cfg.ibot.loss_weight
             assert max(cfg.ibot.mask_ratio_min_max) > 0, "please provide a positive mask ratio tuple for ibot"
@@ -93,10 +93,10 @@ class SSLMetaArch(nn.Module):
             self.ibot_out_dim = cfg.ibot.head_n_prototypes if self.ibot_separate_head else cfg.dino.head_n_prototypes
             self.ibot_patch_loss = iBOTPatchLoss(self.ibot_out_dim)
             if self.ibot_separate_head:
-                logger.info(f"OPTIONS -- IBOT -- loss_weight: {cfg.ibot.loss_weight}")
-                logger.info(f"OPTIONS -- IBOT -- head_n_prototypes: {cfg.ibot.head_n_prototypes}")
-                logger.info(f"OPTIONS -- IBOT -- head_bottleneck_dim: {cfg.ibot.head_bottleneck_dim}")
-                logger.info(f"OPTIONS -- IBOT -- head_hidden_dim: {cfg.ibot.head_hidden_dim}")
+                logger.debug(f"OPTIONS -- IBOT -- loss_weight: {cfg.ibot.loss_weight}")
+                logger.debug(f"OPTIONS -- IBOT -- head_n_prototypes: {cfg.ibot.head_n_prototypes}")
+                logger.debug(f"OPTIONS -- IBOT -- head_bottleneck_dim: {cfg.ibot.head_bottleneck_dim}")
+                logger.debug(f"OPTIONS -- IBOT -- head_hidden_dim: {cfg.ibot.head_hidden_dim}")
                 ibot_head = partial(
                     DINOHead,
                     in_dim=embed_dim,
@@ -108,7 +108,7 @@ class SSLMetaArch(nn.Module):
                 student_model_dict["ibot_head"] = ibot_head()
                 teacher_model_dict["ibot_head"] = ibot_head()
             else:
-                logger.info("OPTIONS -- IBOT -- head shared with DINO")
+                logger.debug("OPTIONS -- IBOT -- head shared with DINO")
 
         self.need_to_synchronize_fsdp_streams = True
 
@@ -118,7 +118,7 @@ class SSLMetaArch(nn.Module):
         # there is no backpropagation through the teacher, so no need for gradients
         for p in self.teacher.parameters():
             p.requires_grad = False
-        logger.info(f"Student and Teacher are built: they are both {cfg.student.arch} network.")
+        logger.debug(f"Student and Teacher are built: they are both {cfg.student.arch} network.")
 
     def forward(self, inputs):
         raise NotImplementedError

@@ -1,8 +1,12 @@
 import os
 import math
 import torch
+import logging
 
 import dinov2.distributed as distributed
+
+
+logger = logging.getLogger("dinov2")
 
 
 def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
@@ -56,7 +60,7 @@ def log_training_step(
     }
 
     if math.isnan(sum(loss_dict_reduced.values())):
-        logger.error(f"NaN detected in reduced loss at iteration {iteration}")
+        logger.error(f"NaN detected in reduced loss at training step {train_step}")
         logger.info(f"Reduced loss dict: {loss_dict_reduced}")
         raise AssertionError
 

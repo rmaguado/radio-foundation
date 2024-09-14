@@ -57,17 +57,17 @@ def get_vit_lr_decay_rate(
 def get_params_groups_with_decay(model, lr_decay_rate=1.0, patch_embed_lr_mult=1.0):
     chunked_blocks = False
     if hasattr(model, "n_blocks"):
-        logger.info("chunked fsdp")
+        logger.debug("chunked fsdp")
         n_blocks = model.n_blocks
         chunked_blocks = model.chunked_blocks
     elif hasattr(model, "blocks"):
-        logger.info("first code branch")
+        logger.debug("first code branch")
         n_blocks = len(model.blocks)
     elif hasattr(model, "backbone"):
-        logger.info("second code branch")
+        logger.debug("second code branch")
         n_blocks = len(model.backbone.blocks)
     else:
-        logger.info("else code branch")
+        logger.debug("else code branch")
         n_blocks = 0
     all_param_groups = []
 
@@ -100,7 +100,7 @@ def get_params_groups_with_decay(model, lr_decay_rate=1.0, patch_embed_lr_mult=1
             d.update({"lr_multiplier": d["lr_multiplier"] * patch_embed_lr_mult})
 
         all_param_groups.append(d)
-        logger.info(
+        logger.debug(
             f"""{name}: lr_multiplier: {d["lr_multiplier"]}, wd_multiplier: {d["wd_multiplier"]}"""
         )
 
