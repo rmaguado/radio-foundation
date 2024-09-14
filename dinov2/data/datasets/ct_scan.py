@@ -115,7 +115,7 @@ class CtDataset(BaseDataset):
             slice_indexes.sort(key=lambda x: x[1])
 
             stack_rows = [
-                slice_indexes[i : i + slice_stack_num, 0]
+                [x[0] for x in slice_indexes[i : i + slice_stack_num]]
                 for i in range(len(slice_indexes) - slice_stack_num + 1)
             ]
 
