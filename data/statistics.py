@@ -15,7 +15,8 @@ import warnings
 logger = logging.getLogger("dataprep")
 logger.setLevel(logging.INFO)
 
-file_handler = logging.FileHandler("data/log/statistics.log")
+os.makedirs("data/database/log", exist_ok=True)
+file_handler = logging.FileHandler("data/database/log/statistics.log")
 file_handler.setLevel(logging.INFO)
 
 formatter = logging.Formatter("%(message)s")

@@ -8,14 +8,14 @@ import ast
 import os
 
 import warnings
-import traceback
 import logging
 
 
 logger = logging.getLogger("dataprep")
 logger.setLevel(logging.INFO)
 
-file_handler = logging.FileHandler("data/log/dataprep.log")
+os.makedirs("data/database/log", exist_ok=True)
+file_handler = logging.FileHandler("data/database/log/dataprep.log")
 file_handler.setLevel(logging.INFO)
 
 formatter = logging.Formatter("%(message)s")
