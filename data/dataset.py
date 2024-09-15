@@ -60,6 +60,13 @@ class CtValidation:
             return False
         return True
 
+    def test_image_size(self, fields: Dict[str, Any]) -> str:
+        rows = fields["Rows"]
+        cols = fields["Columns"]
+        if rows != 512 or cols != 512:
+            return f"\tImage size is not 512x512: ({rows}, {cols}).\n"
+        return ""
+
     def test_modality(self, fields: Dict[str, Any]) -> str:
         modality = fields["Modality"]
         if modality != "CT":
@@ -271,36 +278,46 @@ class Processor:
         spacing_x, spacing_y = dcm.PixelSpacing
         return spacing_x, spacing_y, dcm.SliceThickness
 
-    def load_series(
-        self, dicom_paths: List[str]
-    ) -> List[Tuple[str, pydicom.dataset.FileDataset]]:
+    def load_series(self, dicom_paths: List[str]):
         """
-        Loads the dicoms in the series and sorts them by position in patient.
+        Loads the dicoms in the series, groups them by series id and sorts them by position in patient.
 
         Args:
             dicom_paths (List[str]): A list of paths to the dicom files.
 
         Returns:
-            List[Tuple[str, pydicom.dataset.FileDataset]]: A list of tuples containing the file path and the dicom object.
+            Dict[str, List[Tuple[str, pydicom.dataset.FileDataset]]]: A dictionary containing the series id as the key and a list of tuples containing the path and the dicom object as the value.
         """
-        dicoms = [
+        paths_dicoms = [
             (path, pydicom.dcmread(path, stop_before_pixels=True))
             for path in dicom_paths
         ]
-        dicoms.sort(key=lambda x: x[1].ImagePositionPatient[2])
-        return dicoms
 
-    def process_series(self, dicom_paths: List[str], series_id: str) -> None:
+        grouped_dicoms = {}
+
+        for path, dcm in paths_dicoms:
+            series_id = dcm.get("SeriesInstanceUID")
+            if series_id not in grouped_dicoms:
+                grouped_dicoms[series_id] = []
+            grouped_dicoms[series_id].append((path, dcm))
+
+        for series_id, series_dicoms in grouped_dicoms.items():
+            series_dicoms.sort(key=lambda x: x[1].ImagePositionPatient[2])
+
+        return grouped_dicoms
+
+    def process_series(
+        self, dicom_paths: List[Tuple[str, pydicom.dataset.FileDataset]], series_id: str
+    ) -> None:
         """
         Process a series and return metadata and paths to dicom files.
 
         Args:
-            dicom_paths (List[str]): A list of paths to the dicom files.
+            dicom_paths (List[Tuple[str, pydicom.dataset.FileDataset]]): A list of tuples containing the path and the dicom object.
             series_id (str): Series ID.
         """
-        sorted_dicoms = self.load_series(dicom_paths)
-        first_dicom = sorted_dicoms[0][1]
-        num_slices = len(sorted_dicoms)
+        first_dicom = dicom_paths[0][1]
+        num_slices = len(dicom_paths)
         image_shape = self.get_shape(first_dicom)
         spacing_x, spacing_y, slice_thickness = self.get_spacing(first_dicom)
 
@@ -314,7 +331,7 @@ class Processor:
             spacing_y,
         )
 
-        for slice_index, (dicom_path, dicom) in enumerate(sorted_dicoms):
+        for slice_index, (dicom_path, dicom) in enumerate(dicom_paths):
             rel_dicom_path = os.path.relpath(dicom_path, self.absolute_dataset_path)
             self.database.insert_global_data(
                 self.dataset_name, series_id, slice_index, rel_dicom_path
@@ -342,33 +359,31 @@ class Processor:
             if not dcm_paths:
                 continue
 
-            try:
-                first_dcm = pydicom.dcmread(dcm_paths[0], stop_before_pixels=True)
-            except Exception as e:
-                logger.exception(f"Error reading first dicom in {data_folder}: {e}")
-                continue
+            grouped_series = self.load_series(dcm_paths)
+            for series_id, dicoms in grouped_series.items():
 
-            try:
-                self.ct_validator(first_dcm, data_folder)
-            except AssertionError as e:
-                logger.error(f"Error validating {data_folder}: {e}")
-                continue
-            except Exception as e:
-                logger.exception(f"Error validating {data_folder}: {e}")
-                continue
-            series_id = first_dcm.get("SeriesInstanceUID", None)
-
-            if series_id in included_series_ids:
-                logger.info(f"{data_folder}: Series ID already in database. Skipping.")
-                continue
-
-            if not self.validate_only:
                 try:
-                    self.process_series(dcm_paths, series_id)
-                except Exception as e:
-                    logger.exception(f"Error processing series {series_id}: {e}")
+                    self.ct_validator(dicoms[0][1], data_folder)
+                except AssertionError as e:
+                    logger.error(f"Error validating {data_folder}: {e}")
                     continue
-            included_series_ids.append(series_id)
+                except Exception as e:
+                    logger.exception(f"Error validating {data_folder}: {e}")
+                    continue
+
+                if series_id in included_series_ids:
+                    logger.info(
+                        f"{data_folder}: Series ID already in database. Skipping."
+                    )
+                    continue
+
+                if not self.validate_only:
+                    try:
+                        self.process_series(dicoms, series_id)
+                    except Exception as e:
+                        logger.exception(f"Error processing series {series_id}: {e}")
+                        continue
+                included_series_ids.append(series_id)
 
         logger.info(
             f"Finished processing {self.dataset_name}. {len(included_series_ids)} series included."
