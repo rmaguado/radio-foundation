@@ -301,8 +301,14 @@ class Processor:
                 grouped_dicoms[series_id] = []
             grouped_dicoms[series_id].append((path, dcm))
 
-        for series_id, series_dicoms in grouped_dicoms.items():
-            series_dicoms.sort(key=lambda x: x[1].ImagePositionPatient[2])
+        for series_id, series_dicoms in list(grouped_dicoms.items()):
+            try:
+                series_dicoms.sort(key=lambda x: x[1].ImagePositionPatient[2])
+            except AttributeError:
+                logger.warning(
+                    f"Series {series_id} does not have ImagePositionPatient attribute."
+                )
+                del grouped_dicoms[series_id]
 
         return grouped_dicoms
 
@@ -359,7 +365,12 @@ class Processor:
             if not dcm_paths:
                 continue
 
-            grouped_series = self.load_series(dcm_paths)
+            try:
+                grouped_series = self.load_series(dcm_paths)
+            except Exception as e:
+                logger.exception(f"Error loading series from {data_folder}: {e}")
+                continue
+
             for series_id, dicoms in grouped_series.items():
 
                 try:
