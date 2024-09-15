@@ -180,6 +180,15 @@ class CtDataset(BaseDataset):
         stack_rows = self.cursor.fetchall()
         stack_rows.sort(key=lambda x: x[1])
 
+        try:
+            stack_data = self.create_stack_data(stack_rows)
+        except Exception as e:
+            logger.exception(f"Error processing stack. Rowids: {stack_rowids} \n{e}")
+            stack_data = torch.zeros((self.channels, 512, 512))
+
+        return stack_data
+
+    def create_stack_data(self, stack_rows):
         stack_data = []
         for _, _, dataset, rel_dicom_path in stack_rows:
             abs_dicom_path = os.path.join(self.root_path, dataset, rel_dicom_path)
