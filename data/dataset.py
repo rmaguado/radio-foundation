@@ -425,7 +425,7 @@ def get_argpase():
     parser.add_argument(
         "--db_path",
         type=str,
-        default="data/radiomics_datasets.db",
+        default="data/database/radiomics_datasets.db",
         required=False,
         help="The path to the database.",
     )

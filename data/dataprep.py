@@ -23,7 +23,7 @@ def get_argpase():
     parser.add_argument(
         "--db_path",
         type=str,
-        default="data/radiomics_datasets.db",
+        default="data/database/radiomics_datasets.db",
         required=False,
         help="The path to the database.",
     )
@@ -48,14 +48,18 @@ def get_processed_datasets(db_path):
 
 def get_unprocessed_datasets(root_path, db_path):
     datasets_in_root = [
-        x for x in os.listdir(root_path) if os.path.isdir(os.path.join(root_path, x)) and not x.startswith(".")
+        x
+        for x in os.listdir(root_path)
+        if os.path.isdir(os.path.join(root_path, x)) and not x.startswith(".")
     ]
     if not os.path.exists(db_path):
         return datasets_in_root
 
     processed_datasets = get_processed_datasets(db_path)
     if processed_datasets:
-        logger.info(f"Skipping already processed datasets: {', '.join(processed_datasets)}")
+        logger.info(
+            f"Skipping already processed datasets: {', '.join(processed_datasets)}"
+        )
     unprocessed_datasets = [x for x in datasets_in_root if x not in processed_datasets]
 
     return unprocessed_datasets
@@ -76,7 +80,7 @@ def main(args):
             "dataset_path": dataset_path,
             "target_path": db_path,
             "derived_okay": derived_okay,
-            "validate_only": False
+            "validate_only": False,
         }
         processor = Processor(config)
         processor.prepare_dataset()
