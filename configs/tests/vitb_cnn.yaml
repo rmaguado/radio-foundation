@@ -21,6 +21,7 @@ data:
     - name: "radiomics_datasets"
       index_path: data/database/radiomics_datasets.db
       type: "ct"
+      storage: dicom
       augmentation: default_ct
       channels: 1
       pixel_range:
