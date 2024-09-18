@@ -50,8 +50,6 @@ class CtDataset(BaseDataset):
         self.index_path = index_path
         self.root_path = root_path
         self.output_path = output_path
-        self.entries_path = os.path.join(os.path.dirname(self.index_path), "entries")
-        self.open_db()
 
         self.transform = transform
         self.target_transform = target_transform
@@ -60,6 +58,10 @@ class CtDataset(BaseDataset):
         self.lower_window = lower_window
         self.upper_window = upper_window
 
+        self.entries_path = os.path.join(
+            os.path.dirname(self.index_path), "entries", self.dataset_name
+        )
+        self.open_db()
         self.entries = self.get_entries()
 
     def create_entries(self) -> np.ndarray:
