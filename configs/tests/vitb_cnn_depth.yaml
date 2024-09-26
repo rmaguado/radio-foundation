@@ -18,7 +18,7 @@ data:
   root_path: /home/rmaguado/rdt/DeepRDT/datasets/
   datasets:
     - name: "radiomics_datasets"
-      index_path: data/database/radiomics_datasets.db
+      index_path: data/index/radiomics_datasets.db
       type: "ct"
       storage: dicom
       augmentation: default_ct
