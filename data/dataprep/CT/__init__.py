@@ -1,12 +1,9 @@
-# reads database file if exists
-# finds already processed datasets
-# calls dataset.py on each unprocessed datasets
-# calls statistics.py on final database
-
-from .dataset import Processor
 import sqlite3
 import argparse
 import os
+
+from CT.dicoms import DicomProcessor
+from CT.niftis import NiftiProcessor
 
 import logging
 import warnings
@@ -28,10 +25,16 @@ def get_argpase():
         help="The path to the database.",
     )
     parser.add_argument(
-        "--derived_okay",
+        "--validate_only",
         action="store_true",
-        help="Specify if derived images are allowed.",
+        help="Specify if only validation should be performed.",
     )
+    parser.add_argument(
+        "--storage",
+        type=str,
+        help="The storage type for the dataset. Options are 'nifti' and 'dicom'.",
+    )
+
     return parser
 
 
@@ -68,7 +71,7 @@ def get_unprocessed_datasets(root_path, db_path):
 def main(args):
     root_path = args.root_path
     db_path = args.db_path
-    derived_okay = args.derived_okay
+    storage = args.storage
 
     unprocessed_datasets = get_unprocessed_datasets(root_path, db_path)
     logger.info(f"Unprocessed datasets: {', '.join(unprocessed_datasets)}")
@@ -79,10 +82,13 @@ def main(args):
             "dataset_name": dataset,
             "dataset_path": dataset_path,
             "target_path": db_path,
-            "derived_okay": derived_okay,
             "validate_only": False,
+            "storage": storage,
         }
-        processor = Processor(config)
+        if storage == "dicom":
+            processor = DicomProcessor(config)
+        elif storage == "nifti":
+            processor = NiftiProcessor(config)
         processor.prepare_dataset()
         processor.close_db()
 

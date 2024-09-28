@@ -1,34 +1,21 @@
 from typing import List, Dict, Tuple, Any
 
-import sqlite3
 import argparse
 from tqdm import tqdm
 import pydicom
 import ast
 import os
-
-import warnings
 import logging
+
+from dataprep.utils import walk
+from ct_database import CtDatabase
 
 
 logger = logging.getLogger("dataprep")
-logger.setLevel(logging.INFO)
-
-os.makedirs("data/database/log", exist_ok=True)
-file_handler = logging.FileHandler("data/database/log/dataprep.log")
-file_handler.setLevel(logging.INFO)
-
-formatter = logging.Formatter("%(message)s")
-file_handler.setFormatter(formatter)
-
-logger.addHandler(file_handler)
-
-warnings.filterwarnings("ignore")
 
 
-class CtValidation:
-    def __init__(self, config: dict):
-        self.config = config
+class DicomCtValidation:
+    def __init__(self, config: Dict):
         self.derived_okay = config["derived_okay"]
 
         self.required_fields = [
@@ -128,24 +115,13 @@ class CtValidation:
         assert len(issues) == 0, issues
 
 
-def walk(root_dir):
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        if "ignore" in filenames:
-            dirnames[:] = []
-
-        yield dirpath, dirnames, filenames
-
-
-class Database:
-    def __init__(self, config: dict):
-        self.conn = sqlite3.connect(config["target_path"])
-        self.cursor = self.conn.cursor()
-        self.is_open = True
-
-        self.dataset_name_str = f'"{config["dataset_name"]}"'
+class DicomDatabase(CtDatabase):
+    def __init__(self, config):
+        super().__init__(config, storage="dicom")
 
         self.create_global_table()
-        self.create_dataset_table()
+        self.add_dataset(config["dataset_name"])
+        self.create_dataset_info_table(config["dataset_name"])
 
     def create_global_table(self) -> None:
         """
@@ -163,13 +139,14 @@ class Database:
             """
         )
 
-    def create_dataset_table(self) -> None:
+    def create_dataset_info_table(self, dataset_name) -> None:
         """
         Create a dataset table in the database.
         """
+        dataset_name_str = f'"{dataset_name}"'
         self.cursor.execute(
             f"""
-            CREATE TABLE IF NOT EXISTS {self.dataset_name_str} (
+            CREATE TABLE IF NOT EXISTS {dataset_name_str} (
                 series_id TEXT PRIMARY KEY,
                 num_slices INTEGER,
                 image_shape_x INTEGER,
@@ -228,28 +205,16 @@ class Database:
             metadata,
         )
 
-    def close(self):
-        """
-        Closes the database connection.
-        """
-        if self.is_open:
-            self.conn.commit()
-            self.conn.close()
-            self.is_open = False
 
-    def __del__(self):
-        self.close()
-
-
-class Processor:
+class DicomProcessor:
     def __init__(self, config: dict):
         self.dataset_name = config["dataset_name"]
         self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
         self.validate_only = config["validate_only"]
 
-        self.ct_validator = CtValidation(config)
+        self.validator = DicomCtValidation(config)
         if not self.validate_only:
-            self.database = Database(config)
+            self.database = DicomDatabase(config)
 
     def get_shape(self, dcm: pydicom.dataset.FileDataset) -> Tuple[int, int]:
         """
@@ -374,7 +339,8 @@ class Processor:
             for series_id, dicoms in grouped_series.items():
 
                 try:
-                    self.ct_validator(dicoms[0][1], data_folder)
+                    for dicom_path, dicom in dicoms:
+                        self.validator(dicom, data_folder)
                 except AssertionError as e:
                     logger.error(f"Error validating {data_folder}: {e}")
                     continue
@@ -400,7 +366,10 @@ class Processor:
             f"Finished processing {self.dataset_name}. {len(included_series_ids)} series included."
         )
 
-    def close_db(self):
+    def close_db(self) -> None:
+        """
+        Closes the database connection.
+        """
         self.database.close()
 
 
@@ -425,7 +394,7 @@ def get_argpase():
     parser.add_argument(
         "--db_path",
         type=str,
-        default="data/database/radiomics_datasets.db",
+        default="data/index/dicom_datasets.db",
         required=False,
         help="The path to the database.",
     )
@@ -443,7 +412,7 @@ def main(args):
         "derived_okay": args.derived_okay,
         "validate_only": args.validate_only,
     }
-    processor = Processor(config)
+    processor = DicomProcessor(config)
     processor.prepare_dataset()
 
 
