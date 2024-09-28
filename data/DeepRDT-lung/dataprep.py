@@ -5,10 +5,8 @@ import SimpleITK as sitk
 import pydicom
 from tqdm import tqdm
 
-from data.dataset import DatasetBase, validate_ct_dicom, get_argpase
 
-
-class DeepRDTlung(DatasetBase):
+class DeepRDTlung:
     def __init__(self, config):
         super().__init__(config)
 
@@ -46,27 +44,6 @@ class DeepRDTlung(DatasetBase):
 
             first_file = series_file_names[0]
             dcm = pydicom.dcmread(first_file, stop_before_pixels=True)
-            if validate_ct_dicom(dcm, data_folder):
-                series_paths.append((dosisplan_series_id, data_folder))
+            series_paths.append((dosisplan_series_id, data_folder))
 
         return series_paths
-
-
-def main(dataset_name: str, root_path: str, db_path: str):
-    dataset_path = os.path.join(root_path, dataset_name)
-    if not os.path.exists(dataset_path):
-        raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
-    config = {
-        "dataset_name": dataset_name,
-        "dataset_path": dataset_path,
-        "target_path": db_path,
-        "df_path": "/home/rmaguado/cuda/AI/alba/deepRDT_lung/data/dfs",
-    }
-    dataset = DeepRDTlung(config)
-    dataset.prepare_dataset()
-
-
-if __name__ == "__main__":
-    parser = get_argpase()
-    args = parser.parse_args()
-    main(args.dataset_name, args.root_path, args.db_path)
