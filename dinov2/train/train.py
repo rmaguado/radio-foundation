@@ -152,12 +152,11 @@ def do_train(cfg, model, resume=False):
 
 def main(args):
     cfg = setup(args)
-    is_validated = validate_config(cfg)
+    is_validated = validate_config(cfg) if not args.skip_validation else True
     if not is_validated:
         logger.error("Config validation failed. Exiting.")
         return
 
-    logger.info("Config is validated.")
     model = SSLMetaArch(cfg).to(torch.device("cuda"))
     model.prepare_for_distributed_training()
 
