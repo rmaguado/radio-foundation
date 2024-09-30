@@ -13,18 +13,17 @@ optim:
   epochs: 50
   warmup_epochs: 10
   base_lr: 0.003
-data:
-  root_path: /home/rmaguado/rdt/DeepRDT/datasets/
-  datasets:
-    - name: "radiomics_datasets"
-      index_path: data/index/radiomics_datasets.db
-      type: "ct"
-      storage: dicom
-      augmentation: default_ct
-      channels: 4
-      pixel_range:
-        lower: -1000.0
-        upper: 1900.0
-      norm:
-        mean: -573.8
-        std: 461.3
+datasets:
+  - name: "radiomics_datasets"
+    index_path: data/index/radiomics_datasets.db
+    root_path: /home/rmaguado/rdt/DeepRDT/datasets/
+    type: "ct"
+    storage: dicom
+    augmentation: default_ct
+    channels: 4
+    pixel_range:
+      lower: -1000.0
+      upper: 1900.0
+    norm:
+      mean: -573.8
+      std: 461.3

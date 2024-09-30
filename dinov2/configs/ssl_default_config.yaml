@@ -124,21 +124,20 @@ crops:
   - 0.32
   global_crops_size: 224
   local_crops_size: 98
-data:
-  root_path: .
-  datasets:
-    - name: "radiomics_datasets"
-      index_path: data/index/radiomics_datasets.db
-      type: "ct"
-      storage: dicom
-      augmentation: default_ct
-      channels: 1
-      pixel_range:
-        lower: -1000.0
-        upper: 1900.0
-      norm:
-        mean: -573.8
-        std: 461.3
+datasets:
+  - name: "radiomics_datasets"
+    index_path: data/index/radiomics_datasets.db
+    root_path: .
+    type: "ct"
+    storage: dicom
+    augmentation: default_ct
+    channels: 1
+    pixel_range:
+      lower: -1000.0
+      upper: 1900.0
+    norm:
+      mean: -573.8
+      std: 461.3
 augmentations:
   default_ct:
     global_1:

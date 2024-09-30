@@ -11,5 +11,3 @@ optim:
   epochs: 50
   warmup_epochs: 10
   base_lr: 0.003
-data:
-  root_path: /home/rmaguado/rdt/DeepRDT/datasets/
