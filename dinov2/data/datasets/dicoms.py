@@ -130,9 +130,7 @@ class DicomCtDataset(DicomVolumes):
         self.lower_window = lower_window
         self.upper_window = upper_window
 
-        self.entries_path = os.path.join(
-            os.path.dirname(self.index_path), "entries", self.dataset_name
-        )
+        self.entries_path = os.path.join(os.path.dirname(self.index_path), "entries")
         self.open_db()
         self.entries = self.get_entries()
 
