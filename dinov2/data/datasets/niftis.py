@@ -40,7 +40,7 @@ class NiftiVolumes(BaseDataset):
         )
 
         nifti_volumes = self.cursor.execute(
-            f"SELECT (rowid, num_slices) FROM global"
+            "SELECT rowid, num_slices FROM global"
         ).fetchall()
 
         entries = []
