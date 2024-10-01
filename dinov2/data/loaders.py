@@ -41,10 +41,9 @@ def make_train_dataset(
         MedicalImageDataset: The corresponding dataset object(s).
     """
 
-    datasets = config.data.datasets
     dataset_objects = []
 
-    for dataset_config in datasets:
+    for dataset_config in config.datasets:
         dataset_object = build_dataset_from_cfg(config, use_full_image, dataset_config)
         dataset_objects.append(dataset_object)
 
