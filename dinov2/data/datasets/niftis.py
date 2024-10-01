@@ -126,7 +126,7 @@ class NiftiCtDataset(NiftiVolumes):
             """
             SELECT dataset, axial_dim, nifti_path FROM global WHERE rowid = ?
             """,
-            (rowid,),
+            (int(rowid),),
         )
         dataset, axial_dim, nifti_path = self.cursor.fetchone()
 
