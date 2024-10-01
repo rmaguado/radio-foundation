@@ -135,7 +135,7 @@ class NiftiCtDataset(NiftiVolumes):
         abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
         nifti_file = nib.load(abs_path_to_nifti)
 
-        volume_data = nifti_file.get_fdata()
+        volume_data = nifti_file.get_fdata().astype(np.float32)
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
         volume_data = volume_data[slice_index : slice_index + self.channels]
 

@@ -191,7 +191,7 @@ class DicomCtDataset(DicomVolumes):
         slope = getattr(dcm, "RescaleSlope", 1)
         intercept = getattr(dcm, "RescaleIntercept", 0)
 
-        array_data = dcm.pixel_array * slope + intercept
+        array_data = dcm.pixel_array.astype(np.float32) * slope + intercept
 
         array_data = np.clip(array_data, self.lower_window, self.upper_window)
         array_data = (array_data - self.lower_window) / (
