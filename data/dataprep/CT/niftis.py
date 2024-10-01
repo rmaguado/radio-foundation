@@ -12,6 +12,9 @@ logger = logging.getLogger("dataprep")
 
 
 class NiftiCtValidation:
+    def __init__(self, config: dict):
+        self.skip_validation = config["skip_validation"]
+
     def test_image_shape(self, metadata: Dict) -> str:
         rows = metadata["rows"]
         columns = metadata["columns"]
@@ -38,10 +41,14 @@ class NiftiCtValidation:
             return "\tPixel values are not scaled correctly.\n"
         return ""
 
-    def __call__(self, nifti_file: nib.Nifti1Image, metadata: Dict) -> bool:
+    def __call__(self, nifti_file: nib.Nifti1Image, metadata: Dict):
+        if self.skip_validation:
+            return
+        self.validate_nifti_for_ct(nifti_file, metadata)
+
+    def validate_nifti_for_ct(self, nifti_file, metadata):
         """
         Validates a NIfTI file for CT scans.
-
         Args:
             metadata (Dict): Metadata extracted from the NIfTI file.
         """
@@ -108,7 +115,7 @@ class NiftiProcessor:
         self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
         self.validate_only = config["validate_only"]
 
-        self.validator = NiftiCtValidation()
+        self.validator = NiftiCtValidation(config)
         if not self.validate_only:
             self.database = NiftiDatabase(config)
 
@@ -233,6 +240,11 @@ def get_argparse():
         required=False,
         help="The path to the database.",
     )
+    parser.add_argument(
+        "--skip_validation",
+        action="store_true",
+        help="Specify if validation should be skipped.",
+    )
     return parser
 
 
@@ -245,6 +257,7 @@ def main(args):
         "dataset_path": dataset_path,
         "db_path": args.db_path,
         "validate_only": args.validate_only,
+        "skip_validation": args.skip_validation,
     }
     processor = NiftiProcessor(config)
     processor.prepare_dataset()

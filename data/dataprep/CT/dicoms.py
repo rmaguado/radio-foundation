@@ -17,6 +17,7 @@ logger = logging.getLogger("dataprep")
 class DicomCtValidation:
     def __init__(self, config: Dict):
         self.derived_okay = config["derived_okay"]
+        self.skip_validation = config["skip_validation"]
 
         self.required_fields = [
             "SeriesInstanceUID",
@@ -91,15 +92,16 @@ class DicomCtValidation:
     def __call__(
         self, dcm: pydicom.dataset.FileDataset, dicom_folder_path: str
     ) -> bool:
+        if self.skip_validation:
+            return
+        self.validate_dicom_for_ct(dcm, dicom_folder_path)
+
+    def validate_dicom_for_ct(self, dcm, dicom_folder_path):
         """
         Validates a DICOM file for CT scans.
-
         Args:
             dcm: The DICOM object to validate.
             dicom_folder_path: The folder path of the DICOM file.
-
-        Returns:
-            bool: True if the DICOM file is valid for CT scans, False otherwise.
         """
         fields, missing_fields = self.get_fields(dcm)
         assert (
@@ -398,6 +400,11 @@ def get_argpase():
         required=False,
         help="The path to the database.",
     )
+    parser.add_argument(
+        "--skip_validation",
+        action="store_true",
+        help="Specify if validation should be skipped.",
+    )
     return parser
 
 
@@ -411,6 +418,7 @@ def main(args):
         "target_path": args.db_path,
         "derived_okay": args.derived_okay,
         "validate_only": args.validate_only,
+        "skip_validation": args.skip_validation,
     }
     processor = DicomProcessor(config)
     processor.prepare_dataset()
