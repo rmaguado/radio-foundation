@@ -52,10 +52,6 @@ class EpochSampler(Sampler):
         self._epoch = epoch
 
 
-def _get_numpy_dtype(size: int) -> Any:
-    return np.int32 if size <= 2**31 else np.int64
-
-
 def _get_torch_dtype(size: int) -> Any:
     return torch.int32 if size <= 2**31 else torch.int64
 
