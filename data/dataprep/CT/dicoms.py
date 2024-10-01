@@ -7,8 +7,8 @@ import ast
 import os
 import logging
 
-from dataprep.utils import walk
-from ct_database import CtDatabase
+from ..utils import walk
+from .ct_database import CtDatabase
 
 
 logger = logging.getLogger("dataprep")
@@ -415,7 +415,7 @@ def main(args):
     config = {
         "dataset_name": args.dataset_name,
         "dataset_path": dataset_path,
-        "target_path": args.db_path,
+        "db_path": args.db_path,
         "derived_okay": args.derived_okay,
         "validate_only": args.validate_only,
         "skip_validation": args.skip_validation,

@@ -5,7 +5,9 @@ import logging
 import nibabel as nib
 from tqdm import tqdm
 import numpy as np
-from dataprep.utils import Database, walk
+
+from ..utils import walk
+from .ct_database import CtDatabase
 
 
 logger = logging.getLogger("dataprep")
@@ -30,11 +32,12 @@ class NiftiCtValidation:
         return ""
 
     def test_spacing(self, metadata: Dict) -> str:
-        spacing_x = metadata["image_shape_x"]
-        spacing_y = metadata["image_shape_y"]
+        spacing_x = metadata["x_spacing"]
+        spacing_y = metadata["y_spacing"]
         slice_thickness = metadata["slice_thickness"]
         if spacing_x > slice_thickness or spacing_y > slice_thickness:
             return f"\tSpacing is greater than slice thickness: ({spacing_x}, {spacing_y}).\n"
+        return ""
 
     def test_scaling(self, volume_data: np.ndarray) -> str:
         if -1024 > np.min(volume_data) > -990:
@@ -63,7 +66,7 @@ class NiftiCtValidation:
         assert len(issues) == 0, issues
 
 
-class NiftiDatabase(Database):
+class NiftiDatabase(CtDatabase):
     def __init__(self, config):
         super().__init__(config, storage="nifti")
 
@@ -165,7 +168,11 @@ class NiftiProcessor:
             nifti_path (str): Path to the NIfTI file.
         """
         nifti_file = nib.load(nifti_path)
-        metadata = self.get_metadata(nifti_file)
+        try:
+            metadata = self.get_metadata(nifti_file)
+        except Exception as e:
+            logger.error(f"Metadata extraction failed for {nifti_path}: {e}")
+            return
 
         try:
             self.validator(nifti_file, metadata)

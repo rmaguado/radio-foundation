@@ -14,8 +14,8 @@ import logging
 logger = logging.getLogger("dataprep")
 logger.setLevel(logging.INFO)
 
-os.makedirs("data/database/log", exist_ok=True)
-file_handler = logging.FileHandler("data/database/log/dataprep.log")
+os.makedirs("data/log", exist_ok=True)
+file_handler = logging.FileHandler("data/log/dataprep.log")
 file_handler.setLevel(logging.INFO)
 
 formatter = logging.Formatter("%(message)s")
@@ -36,7 +36,7 @@ def walk(root_dir):
 
 class Database:
     def __init__(self, config):
-        self.conn = sqlite3.connect(config["target_path"])
+        self.conn = sqlite3.connect(config["db_path"])
         self.cursor = self.conn.cursor()
         self.is_open = True
         self.create_metadata_table()

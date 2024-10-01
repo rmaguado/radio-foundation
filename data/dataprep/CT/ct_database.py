@@ -1,4 +1,4 @@
-from dataprep.utils import Database
+from ..utils import Database
 
 
 class CtDatabase(Database):
