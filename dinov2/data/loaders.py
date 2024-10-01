@@ -5,13 +5,13 @@
 
 import logging
 from enum import Enum
-from typing import Any, Callable, List, Optional, TypeVar, Union
+from typing import Any, Callable, List, Optional, TypeVar
 from omegaconf import DictConfig
 
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import CtDataset, MultiDataset
+from .datasets import MultiDataset, DicomCtDataset, NiftiCtDataset, MedicalImageDataset
 from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
 from .augmentations import DataAugmentationDINO
 
@@ -29,7 +29,7 @@ class SamplerType(Enum):
 def make_train_dataset(
     config: DictConfig,
     use_full_image: bool,
-) -> Union[CtDataset, MultiDataset]:
+) -> MedicalImageDataset:
     """
     Parse the dataset from the given OmegaConf configuration.
 
@@ -38,36 +38,14 @@ def make_train_dataset(
         use_full_image (bool): Whether to set the global crop size to the full size.
 
     Returns:
-        Union[ImageDataset, MultiDataset]: The corresponding dataset object(s).
+        MedicalImageDataset: The corresponding dataset object(s).
     """
-
-    def get_ct_kwargs(dataset_config):
-        return {
-            "channels": dataset_config.channels,
-            "lower_window": dataset_config.pixel_range.lower,
-            "upper_window": dataset_config.pixel_range.upper,
-        }
 
     datasets = config.data.datasets
     dataset_objects = []
 
     for dataset_config in datasets:
-        dataset_type = dataset_config.type
-        transform = DataAugmentationDINO(config, dataset_config, use_full_image)
-
-        dataset_kwargs = {
-            "dataset_name": dataset_config.name,
-            "index_path": dataset_config.index_path,
-            "root_path": config.data.root_path,
-            "output_path": config.train.output_dir,
-            "transform": transform,
-        }
-
-        if dataset_type == "ct":
-            dataset_kwargs.update(get_ct_kwargs(dataset_config))
-            dataset_object = CtDataset(**dataset_kwargs)
-        else:
-            raise ValueError(f"Unsupported dataset type: {dataset_type}")
+        dataset_object = build_dataset_from_cfg(config, use_full_image, dataset_config)
         dataset_objects.append(dataset_object)
 
     return (
@@ -75,6 +53,39 @@ def make_train_dataset(
         if len(dataset_objects) == 1
         else MultiDataset(dataset_objects)
     )
+
+
+def build_dataset_from_cfg(config, use_full_image, dataset_config):
+    def get_ct_kwargs(dataset_config):
+        return {
+            "channels": dataset_config.channels,
+            "lower_window": dataset_config.pixel_range.lower,
+            "upper_window": dataset_config.pixel_range.upper,
+        }
+
+    dataset_type = dataset_config.type
+    dataset_storage = dataset_config.storage
+    transform = DataAugmentationDINO(config, dataset_config, use_full_image)
+
+    dataset_kwargs = {
+        "dataset_name": dataset_config.name,
+        "index_path": dataset_config.index_path,
+        "root_path": config.data.root_path,
+        "output_path": config.train.output_dir,
+        "transform": transform,
+    }
+
+    if dataset_type == "ct":
+        dataset_kwargs.update(get_ct_kwargs(dataset_config))
+        if dataset_storage == "dicom":
+            dataset_object = DicomCtDataset(**dataset_kwargs)
+        elif dataset_storage == "nifti":
+            dataset_object = NiftiCtDataset(**dataset_kwargs)
+        else:
+            raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
+    else:
+        raise ValueError(f"Unsupported dataset type: {dataset_type}")
+    return dataset_object
 
 
 def _make_sampler(
