@@ -97,8 +97,8 @@ class NiftiDatabase(CtDatabase):
     ) -> None:
         self.cursor.execute(
             """
-            INSERT INTO "global" (dataset, 
-            VALUES (?, ?, ?, ?
+            INSERT INTO "global" (dataset, num_slices, slice_thickness, x_spacing, y_spacing, axial_dim, nifti_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 dataset_name,
