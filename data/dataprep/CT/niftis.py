@@ -32,8 +32,8 @@ class NiftiCtValidation:
         return ""
 
     def test_spacing(self, metadata: Dict) -> str:
-        spacing_x = metadata["x_spacing"]
-        spacing_y = metadata["y_spacing"]
+        spacing_x = metadata["spacing_x"]
+        spacing_y = metadata["spacing_y"]
         slice_thickness = metadata["slice_thickness"]
         if spacing_x > slice_thickness or spacing_y > slice_thickness:
             return f"\tSpacing is greater than slice thickness: ({spacing_x}, {spacing_y}).\n"
@@ -83,8 +83,8 @@ class NiftiDatabase(CtDatabase):
                 dataset TEXT,
                 num_slices INTEGER,
                 slice_thickness REAL,
-                x_spacing REAL,
-                y_spacing REAL,
+                spacing_x REAL,
+                spacing_y REAL,
                 axial_dim INTEGER,
                 nifti_path TEXT
             )
@@ -96,15 +96,15 @@ class NiftiDatabase(CtDatabase):
     ) -> None:
         self.cursor.execute(
             """
-            INSERT INTO "global" (dataset, num_slices, slice_thickness, x_spacing, y_spacing, axial_dim, nifti_path)
+            INSERT INTO "global" (dataset, num_slices, slice_thickness, spacing_x, spacing_y, axial_dim, nifti_path)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 dataset_name,
                 metadata["num_slices"],
                 metadata["slice_thickness"],
-                metadata["x_spacing"],
-                metadata["y_spacing"],
+                metadata["spacing_x"],
+                metadata["spacing_y"],
                 metadata["axial_dim"],
                 nifti_path,
             ),
@@ -146,16 +146,16 @@ class NiftiProcessor:
         rows = shape[rows_columns_dims[0]]
         columns = shape[rows_columns_dims[1]]
 
-        x_spacing = voxel_sizes[rows_columns_dims[0]]
-        y_spacing = voxel_sizes[rows_columns_dims[1]]
+        spacing_x = voxel_sizes[rows_columns_dims[0]]
+        spacing_y = voxel_sizes[rows_columns_dims[1]]
 
         return {
             "num_slices": shape[axial_dim],
             "rows": rows,
             "columns": columns,
             "slice_thickness": voxel_sizes[axial_dim],
-            "x_spacing": x_spacing,
-            "y_spacing": y_spacing,
+            "spacing_x": spacing_x,
+            "spacing_y": spacing_y,
             "axial_dim": axial_dim,
         }
 
