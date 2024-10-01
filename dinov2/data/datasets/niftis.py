@@ -137,9 +137,7 @@ class NiftiCtDataset(NiftiVolumes):
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
         volume_data = volume_data[slice_index : slice_index + self.channels]
 
-        volume_data = self.process_ct(volume_data)
-
-        return self.transform(volume_data)
+        return self.process_ct(volume_data)
 
     def process_ct(self, volume_data: np.ndarray) -> torch.tensor:
         """
