@@ -40,7 +40,7 @@ class NiftiCtValidation:
         return ""
 
     def test_scaling(self, volume_data: np.ndarray) -> str:
-        if -1024 > np.min(volume_data) > -990:
+        if -1024 > np.min(volume_data) or np.min(volume_data) > -990:
             return "\tPixel values are not scaled correctly.\n"
         return ""
 
@@ -86,8 +86,7 @@ class NiftiDatabase(CtDatabase):
                 x_spacing REAL,
                 y_spacing REAL,
                 axial_dim INTEGER,
-                nifti_path TEXT,
-                PRIMARY KEY (dataset)
+                nifti_path TEXT
             )
             """
         )
