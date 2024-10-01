@@ -33,17 +33,25 @@ class NiftiCtValidation:
         if spacing_x > slice_thickness or spacing_y > slice_thickness:
             return f"\tSpacing is greater than slice thickness: ({spacing_x}, {spacing_y}).\n"
 
-    def __call__(self, metadata: Dict) -> bool:
+    def test_scaling(self, volume_data: np.ndarray) -> str:
+        if -1024 > np.min(volume_data) > -990:
+            return "\tPixel values are not scaled correctly.\n"
+        return ""
+
+    def __call__(self, nifti_file: nib.Nifti1Image, metadata: Dict) -> bool:
         """
         Validates a NIfTI file for CT scans.
 
         Args:
             metadata (Dict): Metadata extracted from the NIfTI file.
         """
+        volume_data = nifti_file.get_fdata()
+
         issues = ""
         issues += self.test_slice_thickness(metadata)
         issues += self.test_image_shape(metadata)
         issues += self.test_spacing(metadata)
+        issues += self.test_scaling(volume_data)
 
         assert len(issues) == 0, issues
 
@@ -153,7 +161,7 @@ class NiftiProcessor:
         metadata = self.get_metadata(nifti_file)
 
         try:
-            self.validator(metadata)
+            self.validator(nifti_file, metadata)
         except Exception as e:
             logger.error(f"Validation failed for {nifti_path}: {e}")
             return
