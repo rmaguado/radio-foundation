@@ -150,13 +150,13 @@ class NiftiProcessor:
         spacing_y = voxel_sizes[rows_columns_dims[1]]
 
         return {
-            "num_slices": shape[axial_dim],
-            "rows": rows,
-            "columns": columns,
-            "slice_thickness": voxel_sizes[axial_dim],
-            "spacing_x": spacing_x,
-            "spacing_y": spacing_y,
-            "axial_dim": axial_dim,
+            "num_slices": int(shape[axial_dim]),
+            "rows": int(rows),
+            "columns": int(columns),
+            "slice_thickness": float(voxel_sizes[axial_dim]),
+            "spacing_x": float(spacing_x),
+            "spacing_y": float(spacing_y),
+            "axial_dim": int(axial_dim),
         }
 
     def process_volume(self, nifti_path: str) -> None:
