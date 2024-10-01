@@ -7,6 +7,7 @@ class CtDatabase(Database):
 
         self.storage = storage
         self.modality = "CT"
+        self.store_metadata()
 
     def store_metadata(self) -> None:
         self.cursor.execute("SELECT value FROM metadata WHERE key = 'modality';")
