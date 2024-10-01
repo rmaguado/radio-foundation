@@ -22,14 +22,14 @@ def validate_data(config: DictConfig) -> bool:
     if not test_has_section(config, "datasets"):
         return False
 
-    data_config = config.datasets
+    data_configs = config.datasets
 
-    if not test_has_dataset(data_config):
+    if not test_has_dataset(data_configs):
         return False
     if not all(
         [
             validate_dataset_instance(config, dataset_config)
-            for dataset_config in data_config.datasets
+            for dataset_config in data_configs
         ]
     ):
         return False
