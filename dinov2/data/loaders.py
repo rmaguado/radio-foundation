@@ -70,7 +70,7 @@ def build_dataset_from_cfg(config, use_full_image, dataset_config):
     dataset_kwargs = {
         "dataset_name": dataset_config.name,
         "index_path": dataset_config.index_path,
-        "root_path": config.data.root_path,
+        "root_path": dataset_config.data.root_path,
         "output_path": config.train.output_dir,
         "transform": transform,
     }
