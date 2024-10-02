@@ -72,7 +72,6 @@ def train(
         max_iter,
         start_iter,
     ):
-        current_batch_size = data["collated_global_crops"].shape[0] / 2
         if iteration > max_iter:
             return
 
@@ -85,9 +84,7 @@ def train(
         if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
             apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps)
             model.update_teacher(mom)
-            log_training_step(
-                metric_logger, loss_dict, schedulers, train_step, current_batch_size
-            )
+            log_training_step(metric_logger, loss_dict, schedulers, train_step)
             train_step += 1
 
         if should_eval_model(cfg, iteration):

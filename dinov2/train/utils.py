@@ -49,9 +49,7 @@ def apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps):
         optimizer.step()
 
 
-def log_training_step(
-    metric_logger, loss_dict, schedulers, train_step, current_batch_size
-):
+def log_training_step(metric_logger, loss_dict, schedulers, train_step):
     if distributed.get_global_size() > 1:
         for v in loss_dict.values():
             torch.distributed.all_reduce(v)
@@ -70,7 +68,6 @@ def log_training_step(
     metric_logger.update(wd=schedulers["wd"][train_step])
     metric_logger.update(mom=schedulers["momentum"][train_step])
     metric_logger.update(last_layer_lr=schedulers["last_layer_lr"][train_step])
-    metric_logger.update(current_batch_size=current_batch_size)
     metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
 
 
