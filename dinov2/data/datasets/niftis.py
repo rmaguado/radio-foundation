@@ -153,5 +153,4 @@ class NiftiCtDataset(NiftiVolumes):
         volume_data = (volume_data - self.lower_window) / (
             self.upper_window - self.lower_window
         )
-        volume_data = np.expand_dims(volume_data, axis=1)
         return torch.tensor(volume_data, dtype=torch.float32)
