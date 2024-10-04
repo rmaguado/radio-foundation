@@ -6,7 +6,6 @@ from .dicoms import DicomProcessor
 from .niftis import NiftiProcessor
 
 import logging
-import warnings
 
 
 logger = logging.getLogger("dataprep")
@@ -18,11 +17,11 @@ def get_argpase():
         "--root_path", type=str, required=True, help="The root path of the dataset."
     )
     parser.add_argument(
-        "--db_path",
+        "--db_name",
         type=str,
-        default="data/database/radiomics_datasets.db",
+        default="radiomics_datasets",
         required=False,
-        help="The path to the database.",
+        help="The name of the database. Will be saved in data/index/<db_name>/<db_name>.db",
     )
     parser.add_argument(
         "--validate_only",
@@ -70,8 +69,11 @@ def get_unprocessed_datasets(root_path, db_path):
 
 def main(args):
     root_path = args.root_path
-    db_path = args.db_path
     storage = args.storage
+
+    db_dir = os.path.join("data/index", args.db_name)
+    os.makedirs(db_dir, exist_ok=True)
+    db_path = os.path.join(db_dir, f"{args.db_name}.db")
 
     unprocessed_datasets = get_unprocessed_datasets(root_path, db_path)
     logger.info(f"Unprocessed datasets: {', '.join(unprocessed_datasets)}")

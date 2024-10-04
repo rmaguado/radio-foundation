@@ -394,11 +394,11 @@ def get_argpase():
         help="Specify if only validation should be performed.",
     )
     parser.add_argument(
-        "--db_path",
+        "--db_name",
         type=str,
-        default="data/index/dicom_datasets.db",
+        default="dicom_datasets",
         required=False,
-        help="The path to the database.",
+        help="The name of the database. Will be saved in data/index/<db_name>/<db_name>.db",
     )
     parser.add_argument(
         "--skip_validation",
@@ -412,10 +412,15 @@ def main(args):
     dataset_path = os.path.join(args.root_path, args.dataset_name)
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
+    
+    db_dir = os.path.join("data/index", args.db_name)
+    os.makedirs(db_dir, exist_ok=True)
+    db_path = os.path.join(db_dir, f"{args.db_name}.db")
+
     config = {
         "dataset_name": args.dataset_name,
         "dataset_path": dataset_path,
-        "db_path": args.db_path,
+        "db_path": db_path,
         "derived_okay": args.derived_okay,
         "validate_only": args.validate_only,
         "skip_validation": args.skip_validation,
