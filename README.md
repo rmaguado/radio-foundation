@@ -6,10 +6,9 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 - Dataloader to eval using entire volume
 - script for running benchmark tests (after I have many datasets)
+- scripts to test transforms (generate samples)
 
-- unit tests for image transforms and data loaders
 - write userguide for data processing
-- unique PatchEmbed modules (from dinov2.layers) for each input type
 
 ## Overview
 
