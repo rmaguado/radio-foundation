@@ -23,92 +23,97 @@ Modified the transforms module to allow for easy customization of the transforms
 
 ## Configuring transforms
 
-Here is an example of how the config file is parsed to select which transforms are used and in what order:
+Here is an example of how the config file is parsed to select which transforms are used and in what order. Multiple groups of augmentations can be passed and used for different datasets.
 
 ```
 augmentations:
-  global_1:
-  - name: rotation
-    p: 0.8
-    degrees: 90
-  - name: globalcrop
-  - name: flip
-    p: 0.5
-  - name: contrast
-    p: 0.8
-    contrast: 0.4
-  - name: brightness
-    p: 0.8
-    brightness: 0.4
-  - name: blur
-    p: 1.0
-  global_2:
-  - name: globalcrop
-  - name: flip
-    p: 0.5
-  - name: contrast
-    p: 0.8
-    contrast: 0.4
-  - name: brightness
-    p: 0.8
-    brightness: 0.4
-  - name: solarize
-    p: 0.2
-    threshold: 0.5
-    max_value: 1.0
-  - name: noise
-    p: 0.5
-    noise_level: 0.02
-    max_value: 1.0
-  - name: blur
-    p: 0.1
-  local:
-  - name: localcrop
-  - name: flip
-    p: 0.5
-  - name: contrast
-    p: 0.8
-    contrast: 0.4
-  - name: brightness
-    p: 0.8
-    brightness: 0.4
-  - name: blur
-    p: 0.5
+  default_ct:
+    global_1:
+    - name: rotate
+      p: 0.8
+    - name: globalcrop
+    - name: flip
+      p: 0.5
+    - name: contrast
+      p: 0.8
+    - name: brightness
+      p: 0.8
+    - name: gaussian_blur
+      p: 1.0
+    global_2:
+    - name: globalcrop
+    - name: flip
+      p: 0.5
+    - name: contrast
+      p: 0.8
+    - name: brightness
+      p: 0.8
+    - name: noise
+      p: 0.5
+      mean: 0.0
+      std: 10.0
+    - name: gaussian_blur
+      p: 0.1
+    local:
+    - name: localcrop
+    - name: flip
+      p: 0.5
+    - name: contrast
+      p: 0.8
+    - name: brightness
+      p: 0.8
+    - name: gaussian_blur
+      p: 0.5
 ```
 Check dinov2/data/transforms.py to check the parameter usage.
 
 ## Data Preparation
 
-Example datasets folder layout
+Suppose you have a main folder containing multiple untouched CT datasets.
+
 ```
 datasets
-+- LIDC-IDRI
-|  +- data
-|  |  +- series_0000
-|  |     +- image.h5
-|  |     +- metadata.json
-|  |  +- ...
-|  +- extra
-|     +- train.json
-|     +- val.json
-+- ...
-+- __init__.py
-+- dataset.py
-+- entries.py
+ +- LIDC-IDRI
+ |   +- patient1
+ |       +- 0-001.dcm
+ |       +- 0-002.dcm
+ |       ...
+ |   ...
+ +- NSCLC-Radiomics
+ ...
 ```
 
-The project is currently only geared to processing CT scans. To prepare a dataset for training, follow these steps:
+The following script will search through all DICOM files in the LIDC-IDRI folder, quality-check the scans, and index the valid ones in an SQLite database. 
 
-1. **Resample scans and generate h5 files**
+```
+python3 -m data.dataprep.CT.dicoms --root_path <path to /datasets> --dataset_name <LIDC-IDRI> --db_name <name of dataset group e.g ct_datasets>
+```
 
-2. **Generate entry files**
+This will create the directory data/index/<db_name>/<db_name>.db which contains the paths to each DICOM file and their order in their respective scans. 
 
-3. **Create a dataset child object**
+Assuming that <db_name> is ct_datasets, the following is an example config section to use that dataset for training:
+```
+datasets:
+  - name: ct_datasets
+    index_path: data/index/radiomics_datasets.db
+    root_path: .
+    type: "ct"
+    storage: dicom
+    augmentation: default_ct
+    channels: 1
+    pixel_range:
+      lower: -1000.0
+      upper: 1900.0
+    norm:
+      mean: -573.8
+      std: 461.3
+```
+
 
 ## Running the Training Script
 
 Below is an example command for training without a Slurm system:
 
 ```bash
-./scripts/train.sh --devices 0,1,2,3 --config "lidc_idri/vits14_reg4.yaml" --output lidc_test
+./train.sh --devices 0,1,2,3 --config "lidc_idri/vits14_reg4.yaml" --output runs/lidc_test
 ```
