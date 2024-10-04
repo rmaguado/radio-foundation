@@ -189,16 +189,17 @@ class DicomDatabase(CtDatabase):
             (dataset_name, series_id, slice_index, dicom_path),
         )
 
-    def insert_dataset_data(self, metadata: Tuple) -> None:
+    def insert_dataset_data(self, metadata: Tuple, dataset_name: str) -> None:
         """
         Insert dataset data into the specified table.
 
         Args:
             metadata (dict): The metadata dictionary containing information about the dataset.
         """
+        dataset_name_str = f'"{dataset_name}"'
         self.cursor.execute(
             f"""
-            INSERT INTO {self.dataset_name_str} (
+            INSERT INTO {dataset_name_str} (
                 series_id, num_slices, image_shape_x, image_shape_y,
                 slice_thickness, spacing_x, spacing_y
             )
@@ -310,7 +311,7 @@ class DicomProcessor:
                 self.dataset_name, series_id, slice_index, rel_dicom_path
             )
 
-        self.database.insert_dataset_data(metadata)
+        self.database.insert_dataset_data(metadata, self.dataset_name)
         logger.info(f"Processed series {series_id}.")
 
     def prepare_dataset(self) -> None:
