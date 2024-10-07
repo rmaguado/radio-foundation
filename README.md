@@ -89,15 +89,14 @@ The following script will search through all DICOM files in the LIDC-IDRI folder
 python3 -m data.dataprep.CT.dicoms --root_path <path to /datasets> --dataset_name <LIDC-IDRI> --db_name <name of dataset group e.g ct_datasets>
 ```
 
-This will create the directory data/index/<db_name>/<db_name>.db which contains the paths to each DICOM file and their order in their respective scans. 
+This will create the directory data/index/<db_name>/index.db which contains the paths to each DICOM file and their order in their respective scans. 
 
 Assuming that <db_name> is ct_datasets, the following is an example config section to use that dataset for training:
 ```
 datasets:
   - name: ct_datasets
-    index_path: data/index/radiomics_datasets.db
     root_path: .
-    type: "ct"
+    type: ct
     storage: dicom
     augmentation: default_ct
     channels: 1
@@ -115,5 +114,5 @@ datasets:
 Below is an example command for training without a Slurm system:
 
 ```bash
-./train.sh --devices 0,1,2,3 --config "lidc_idri/vits14_reg4.yaml" --output runs/lidc_test
+./train.sh --devices 0,1,2,3 --config "configs/quicktest.yaml" --output "runs/quicktest"
 ```
