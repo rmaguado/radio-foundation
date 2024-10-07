@@ -71,7 +71,6 @@ class NiftiCtDataset(NiftiVolumes):
     def __init__(
         self,
         dataset_name: str,
-        index_path: str,
         root_path: str,
         output_path: str,
         channels: int,
@@ -85,7 +84,6 @@ class NiftiCtDataset(NiftiVolumes):
 
         Args:
             dataset_name (str): The name of the dataset.
-            index_path (str): The path to the index file.
             root_path (str): The root path of the dataset.
             output_path (str): The output path for the dataset.
             channels (int): The number of channels to use.
@@ -96,7 +94,9 @@ class NiftiCtDataset(NiftiVolumes):
         """
         super().__init__()
         self.dataset_name = dataset_name
-        self.index_path = index_path
+        self.index_path = os.path.join("data/index", self.dataset_name, "index.db")
+        self.entries_path = os.path.join("data/index", self.dataset_name, "entries")
+
         self.root_path = root_path
         self.output_path = output_path
         self.channels = channels
@@ -107,7 +107,6 @@ class NiftiCtDataset(NiftiVolumes):
         self.lower_window = lower_window
         self.upper_window = upper_window
 
-        self.entries_path = os.path.join(os.path.dirname(self.index_path), "entries")
         self.open_db()
         self.entries = self.get_entries()
 

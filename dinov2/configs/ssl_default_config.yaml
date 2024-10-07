@@ -125,10 +125,9 @@ crops:
   global_crops_size: 224
   local_crops_size: 98
 datasets:
-  - name: "radiomics_datasets"
-    index_path: data/index/radiomics_datasets.db
+  - name: radiomics_datasets
     root_path: .
-    type: "ct"
+    type: ct
     storage: dicom
     augmentation: default_ct
     channels: 1
