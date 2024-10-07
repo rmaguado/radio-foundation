@@ -3,9 +3,9 @@ train:
   batch_size_per_gpu: 64
 student:
   arch: vit_base
-  ffn_layer: "mlp"
+  ffn_layer: mlp
   drop_path_rate: 0.1
-  embed_layer: "patch"
+  embed_layer: patch
   channels: 4
 teacher:
   warmup_teacher_temp_epochs: 20
@@ -14,10 +14,9 @@ optim:
   warmup_epochs: 10
   base_lr: 0.003
 datasets:
-  - name: "radiomics_datasets"
-    index_path: data/index/radiomics_datasets.db
-    root_path: /home/rmaguado/rdt/DeepRDT/datasets/
-    type: "ct"
+  - name: radiomics_datasets
+    root_path: .
+    type: ct
     storage: dicom
     augmentation: default_ct
     channels: 4

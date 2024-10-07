@@ -3,7 +3,7 @@ train:
   batch_size_per_gpu: 64
 student:
   arch: vit_base
-  ffn_layer: "mlp"
+  ffn_layer: mlp
   drop_path_rate: 0.1
 teacher:
   warmup_teacher_temp_epochs: 20
