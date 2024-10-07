@@ -7,15 +7,7 @@ import logging
 
 logger = logging.getLogger("dataprep")
 logger.setLevel(logging.INFO)
-
 os.makedirs("data/log", exist_ok=True)
-file_handler = logging.FileHandler("data/log/dataprep.log")
-file_handler.setLevel(logging.INFO)
-
-formatter = logging.Formatter("%(message)s")
-file_handler.setFormatter(formatter)
-
-logger.addHandler(file_handler)
 
 warnings.filterwarnings("ignore")
 
@@ -26,6 +18,16 @@ def walk(root_dir):
             dirnames[:] = []
 
         yield dirpath, dirnames, filenames
+
+
+def set_logging(log_path):
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setLevel(logging.INFO)
+
+    formatter = logging.Formatter("%(message)s")
+    file_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
 
 
 class Database:

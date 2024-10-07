@@ -7,7 +7,7 @@ import ast
 import os
 import logging
 
-from ..utils import walk
+from ..utils import walk, set_logging
 from .ct_database import CtDatabase
 
 
@@ -219,6 +219,9 @@ class DicomProcessor:
         if not self.validate_only:
             self.database = DicomDatabase(config)
 
+        log_path = f"data/log/{self.dataset_name}.log"
+        set_logging(log_path)
+
     def get_shape(self, dcm: pydicom.dataset.FileDataset) -> Tuple[int, int]:
         """
         Returns the shape of the image array.
@@ -399,7 +402,7 @@ def get_argpase():
         type=str,
         default="dicom_datasets",
         required=False,
-        help="The name of the database. Will be saved in data/index/<db_name>/<db_name>.db",
+        help="The name of the database. Will be saved in data/index/<db_name>/index.db",
     )
     parser.add_argument(
         "--skip_validation",
@@ -413,10 +416,10 @@ def main(args):
     dataset_path = os.path.join(args.root_path, args.dataset_name)
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
-    
+
     db_dir = os.path.join("data/index", args.db_name)
     os.makedirs(db_dir, exist_ok=True)
-    db_path = os.path.join(db_dir, f"{args.db_name}.db")
+    db_path = os.path.join(db_dir, "index.db")
 
     config = {
         "dataset_name": args.dataset_name,

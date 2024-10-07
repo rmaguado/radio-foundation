@@ -6,7 +6,7 @@ import nibabel as nib
 from tqdm import tqdm
 import numpy as np
 
-from ..utils import walk
+from ..utils import walk, set_logging
 from .ct_database import CtDatabase
 
 
@@ -39,9 +39,16 @@ class NiftiCtValidation:
             return f"\tSpacing is greater than slice thickness: ({spacing_x}, {spacing_y}).\n"
         return ""
 
-    def test_scaling(self, volume_data: np.ndarray) -> str:
-        if -1024 > np.min(volume_data) or np.min(volume_data) > -990:
-            return "\tPixel values are not scaled correctly.\n"
+    def test_rescale(self, header: nib.Nifti1Header) -> str:
+        slope = header.get("scl_slope")
+        intercept = header.get("scl_inter")
+
+        if np.isnan(slope) or np.isnan(intercept):
+            return "\tRescale slope or intercept is NaN.\n"
+        if slope == 0:
+            return "\tRescale slope is 0.\n"
+        if slope is None or intercept is None:
+            return "\tRescale slope or intercept is None.\n"
         return ""
 
     def __call__(self, nifti_file: nib.Nifti1Image, metadata: Dict):
@@ -49,19 +56,20 @@ class NiftiCtValidation:
             return
         self.validate_nifti_for_ct(nifti_file, metadata)
 
-    def validate_nifti_for_ct(self, nifti_file, metadata):
+    def validate_nifti_for_ct(self, nifti_file: nib.Nifti1Image, metadata: Dict):
         """
         Validates a NIfTI file for CT scans.
         Args:
             metadata (Dict): Metadata extracted from the NIfTI file.
         """
         volume_data = nifti_file.get_fdata()
+        header = nifti_file.header
 
         issues = ""
         issues += self.test_slice_thickness(metadata)
         issues += self.test_image_shape(metadata)
         issues += self.test_spacing(metadata)
-        issues += self.test_scaling(volume_data)
+        issues += self.test_rescale(header)
 
         assert len(issues) == 0, issues
 
@@ -120,6 +128,9 @@ class NiftiProcessor:
         self.validator = NiftiCtValidation(config)
         if not self.validate_only:
             self.database = NiftiDatabase(config)
+
+        log_path = f"data/log/{self.dataset_name}.log"
+        set_logging(log_path)
 
     def get_metadata(self, nifti_file: nib.Nifti1Image) -> dict:
         """
@@ -244,7 +255,7 @@ def get_argparse():
         type=str,
         default="nifti_datasets",
         required=False,
-        help="The name of the database. Will be saved in data/index/<db_name>/<db_name>.db",
+        help="The name of the database. Will be saved in data/index/<db_name>/index.db",
     )
     parser.add_argument(
         "--skip_validation",
@@ -261,7 +272,7 @@ def main(args):
 
     db_dir = os.path.join("data/index", args.db_name)
     os.makedirs(db_dir, exist_ok=True)
-    db_path = os.path.join(db_dir, f"{args.db_name}.db")
+    db_path = os.path.join(db_dir, "index.db")
 
     config = {
         "dataset_name": args.dataset_name,
