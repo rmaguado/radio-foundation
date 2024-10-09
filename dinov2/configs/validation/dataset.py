@@ -62,7 +62,6 @@ def test_norm_is_valid(norm: DictConfig) -> bool:
 def validate_dataset_instance(config: DictConfig, dataset_config: DictConfig) -> bool:
     dataset_required_attributes = [
         ("name", str),
-        ("index_path", str),
         ("root_path", str),
         ("type", str),
         ("channels", int),
