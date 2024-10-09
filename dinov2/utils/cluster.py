@@ -78,12 +78,13 @@ def get_slurm_partition(cluster_type: Optional[ClusterType] = None) -> Optional[
 def get_slurm_executor_parameters(
     nodes: int,
     num_gpus_per_node: int,
+    mem: int,
     cluster_type: Optional[ClusterType] = None,
     **kwargs
 ) -> Dict[str, Any]:
     # create default parameters
     params = {
-        "mem_gb": 0,  # Requests all memory on a node, see https://slurm.schedmd.com/sbatch.html
+        "mem_gb": mem,  # Requests all memory on a node, see https://slurm.schedmd.com/sbatch.html
         "gpus_per_node": num_gpus_per_node,
         "tasks_per_node": num_gpus_per_node,  # one task per GPU
         "cpus_per_task": 10,
