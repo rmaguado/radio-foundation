@@ -126,6 +126,7 @@ crops:
   local_crops_size: 98
 datasets:
   - name: radiomics_datasets
+    weight: 1.0
     root_path: .
     type: ct
     storage: dicom

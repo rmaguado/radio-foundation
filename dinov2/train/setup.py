@@ -84,7 +84,7 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         dtype=inputs_dtype,
     )
 
-    dataset = make_train_dataset(cfg, use_full_image)
+    dataset, weights = make_train_dataset(cfg, use_full_image)
 
     batch_size = (
         cfg.train.full_image.batch_size_per_gpu
@@ -92,13 +92,13 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         else cfg.train.batch_size_per_gpu
     )
 
-    sampler_type = SamplerType.SHARDED_INFINITE
+    sampler_type = SamplerType.WEIGHTED_SHARDED_INFINITE
     data_loader = make_data_loader(
         dataset=dataset,
         batch_size=batch_size,
         num_workers=cfg.train.num_workers,
-        shuffle=True,
         seed=cfg.train.seed,
+        weights=weights,
         sampler_type=sampler_type,
         drop_last=True,
         collate_fn=collate_fn,

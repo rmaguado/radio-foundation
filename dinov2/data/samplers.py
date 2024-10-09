@@ -4,7 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import itertools
-from typing import Any, Optional
+from typing import List, Any, Optional
 import warnings
 
 import numpy as np
@@ -12,44 +12,6 @@ import torch
 from torch.utils.data.sampler import Sampler
 
 import dinov2.distributed as distributed
-
-
-class EpochSampler(Sampler):
-    def __init__(
-        self,
-        *,
-        size: int,
-        sample_count: int,
-        shuffle: bool = False,
-        seed: int = 0,
-        start: Optional[int] = None,
-        step: Optional[int] = None,
-    ):
-        self._size = size
-        self._sample_count = sample_count
-        self._shuffle = shuffle
-        self._seed = seed
-        self._start = distributed.get_global_rank() if start is None else start
-        self._step = distributed.get_global_size() if step is None else step
-        self._epoch = 0
-
-    def __iter__(self):
-        count = (self._size + self._sample_count - 1) // self._sample_count
-        tiled_indices = np.tile(np.arange(self._sample_count), count)
-        if self._shuffle:
-            seed = self._seed * self._epoch if self._seed != 0 else self._epoch
-            rng = np.random.default_rng(seed)
-            iterable = rng.choice(tiled_indices, self._size, replace=False)
-        else:
-            iterable = tiled_indices[: self._size]
-
-        yield from itertools.islice(iterable, self._start, None, self._step)
-
-    def __len__(self):
-        return (self._size - self._start + self._step - 1) // self._step
-
-    def set_epoch(self, epoch):
-        self._epoch = epoch
 
 
 def _get_torch_dtype(size: int) -> Any:
@@ -71,49 +33,30 @@ def _generate_randperm_indices(*, size: int, generator: torch.Generator):
         yield value
 
 
-class InfiniteSampler(Sampler):
-    def __init__(
-        self,
-        *,
-        sample_count: int,
-        shuffle: bool = False,
-        seed: int = 0,
-        start: Optional[int] = None,
-        step: Optional[int] = None,
-    ):
-        self._sample_count = sample_count
-        self._seed = seed
-        self._shuffle = shuffle
-        self._start = distributed.get_global_rank() if start is None else start
-        self._step = distributed.get_global_size() if step is None else step
+def _weighted_generate_randperm_indices(
+    *, sizes: List[int], weights: List[float], generator: torch.Generator
+):
+    """Generate indices of a weighted random permutation across multiple datasets."""
+    cumulative_sizes = np.cumsum([0] + sizes)
+    normalized_weights = [w / sum(weights) for w in weights]
 
-    def __iter__(self):
-        if self._shuffle:
-            iterator = self._shuffled_iterator()
-        else:
-            iterator = self._iterator()
+    min_size = min(sizes)
 
-        yield from itertools.islice(iterator, 0, None)
-
-    def _iterator(self):
-        assert not self._shuffle
-
-        while True:
-            iterable = range(self._sample_count)
-            yield from itertools.islice(iterable, self._start, None, self._step)
-
-    def _shuffled_iterator(self):
-        assert self._shuffle
-
-        # Instantiate a generator here (rather than in the ctor) to keep the class
-        # picklable (requirement of mp.spawn)
-        generator = torch.Generator().manual_seed(self._seed)
-
-        while True:
-            iterable = _generate_randperm_indices(
-                size=self._sample_count, generator=generator
+    while True:
+        indices = []
+        for dataset_idx, (size, weight) in enumerate(zip(sizes, normalized_weights)):
+            dataset_indices = (
+                torch.randperm(size, generator=generator)
+                + cumulative_sizes[dataset_idx]
             )
-            yield from itertools.islice(iterable, self._start, None, self._step)
+
+            sample_size = int(weight * min_size)
+            indices.extend(dataset_indices[:sample_size].tolist())
+
+        indices = torch.tensor(indices)
+        perm = torch.randperm(len(indices), generator=generator)
+        for idx in perm:
+            yield indices[idx].item()
 
 
 def _new_shuffle_tensor_slice(
@@ -121,12 +64,10 @@ def _new_shuffle_tensor_slice(
 ) -> np.ndarray:
     stop = len(tensor)
     count = stop // step
-    dtype = torch.int64  # Needed for using randperm result as indices
-    count = stop // step
     drop_count = stop - step * count
     if drop_count:
         warnings.warn(f"# of dropped samples: {drop_count}")
-    indices = torch.randperm(count, dtype=dtype, generator=generator)
+    indices = torch.randperm(count, dtype=torch.int64, generator=generator)
     return tensor[start::step][indices].numpy()
 
 
@@ -135,42 +76,110 @@ def _make_seed(seed: int, start: int, iter_count: int) -> int:
     return seed + start + (iter_count << 24)
 
 
-class ShardedInfiniteSampler(Sampler):
+def check_weighted_sampler_params(dataset_sizes: List[int], weights: List[float]):
+    min_size = min(dataset_sizes)
+    total_size = sum(dataset_sizes)
+    if min_size < total_size * 0.01:
+        warnings.warn(
+            f"Dataset with size {min_size} is less than 1% of the total data size {total_size}. Weighted sampling may be unstable."
+        )
+
+    if len(dataset_sizes) != len(weights):
+        raise ValueError(
+            f"Dataset sizes and weights must have the same length, got {len(dataset_sizes)} and {len(weights)}"
+        )
+
+    if not all(isinstance(weight, float) for weight in weights):
+        raise ValueError("Weights must be floats")
+
+
+class InfiniteSampler(Sampler):
     def __init__(
         self,
         *,
         sample_count: int,
-        shuffle: bool = False,
         seed: int = 0,
         start: Optional[int] = None,
         step: Optional[int] = None,
     ):
         self._sample_count = sample_count
         self._seed = seed
-        self._shuffle = shuffle
+        self._start = distributed.get_global_rank() if start is None else start
+        self._step = distributed.get_global_size() if step is None else step
+
+    def __iter__(self):
+        iterator = self._iterator()
+
+        yield from itertools.islice(iterator, 0, None)
+
+    def _iterator(self):
+        # Instantiate a generator here (rather than in the ctor) to keep the class
+        # picklable (requirement of mp.spawn)
+        generator = torch.Generator()
+        generator.manual_seed(self._seed)
+
+        while True:
+            iterable = _generate_randperm_indices(
+                size=self._sample_count, generator=generator
+            )
+            yield from itertools.islice(iterable, self._start, None, self._step)
+
+
+class WeightedInfiniteSampler(Sampler):
+    def __init__(
+        self,
+        *,
+        dataset_sizes: List[int],
+        weights: List[float],
+        seed: int = 0,
+        start: Optional[int] = None,
+        step: Optional[int] = None,
+    ):
+        self._dataset_sizes = dataset_sizes
+        self._weights = weights
+        self._seed = seed
+        self._start = distributed.get_global_rank() if start is None else start
+        self._step = distributed.get_global_size() if step is None else step
+
+        check_weighted_sampler_params(dataset_sizes, weights)
+
+    def __iter__(self):
+        iterator = self._iterator()
+        yield from itertools.islice(iterator, 0, None)
+
+    def _iterator(self):
+        generator = torch.Generator()
+        generator.manual_seed(self._seed)
+
+        while True:
+            iterable = _weighted_generate_randperm_indices(
+                sizes=self._dataset_sizes, weights=self._weights, generator=generator
+            )
+            yield from itertools.islice(iterable, self._start, None, self._step)
+
+
+class ShardedInfiniteSampler(Sampler):
+    def __init__(
+        self,
+        *,
+        sample_count: int,
+        seed: int = 0,
+        start: Optional[int] = None,
+        step: Optional[int] = None,
+    ):
+        self._sample_count = sample_count
+        self._seed = seed
         self._start = distributed.get_global_rank() if start is None else start
         self._step = distributed.get_global_size() if step is None else step
         self._iter_count = 0
         self._shuffle_tensor_slice_fn = _new_shuffle_tensor_slice
 
     def __iter__(self):
-        if self._shuffle:
-            iterator = self._shuffled_iterator()
-        else:
-            iterator = self._iterator()
+        iterator = self._iterator()
 
         yield from itertools.islice(iterator, 0, None)
 
     def _iterator(self):
-        assert not self._shuffle
-
-        while True:
-            iterable = range(self._sample_count)
-            yield from itertools.islice(iterable, self._start, None, self._step)
-
-    def _shuffled_iterator(self):
-        assert self._shuffle
-
         # Instantiate a generator here (rather than in the ctor) to be keep the class
         # picklable (requirement of mp.spawn)
         generator = torch.Generator()
@@ -187,6 +196,78 @@ class ShardedInfiniteSampler(Sampler):
 
             iterable = self._shuffle_tensor_slice_fn(
                 tensor=perm, start=self._start, step=self._step, generator=generator
+            )
+            yield from iterable
+            self._iter_count += 1
+
+
+class WeightedShardedInfiniteSampler(Sampler):
+    def __init__(
+        self,
+        *,
+        dataset_sizes: List[int],
+        weights: List[float],
+        seed: int = 0,
+        start: Optional[int] = None,
+        step: Optional[int] = None,
+    ):
+        self._dataset_sizes = dataset_sizes
+        self._weights = weights
+        self._seed = seed
+        self._start = distributed.get_global_rank() if start is None else start
+        self._step = distributed.get_global_size() if step is None else step
+        self._iter_count = 0
+        self._shuffle_tensor_slice_fn = _new_shuffle_tensor_slice
+
+        check_weighted_sampler_params(dataset_sizes, weights)
+
+    def __iter__(self):
+        iterator = self._iterator()
+        yield from itertools.islice(iterator, 0, None)
+
+    def _iterator(self):
+        generator = torch.Generator()
+
+        # Normalize weights
+        total_weight = sum(self._weights)
+        normalized_weights = [weight / total_weight for weight in self._weights]
+
+        while True:
+            total_samples = sum(
+                size * weight
+                for size, weight in zip(self._dataset_sizes, normalized_weights)
+            )
+
+            sample_sizes = [
+                int(total_samples * weight) for weight in normalized_weights
+            ]
+            sample_sizes = [
+                min(size, s) for size, s in zip(self._dataset_sizes, sample_sizes)
+            ]
+
+            all_indices = []
+            for dataset_idx, size in enumerate(self._dataset_sizes):
+                if sample_sizes[dataset_idx] > 0:
+                    perm = torch.randperm(size, generator=generator)
+                    indices = perm[: sample_sizes[dataset_idx]] + sum(
+                        self._dataset_sizes[:dataset_idx]
+                    )
+                    all_indices.append(indices)
+
+            assert all_indices, "No samples to shuffle"
+
+            all_indices = torch.cat(all_indices)
+            seed = _make_seed(self._seed, self._start, self._iter_count)
+            generator.manual_seed(seed)
+            shuffled_indices = all_indices[
+                torch.randperm(len(all_indices), generator=generator)
+            ]
+
+            iterable = self._shuffle_tensor_slice_fn(
+                tensor=shuffled_indices,
+                start=self._start,
+                step=self._step,
+                generator=generator,
             )
             yield from iterable
             self._iter_count += 1
