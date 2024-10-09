@@ -97,6 +97,7 @@ Assuming that <db_name> is ct_datasets, the following is an example config secti
 ```
 datasets:
   - name: ct_datasets
+    weight: 1.0
     root_path: .
     type: ct
     storage: dicom
@@ -109,6 +110,8 @@ datasets:
       mean: -573.8
       std: 461.3
 ```
+
+The argument ```weight``` is optional and used for adjusting the sampling ratio of multiple datasets.
 
 
 ## Running the Training Script
