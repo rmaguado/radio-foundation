@@ -82,7 +82,6 @@ def validate_dataset_instance(config: DictConfig, dataset_config: DictConfig) ->
 
     if not all(
         [
-            test_path_exists(dataset_config.index_path),
             test_path_exists(dataset_config.root_path),
             test_dataset_type_is_valid(dataset_config),
             test_channels_is_valid(dataset_config, dataset_config.name),
