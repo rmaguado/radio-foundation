@@ -53,7 +53,7 @@ augmentations:
     - name: noise
       p: 0.5
       mean: 0.0
-      std: 10.0
+      std: 0.1
     - name: gaussian_blur
       p: 0.1
     local:
