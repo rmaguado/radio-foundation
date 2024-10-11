@@ -58,9 +58,6 @@ class NiftiVolumes(BaseDataset):
         entries_dtype = np.dtype([("rowid", np.int32), ("slice_index", np.int32)])
         entries_array = np.array(entries, dtype=entries_dtype)
 
-        entries_dataset_path = os.path.join(
-            self.entries_path, f"{self.channels}_channels.npy"
-        )
         logger.info(f"Saving entries to {entries_dataset_path}.")
         np.save(entries_dataset_path, entries_array)
         return np.load(entries_dataset_path, mmap_mode="r")
@@ -153,3 +150,52 @@ class NiftiCtDataset(NiftiVolumes):
             self.upper_window - self.lower_window
         )
         return torch.tensor(volume_data, dtype=torch.float32)
+
+
+class NiftiCtVolumesFull(NiftiCtDataset):
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    def create_entries(self) -> np.ndarray:
+        """
+        Generates a numpy memmap object pointing to the sqlite database rows of nifti paths.
+        For collecting various slices of a CT scan (multi-channel) each memmap row contains the ordered rowids of the slices.
+
+        Returns:
+            np.ndarray: The entries dataset (memmap).
+        """
+        logger.info(f"Creating entries for {self.dataset_name}.")
+
+        entries_dataset_path = os.path.join(self.entries_path, f"full.npy")
+
+        entries = self.cursor.execute("SELECT rowid FROM global").fetchall()
+
+        entries_dtype = np.dtype([("rowid", np.int32)])
+        entries_array = np.array(entries, dtype=entries_dtype)
+
+        logger.info(f"Saving entries to {entries_dataset_path}.")
+        np.save(entries_dataset_path, entries_array)
+        return np.load(entries_dataset_path, mmap_mode="r")
+
+    def get_image_data(self, index: int) -> torch.Tensor:
+        rowid = self.entries[index]
+        self.cursor.execute(
+            """
+            SELECT dataset, axial_dim, nifti_path FROM global WHERE rowid = ?
+            """,
+            (int(rowid),),
+        )
+        dataset, axial_dim, nifti_path = self.cursor.fetchone()
+
+        abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
+        nifti_file = nib.load(abs_path_to_nifti)
+
+        volume_data = nifti_file.get_fdata().astype(np.float32)
+        volume_data = np.moveaxis(volume_data, axial_dim, 0)
+
+        return self.process_ct(volume_data)
+
+    def get_target(self, index: int) -> Optional[Any]:
+        """Maybe get it from a csv file"""
+        raise NotImplementedError
