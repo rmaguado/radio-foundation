@@ -44,6 +44,9 @@ class Trainer(object):
 
 
 def main():
+    if os.environ.get("PYTHONPATH") is not None:
+        os.chdir(os.environ["PYTHONPATH"])
+
     description = "Submitit launcher for DINOv2 training"
     train_args_parser = get_train_args_parser(add_help=False)
     parents = [train_args_parser]
