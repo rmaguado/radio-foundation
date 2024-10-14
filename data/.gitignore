@@ -7,3 +7,7 @@
 
 !__init__.py
 !statistics.py
+
+dataprep/**/__pycache__
+dataprep/**/.ipynb_checkpoints/
+dataprep/**/.DS_Store
