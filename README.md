@@ -4,6 +4,9 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
+- Remove patches with only black pixels
+- FFT for sharpening
+- Use sagitan and coronal projections
 - Test and merge with main
 
 - Dataloader to eval using entire volume
