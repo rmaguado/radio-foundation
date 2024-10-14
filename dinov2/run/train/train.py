@@ -44,9 +44,6 @@ class Trainer(object):
 
 
 def main():
-    if os.environ.get("PYTHONPATH") is not None:
-        os.chdir(os.environ["PYTHONPATH"])
-
     description = "Submitit launcher for DINOv2 training"
     train_args_parser = get_train_args_parser(add_help=False)
     parents = [train_args_parser]
@@ -61,4 +58,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if os.environ.get("PYTHONPATH") is not None and not os.path.exists("dinov2"):
+        os.chdir(os.environ["PYTHONPATH"])
+
     sys.exit(main())
