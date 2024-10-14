@@ -21,7 +21,7 @@ class NiftiVolumes(BaseDataset):
     def __len__(self) -> int:
         return len(self.entries)
 
-    def get_image_data(self, index: int) -> torch.tensor:
+    def get_image_data(self, index: int) -> torch.Tensor:
         raise NotImplementedError
 
     def create_entries(self) -> np.ndarray:
@@ -109,7 +109,7 @@ class NiftiCtDataset(NiftiVolumes):
         self.open_db()
         self.entries = self.get_entries()
 
-    def get_image_data(self, index: int) -> torch.tensor:
+    def get_image_data(self, index: int) -> torch.Tensor:
         """
         Retrieves the image data for a given index.
 
@@ -117,7 +117,7 @@ class NiftiCtDataset(NiftiVolumes):
             index (int): The index of the image data to retrieve.
 
         Returns:
-            torch.tensor: The image data as a torch tensor.
+            torch.Tensor: The image data as a torch tensor.
         """
         rowid, slice_index = self.entries[index]
         self.cursor.execute(
@@ -147,7 +147,7 @@ class NiftiCtDataset(NiftiVolumes):
 
         return self.process_ct(volume_data)
 
-    def process_ct(self, volume_data: np.ndarray) -> torch.tensor:
+    def process_ct(self, volume_data: np.ndarray) -> torch.Tensor:
         """
         Processes the CT scan data.
 
@@ -155,7 +155,7 @@ class NiftiCtDataset(NiftiVolumes):
             volume_data (np.ndarray): The CT scan data.
 
         Returns:
-            torch.tensor: The processed CT scan data.
+            torch.Tensor: The processed CT scan data.
         """
         volume_data = np.clip(volume_data, self.lower_window, self.upper_window)
         volume_data = (volume_data - self.lower_window) / (

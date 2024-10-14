@@ -47,10 +47,10 @@ class ImageTransforms:
         Applies the transformations to the image.
 
         Args:
-            img (torch.tensor): The image to be transformed.
+            img (torch.Tensor): The image to be transformed.
 
         Returns:
-            torch.tensor: The transformed image.
+            torch.Tensor: The transformed image.
         """
         for transform in self.transform_list:
             img = transform(img)

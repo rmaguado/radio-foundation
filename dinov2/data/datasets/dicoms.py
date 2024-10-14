@@ -131,7 +131,7 @@ class DicomCtDataset(DicomVolumes):
         self.open_db()
         self.entries = self.get_entries()
 
-    def get_image_data(self, index: int) -> torch.tensor:
+    def get_image_data(self, index: int) -> torch.Tensor:
         """
         Retrieves the image data for a given index.
 
@@ -139,7 +139,7 @@ class DicomCtDataset(DicomVolumes):
             index (int): The index of the image data to retrieve.
 
         Returns:
-            torch.tensor: The image data as a torch tensor.
+            torch.Tensor: The image data as a torch tensor.
         """
         stack_rowids = [int(x) for x in self.entries[index]]
         self.cursor.execute(
@@ -172,7 +172,7 @@ class DicomCtDataset(DicomVolumes):
 
         return torch.stack(stack_data)
 
-    def process_ct(self, dcm: pydicom.dataset.FileDataset) -> torch.tensor:
+    def process_ct(self, dcm: pydicom.dataset.FileDataset) -> torch.Tensor:
         """
         Process a CT scan by applying rescaling and windowing.
 
@@ -180,7 +180,7 @@ class DicomCtDataset(DicomVolumes):
             dcm (pydicom.dataset.FileDataset): The DICOM object representing the CT scan.
 
         Returns:
-            torch.tensor: The processed CT scan as a tensor.
+            torch.Tensor: The processed CT scan as a tensor.
 
         """
         slope = getattr(dcm, "RescaleSlope", 1)

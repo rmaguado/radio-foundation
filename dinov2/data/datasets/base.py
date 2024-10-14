@@ -96,7 +96,7 @@ class BaseDataset:
         """
         raise NotImplementedError
 
-    def get_image_data(self, index: int) -> torch.tensor:
+    def get_image_data(self, index: int) -> torch.Tensor:
         """
         Retrieves the image data at the specified index.
 
@@ -104,7 +104,7 @@ class BaseDataset:
             index (int): The index of the image data to retrieve.
 
         Returns:
-            torch.tensor: The image data as a tensor.
+            torch.Tensor: The image data as a tensor.
         """
         raise NotImplementedError
 
@@ -129,7 +129,7 @@ class BaseDataset:
     def apply_transforms(self, image, target):
         return self.transform(image), self.target_transform(target)
 
-    def __getitem__(self, index: int) -> Tuple[torch.tensor, Any]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         """
         Get the item at the specified index from the dataset.
 
@@ -137,7 +137,7 @@ class BaseDataset:
             index (int): The index of the item to retrieve.
 
         Returns:
-            Tuple[torch.tensor, Any]: A tuple containing the image data and the target for the specified index.
+            Tuple[torch.Tensor, Any]: A tuple containing the image data and the target for the specified index.
         """
         try:
             image = self.get_image_data(index)

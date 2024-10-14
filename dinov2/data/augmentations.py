@@ -87,7 +87,7 @@ class DataAugmentationDINO(object):
         ]
         return tuple(transform_groups)
 
-    def __call__(self, image: torch.tensor) -> dict[str, list[torch.tensor]]:
+    def __call__(self, image: torch.Tensor) -> dict[str, list[torch.Tensor]]:
         """
         Apply augmentations to the input image.
 
