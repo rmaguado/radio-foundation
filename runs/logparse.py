@@ -89,11 +89,14 @@ class Logs:
         return self.attr["total_loss"]
 
     def plot(self):
+        outpath = os.path.join("runs/figures", f"{self.label}_total_loss.png")
+        os.makedirs(os.path.dirname(outpath), exist_ok=True)
+
         plt.plot(self.epochs, self.total_loss, label=self.label)
         plt.xlabel("Epoch")
         plt.ylabel("Total Loss")
         plt.legend()
-        plt.savefig(f"{self.label}_total_loss.png")
+        plt.savefig(outpath)
 
 
 def main(run_path="runs/default"):
