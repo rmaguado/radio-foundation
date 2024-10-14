@@ -135,10 +135,12 @@ class NiftiCtDataset(NiftiVolumes):
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
         volume_data = volume_data[slice_index : slice_index + self.channels]
 
-        slope, intercept = nifti_file.get_header().get_slope_inter()
-        if np.isnan(slope):
+        header = nifti_file.header
+        slope, intercept = header.get_slope_inter()
+
+        if not slope or np.isnan(slope):
             slope = 1.0
-        if np.isnan(intercept):
+        if not intercept or np.isnan(intercept):
             intercept = 0.0
 
         volume_data = volume_data * slope + intercept
