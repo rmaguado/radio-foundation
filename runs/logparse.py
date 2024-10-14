@@ -93,13 +93,12 @@ class Logs:
         plt.xlabel("Epoch")
         plt.ylabel("Total Loss")
         plt.legend()
-        plt.show()
+        plt.savefig(f"{self.label}_total_loss.png")
 
 
 def main(run_path="runs/default"):
     logs = Logs(run_path)
-    plt.plot(logs.epochs, logs.attr["total_loss"])
-    plt.show()
+    logs.plot()
 
 
 if __name__ == "__main__":
