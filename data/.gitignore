@@ -1,5 +1,9 @@
-**/*.csv
-**/*.db
-**/*.ipynb
-**/*.txt
-**/*.log
+*
+
+!.gitignore
+
+!dataprep/
+!dataprep/**
+
+!__init__.py
+!statistics.py
