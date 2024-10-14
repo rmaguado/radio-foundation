@@ -4,16 +4,15 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- Remove patches with only black pixels
-- FFT for sharpening
-- Use sagitan and coronal projections
-- Test and merge with main
+- Allow sagital and coronal views for niftis.
 
 - Dataloader to eval using entire volume
 - script for running benchmark tests (after I have many datasets)
 - scripts to test transforms (generate samples)
 
 - write userguide for data processing
+
+- Experiment: Remove patches with only black pixels to increase efficiency. 
 
 ## Overview
 
