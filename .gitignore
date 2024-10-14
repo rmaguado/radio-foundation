@@ -2,5 +2,4 @@
 **/__pycache__/
 **/.DS_Store
 .vscode
-# only ignore the datasets folder in the root directory
 /datasets*
