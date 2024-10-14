@@ -7,8 +7,11 @@ from dinov2.configs import dinov2_default_config
 
 
 class Logs:
-    def __init__(self, run_path, num_gpus=1):
+    def __init__(self, run_name, num_gpus=1):
+        run_path = os.path.join("runs", run_name)
         cfg_path = os.path.join(run_path, "config.yaml")
+        metrics_path = os.path.join(run_path, "training_metrics.json")
+
         default_cfg = OmegaConf.create(dinov2_default_config)
         cfg = OmegaConf.load(cfg_path)
         cfg = OmegaConf.merge(default_cfg, cfg, OmegaConf.from_cli())
@@ -30,7 +33,6 @@ class Logs:
             "mom": [],
             "wd": [],
         }
-        metrics_path = os.path.join(run_path, "training_metrics.json")
         with open(metrics_path, "r") as f:
             lines = f.read().split("\n")
         json_lines = []
@@ -89,26 +91,35 @@ class Logs:
         return self.attr["total_loss"]
 
     def plot(self):
-        outpath = os.path.join("runs/figures", f"{self.label}_total_loss.png")
-        os.makedirs(os.path.dirname(outpath), exist_ok=True)
-
         plt.plot(self.epochs, self.total_loss, label=self.label)
-        plt.xlabel("Epoch")
-        plt.ylabel("Total Loss")
-        plt.legend()
-        plt.savefig(outpath)
 
 
-def main(run_path="runs/default"):
-    logs = Logs(run_path)
-    logs.plot()
+def main(runs):
+    import datetime
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    outdir = os.path.join("runs/figures")
+    os.makedirs(outdir, exist_ok=True)
+    outpath = os.path.join(outdir, f"{timestamp}.png")
+
+    logs = [Logs(run_name) for run_name in runs]
+
+    plt.figure()
+    for log in logs:
+        log.plot()
+    plt.xlabel("Epoch")
+    plt.ylabel("Total Loss")
+    plt.legend()
+
+    plt.savefig(outpath, dpi=300)
 
 
 if __name__ == "__main__":
     import sys
 
     if len(sys.argv) > 1:
-        run_path = sys.argv[1]
-        main(run_path)
+        runs = sys.argv[1:]
+        main(runs)
     else:
-        main()
+        main(["default"])
