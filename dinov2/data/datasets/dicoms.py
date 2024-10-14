@@ -113,7 +113,9 @@ class DicomCtDataset(DicomVolumes):
         """
         super().__init__()
         self.dataset_name = dataset_name
-        self.index_path = os.path.join("data/index", self.dataset_name, "index.db")
+        self.index_path = os.path.join(
+            "file:data/index", self.dataset_name, "index.db?mode=ro"
+        )
         self.entries_path = os.path.join("data/index", self.dataset_name, "entries")
 
         self.root_path = root_path

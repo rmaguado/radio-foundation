@@ -91,7 +91,9 @@ class NiftiCtDataset(NiftiVolumes):
         """
         super().__init__()
         self.dataset_name = dataset_name
-        self.index_path = os.path.join("data/index", self.dataset_name, "index.db")
+        self.index_path = os.path.join(
+            "file:data/index", self.dataset_name, "index.db?mode=ro"
+        )
         self.entries_path = os.path.join("data/index", self.dataset_name, "entries")
 
         self.root_path = root_path
@@ -132,6 +134,16 @@ class NiftiCtDataset(NiftiVolumes):
         volume_data = nifti_file.get_fdata().astype(np.float32)
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
         volume_data = volume_data[slice_index : slice_index + self.channels]
+
+        header = nifti_file.header
+        slope, intercept = header.get_slope_inter()
+
+        if not slope or np.isnan(slope):
+            slope = 1.0
+        if not intercept or np.isnan(intercept):
+            intercept = 0.0
+
+        volume_data = volume_data * slope + intercept
 
         return self.process_ct(volume_data)
 
