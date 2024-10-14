@@ -163,6 +163,9 @@ def main(args):
 
 
 if __name__ == "__main__":
+    if os.environ.get("PYTHONPATH") is not None and not os.path.exists("dinov2"):
+        os.chdir(os.environ["PYTHONPATH"])
+
     args = get_args_parser(add_help=True).parse_args()
     try:
         main(args)
