@@ -1,6 +1,7 @@
 import os
 import json
 import matplotlib.pyplot as plt
+import seaborn as sns
 from omegaconf import OmegaConf
 
 from dinov2.configs import dinov2_default_config
@@ -90,27 +91,27 @@ class Logs:
     def total_loss(self):
         return self.attr["total_loss"]
 
-    def plot(self):
-        plt.plot(self.epochs, self.total_loss, label=self.label)
-
 
 def main(runs):
     import datetime
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    outdir = os.path.join("runs/figures")
-    os.makedirs(outdir, exist_ok=True)
+    outdir = "runs/figures"
     outpath = os.path.join(outdir, f"{timestamp}.png")
+    os.makedirs(outdir, exist_ok=True)
 
     logs = [Logs(run_name) for run_name in runs]
 
+    sns.set(style="darkgrid", context="talk", palette="deep")
     plt.figure()
+
     for log in logs:
-        log.plot()
-    plt.xlabel("Epoch")
-    plt.ylabel("Total Loss")
-    plt.legend()
+        plt.plot(log.epochs, log.total_loss, label=log.label)
+
+    plt.xlabel("Epoch", fontsize=14)
+    plt.ylabel("Total Loss", fontsize=14)
+    plt.legend(title="Runs", fontsize=12, title_fontsize='13')
 
     plt.savefig(outpath, dpi=300)
 
