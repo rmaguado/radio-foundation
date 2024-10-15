@@ -131,10 +131,6 @@ class NiftiCtDataset(NiftiVolumes):
         abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
         nifti_file = nib.load(abs_path_to_nifti)
 
-        volume_data = nifti_file.get_fdata().astype(np.float32)
-        volume_data = np.moveaxis(volume_data, axial_dim, 0)
-        volume_data = volume_data[slice_index : slice_index + self.channels]
-
         header = nifti_file.header
         slope, intercept = header.get_slope_inter()
 
@@ -143,9 +139,16 @@ class NiftiCtDataset(NiftiVolumes):
         if not intercept or np.isnan(intercept):
             intercept = 0.0
 
-        volume_data = volume_data * slope + intercept
+        slice_data = np.take(
+            nifti_file.dataobj,
+            range(slice_index, slice_index + self.channels),
+            axis=axial_dim,
+        )
 
-        return self.process_ct(volume_data)
+        slice_data = slice_data * slope + intercept
+        slice_data = slice_data.astype(np.float32)
+
+        return self.process_ct(slice_data)
 
     def process_ct(self, volume_data: np.ndarray) -> torch.Tensor:
         """
