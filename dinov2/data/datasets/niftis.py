@@ -131,12 +131,16 @@ class NiftiCtDataset(NiftiVolumes):
         abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
         nifti_file = nib.load(abs_path_to_nifti)
 
-        header = nifti_file.header
-        slope, intercept = header.get_slope_inter()
+        try:
+            slope = nifti_file.dataobj.slope
+            intercept = nifti_file.dataobj.inter
 
-        if not slope or np.isnan(slope):
+            if not slope or np.isnan(slope):
+                slope = 1.0
+            if not intercept or np.isnan(intercept):
+                intercept = 0.0
+        except AttributeError as e:
             slope = 1.0
-        if not intercept or np.isnan(intercept):
             intercept = 0.0
 
         slice_data = np.take(
