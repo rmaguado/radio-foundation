@@ -139,20 +139,22 @@ class NiftiCtDataset(NiftiVolumes):
                 slope = 1.0
             if not intercept or np.isnan(intercept):
                 intercept = 0.0
+
         except AttributeError as e:
             slope = 1.0
             intercept = 0.0
 
-        slice_data = np.take(
-            nifti_file.dataobj,
-            range(slice_index, slice_index + self.channels),
-            axis=axial_dim,
-        )
+        slice_obj = [slice(None)] * 3
+        slice_obj[axial_dim] = slice(slice_index, slice_index + self.channels)
 
-        slice_data = slice_data * slope + intercept
-        slice_data = slice_data.astype(np.float32)
-
-        return self.process_ct(slice_data)
+        try:
+            slice_data = nifti_file.dataobj[slice_obj].astype(np.float32)
+            slice_data = slice_data * slope + intercept
+            return self.process_ct(slice_data)
+        except Exception as e:
+            logger.error(f"Error in loading slice {slice_index} from {nifti_path}.")
+            
+            return torch.zeros((self.channels, 512, 512), dtype=torch.float32)
 
     def process_ct(self, volume_data: np.ndarray) -> torch.Tensor:
         """
