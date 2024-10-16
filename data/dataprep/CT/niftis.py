@@ -36,12 +36,12 @@ class NiftiCtValidation:
         spacing_y = metadata["spacing_y"]
         slice_thickness = metadata["slice_thickness"]
         if spacing_x > slice_thickness or spacing_y > slice_thickness:
-            return f"\tSpacing is greater than slice thickness: ({spacing_x}, {spacing_y}).\n"
+            return f"\tSpacing ({spacing_x}, {spacing_y}) is greater than slice thickness: ({slice_thickness}) .\n"
         return ""
 
-    def test_rescale(self, header: nib.Nifti1Header) -> str:
-        slope = header.get("scl_slope")
-        intercept = header.get("scl_inter")
+    def test_rescale(self, image: nib.Nifti1Image) -> str:
+        slope = image.dataobj.slope
+        intercept = image.dataobj.inter
 
         if np.isnan(slope) or np.isnan(intercept):
             return "\tRescale slope or intercept is NaN.\n"
@@ -62,14 +62,12 @@ class NiftiCtValidation:
         Args:
             metadata (Dict): Metadata extracted from the NIfTI file.
         """
-        volume_data = nifti_file.get_fdata()
-        header = nifti_file.header
 
         issues = ""
         issues += self.test_slice_thickness(metadata)
         issues += self.test_image_shape(metadata)
         issues += self.test_spacing(metadata)
-        issues += self.test_rescale(header)
+        issues += self.test_rescale(nifti_file)
 
         assert len(issues) == 0, issues
 
