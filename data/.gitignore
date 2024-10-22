@@ -5,6 +5,9 @@
 !dataprep/
 !dataprep/**
 
+!eval/
+!eval/**
+
 !__init__.py
 !statistics.py
 
