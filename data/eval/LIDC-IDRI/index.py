@@ -51,7 +51,7 @@ class LidcIdriDatabase(DicomDatabase):
                 series_id, scan_id, num_slices, image_shape_x, image_shape_y,
                 slice_thickness, spacing_x, spacing_y
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             metadata,
         )
