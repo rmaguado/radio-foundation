@@ -21,6 +21,8 @@ def walk(root_dir):
 
 
 def set_logging(log_path):
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
     file_handler = logging.FileHandler(log_path)
     file_handler.setLevel(logging.INFO)
 
