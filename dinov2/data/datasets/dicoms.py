@@ -232,7 +232,7 @@ class DicomCTVolumesFull(DicomCtDataset):
     def get_image_data(self, index: int) -> torch.Tensor:
         dataset_name, rowid = self.entries[index]
         series_id = self.cursor.execute(
-            f"SELECT series_id, num_slices FROM '{dataset_name}' WHERE rowid = ?",
+            f"SELECT series_id FROM '{dataset_name}' WHERE rowid = ?",
             (rowid),
         ).fetchone()
 
