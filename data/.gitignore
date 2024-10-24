@@ -14,3 +14,7 @@
 dataprep/**/__pycache__
 dataprep/**/.ipynb_checkpoints/
 dataprep/**/.DS_Store
+
+eval/**/__pycache__
+eval/**/.ipynb_checkpoints/
+eval/**/.DS_Store
