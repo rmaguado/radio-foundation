@@ -20,25 +20,25 @@ def get_argpase():
 
 
 def rle_encode(x: np.ndarray):
-    shape = x.shape
     x_ = x.flatten()
 
     dif = np.concatenate(([0], x_))[:-1] != x_
-    pos = np.nonzero(dif, )
+    pos = np.nonzero(dif)[0]
 
-    return pos, shape
+    run_lengths = np.diff(pos, prepend=0)
+
+    return run_lengths, x.shape
 
 
-def rle_decode(pos, shape):
+def rle_decode(run_lengths, shape):
+    pos = np.cumsum(run_lengths)
     decoded = np.zeros(np.prod(shape), dtype=np.int32)
-    pos = pos[0]
     current_value = 1
     for i in range(len(pos)):
         decoded[pos[i]:pos[i+1] if i+1 < len(pos) else None] = current_value
         current_value = 1 - current_value
     
     return decoded.reshape(shape)
-
 
 
 def main(args):
@@ -80,7 +80,7 @@ def main(args):
                 segmentation_mask[bbox] = cmask
 
             rle_mask, shape = rle_encode(segmentation_mask)
-            mask_path = os.path.join(output_path, f"{scan_id}.npy")
+            mask_path = os.path.join(output_path, f"{scan_id}.npz")
             np.savez(mask_path, rle_mask=rle_mask, shape=shape)
 
 
