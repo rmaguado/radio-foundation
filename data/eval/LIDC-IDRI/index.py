@@ -115,10 +115,13 @@ class LidcIdriProcessor(DicomProcessor):
         for patient_id in patient_ids:
             patient_scans = pl.query(pl.Scan).filter(pl.Scan.patient_id == patient_id).all()
             for scan in patient_scans:
-                scan_path = scan.get_path_to_dicom_files()
-                scan_id = scan.id
-
-                paths_ids.append((scan_path, scan_id))
+                try:
+                    scan_path = scan.get_path_to_dicom_files()
+                    scan_id = scan.id
+    
+                    paths_ids.append((scan_path, scan_id))
+                except Exception as e:
+                    logger.exception(f"failed to get path for patient {patient_id}. {e}")
 
         return paths_ids
 
