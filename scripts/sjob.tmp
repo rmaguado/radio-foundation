@@ -1,0 +1,36 @@
+#!/bin/bash
+
+## CONF NODES GPUS VISIBLE 
+
+#SBATCH --job-name=dinov2:train
+
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:L40S:4
+#SBATCH --cpus-per-task=16
+#SBATCH --nodelist=compute-cuda-02
+
+#SBATCH --mem=96GB
+#SBATCH --partition=odap-gpu
+#SBATCH --signal=USR2@120
+#SBATCH --time=14400
+
+source $HOME/.conda_rc
+conda activate dino2t24
+cd $HOME/prj/radio-foundation
+export PYTHONPATH=dinov2_lat
+
+# export CUDA_VISIBLE_DEVICES=$VISIBLE
+
+mkdir -p outs/niftis
+
+srun --unbuffered --ntasks=4 --cpus-per-task=16 \
+    python3 ${PYTHONPATH}/dinov2/train/train.py \
+            --config-file="${PWD}/configs/niftis.yaml" \
+            --output-dir="${PWD}/outs/niftis"
+
+exit 0
+
+
+
+
