@@ -121,7 +121,7 @@ class LidcIdriProcessor(DicomProcessor):
     
                     paths_ids.append((scan_path, scan_id))
                 except Exception as e:
-                    logger.exception(f"failed to get path for patient {patient_id}. {e}")
+                    logger.error("failed to get path for patient {patient_id}.")
 
         return paths_ids
 
