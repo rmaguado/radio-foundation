@@ -13,8 +13,9 @@ warnings.filterwarnings("ignore")
 
 
 def walk(root_dir):
+    ignorewords = ["ignore", "segmentations", "labels"]
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        if "ignore" in filenames:
+        if any(x in filenames for x in ignorewords):
             dirnames[:] = []
 
         yield dirpath, dirnames, filenames
