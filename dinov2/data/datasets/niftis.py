@@ -150,6 +150,7 @@ class NiftiCtDataset(NiftiVolumes):
 
         try:
             slice_data = nifti_file.dataobj[slice_obj].astype(np.float32)
+            slice_data = np.moveaxis(slice_data, axial_dim, 0)
             slice_data = slice_data * slope + intercept
             return self.process_ct(slice_data)
         except Exception as e:
