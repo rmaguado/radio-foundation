@@ -152,8 +152,8 @@ class NiftiCtDataset(NiftiVolumes):
             slice_data = slice_data * slope + intercept
             return self.process_ct(slice_data)
         except Exception as e:
-            logger.error(f"Error in loading slice {slice_index} from {nifti_path}.")
-            
+            logger.exception(f"Error in loading slice {slice_index} from {nifti_path}.")
+
             return torch.zeros((self.channels, 512, 512), dtype=torch.float32)
 
     def process_ct(self, volume_data: np.ndarray) -> torch.Tensor:
