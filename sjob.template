@@ -1,21 +1,21 @@
 #!/bin/bash
 
+#SBATCH --nodes=1
 #SBATCH --job-name=$CONF
-
-#SBATCH --nodes=$NODES
-#SBATCH --ntasks-per-node=4
-#SBATCH --gres=gpu:L40S:$GPUS
+#SBATCH --ntasks-per-node=$GPUS
+#SBATCH --gres=gpu:$GPUTYPE:$GPUS
 #SBATCH --cpus-per-task=16
-#SBATCH --nodelist=compute-cuda-0$W
+#SBATCH -o "$OUTPUTDIR/slurm-%j.out" # STDOUT
 
 #SBATCH --mem=96GB
 #SBATCH --partition=odap-gpu
+#SBATCH --nodelist=compute-cuda-02
 #SBATCH --signal=USR2@120
 #SBATCH --time=14400
 
-source $HOME/.conda_rc
+source ~/.conda_rc
 conda activate dino2t24
 cd $HOME/projects/radio-foundation
-export PYTHONPATH=.
+export PYTHONPATH=$PWD
 
 srun python3 ${PYTHONPATH}/dinov2/train/train.py --config-file="$PWD/configs/$CONF.yaml" --output-dir="$PWD/runs/$CONF"

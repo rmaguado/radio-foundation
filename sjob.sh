@@ -1,22 +1,21 @@
 #!/bin/bash
 
-# CONF NODES GPUS [W]
-
 CONF="${1##*/}"
 export CONF="${CONF%.*}"
 
-export NODES=$2
-export GPUS=$3
-export W=${4:-2}
+export GPUS=$2
+export GPUTYPE=${3:-A40}
 
+export OUTPUTDIR="$PWD/runs/$CONF"
+mkdir $OUTPUTDIR
 
-if [ ! -z $3 ]; then 
-  printf "Job  conf: $CONF  nodes: $NODES gpus-per_node: $GPUS compute-cuda-0$W\n"
+if [ ! -z $2 ]; then 
+  printf "$GPUTYPE:$GPUS conf:$CONF\n"
 
-  envsubst '$CONF $NODES $GPUS $W $PORT' < sjob.template > sjob.tmp
-  sbatch sjob.tmp
+  envsubst '$CONF $GPUS $GPUTYPE $OUTPUTDIR' < sjob.template > "$OUTPUTDIR/sjob.tmp"
+  sbatch "$OUTPUTDIR/sjob.tmp"
 
 else
-  printf "Need \$CONF \$NODES \$GPUS \$VISIBLE [\$W]\n"
+  printf "CONF nGPUS [GPUTYPE]\n"
 
 fi
