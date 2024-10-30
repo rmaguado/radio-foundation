@@ -146,6 +146,7 @@ class NiftiCtDataset(NiftiVolumes):
 
         slice_obj = [slice(None)] * 3
         slice_obj[axial_dim] = slice(slice_index, slice_index + self.channels)
+        slice_obj = tuple(slice_obj)
 
         try:
             slice_data = nifti_file.dataobj[slice_obj].astype(np.float32)
