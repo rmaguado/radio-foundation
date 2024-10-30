@@ -1,21 +1,47 @@
 #!/bin/bash
 
-CONF="${1##*/}"
+export DHOME="$HOME/projects/radio-foundation"
+export OUT="$PWD/runs"
+
+if [ ! -e $DHOME/sjob.template ]; then
+  echo "sjob.template not found"
+  exit 1
+fi
+
+# CONF NODES GPUS [W]
+
+if [ ! -e $1 ]; then
+  echo "config $1 not found"
+  exit 1
+fi
+
+export CONF="${1##*/}"
 export CONF="${CONF%.*}"
-
 export GPUS=$2
-export GPUTYPE=${3:-A40}
+export GPUTYPE=${3:-L40S}
 
-export OUTPUTDIR="$PWD/runs/$CONF"
-mkdir $OUTPUTDIR
+if [ "$GPUTYPE" != "A40" -a "$GPUTYPE" != "L40S" ]; then
+  echo "$GPUTYPE not available"
+  exit 1
+fi
+
+if [[ "$GPUTYPE" == "A40" ]] && [[ "$GPUS" -gt "2" ]]; then
+  export GPUS=2
+  echo "max $GPUTYPE changed to 2"
+fi
+if [[ "$GPUTYPE" == "L40S" ]] && [[ "$GPUS" -gt "4" ]]; then
+  export GPUS=4
+  echo "max $GPUTYPE changed to 4"
+fi
+
 
 if [ ! -z $2 ]; then 
-  printf "$GPUTYPE:$GPUS conf:$CONF\n"
-
-  envsubst '$CONF $GPUS $GPUTYPE $OUTPUTDIR' < sjob.template > "$OUTPUTDIR/sjob.tmp"
-  sbatch "$OUTPUTDIR/sjob.tmp"
+  printf "\nJob  conf: $CONF  gpus-per_node: $GPUS $GPUTYPE GPUs\n\n"
+  mkdir -p $OUT/$CONF
+  envsubst '$CONF $GPUS $GPUTYPE $OUT' < $PWD/sjob.template > $OUT/$CONF/$CONF.run
+  sbatch $OUT/$CONF/$CONF.run
 
 else
-  printf "CONF nGPUS [GPUTYPE]\n"
+  printf "\nneed CONF GPUS GPUTYPE\n\n"
 
 fi
