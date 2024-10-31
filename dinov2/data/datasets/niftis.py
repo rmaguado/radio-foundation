@@ -4,6 +4,7 @@ import os
 import torch
 import numpy as np
 import nibabel as nib
+import indexed_gzip as igzip
 
 from .base import BaseDataset
 
@@ -129,7 +130,14 @@ class NiftiCtDataset(NiftiVolumes):
         dataset, axial_dim, nifti_path = self.cursor.fetchone()
 
         abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
-        nifti_file = nib.load(abs_path_to_nifti)
+
+        fobj = igzip.IndexedGzipFile(
+            filename=abs_path_to_nifti, spacing=4194304, readbuf_size=131072
+        )
+
+        fmap = nib.Nifti1Image.make_file_map()
+        fmap["image"].fileobj = fobj
+        nifti_file = nib.Nifti1Image.from_file_map(fmap)
 
         try:
             slope = nifti_file.dataobj.slope

@@ -4,4 +4,4 @@ conda install pytorch==2.4.1 torchvision torchaudio pytorch-cuda=12.4 -c pytorch
 conda install -c xformers xformers -y
 conda install -c conda-forge omegaconf torchmetrics fvcore iopath submitit -y
 pip3 install --extra-index-url https://pypi.nvidia.com cuml-cu12
-pip3 install nibabel pydicom python-dotenv
+pip3 install nibabel pydicom python-dotenv indexed_gzip
