@@ -3,6 +3,7 @@ from typing import Dict
 import argparse
 import logging
 import nibabel as nib
+import indexed_gzip as igzip
 from tqdm import tqdm
 import numpy as np
 
@@ -39,6 +40,11 @@ class NiftiCtValidation:
             return f"\tSpacing ({spacing_x}, {spacing_y}) is greater than slice thickness: ({slice_thickness}) .\n"
         return ""
 
+    def test_dimension(self, image: nib.Nifti1Image) -> str:
+        if len(image.shape) != 3:
+            return "\tImage is not 3D.\n"
+        return ""
+
     def test_rescale(self, image: nib.Nifti1Image) -> str:
         slope = image.dataobj.slope
         intercept = image.dataobj.inter
@@ -68,6 +74,7 @@ class NiftiCtValidation:
         issues += self.test_image_shape(metadata)
         issues += self.test_spacing(metadata)
         issues += self.test_rescale(nifti_file)
+        issues += self.test_dimension(nifti_file)
 
         assert len(issues) == 0, issues
 
@@ -175,7 +182,13 @@ class NiftiProcessor:
         Args:
             nifti_path (str): Path to the NIfTI file.
         """
-        nifti_file = nib.load(nifti_path)
+        fobj = igzip.IndexedGzipFile(
+            filename=nifti_path, spacing=4194304, readbuf_size=131072
+        )
+
+        fmap = nib.Nifti1Image.make_file_map()
+        fmap["image"].fileobj = fobj
+        nifti_file = nib.Nifti1Image.from_file_map(fmap)
         try:
             metadata = self.get_metadata(nifti_file)
         except Exception as e:
