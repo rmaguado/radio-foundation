@@ -10,11 +10,6 @@ fi
 
 # CONF NODES GPUS [W]
 
-if [ ! -e $1 ]; then
-  echo "config $1 not found"
-  exit 1
-fi
-
 export CONF="${1##*/}"
 export CONF="${CONF%.*}"
 export GPUS=$2
