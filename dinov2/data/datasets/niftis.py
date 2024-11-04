@@ -131,13 +131,8 @@ class NiftiCtDataset(NiftiVolumes):
 
         abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
 
-        fobj = igzip.IndexedGzipFile(
-            filename=abs_path_to_nifti, spacing=4194304, readbuf_size=131072
-        )
-
-        fmap = nib.Nifti1Image.make_file_map()
-        fmap["image"].fileobj = fobj
-        nifti_file = nib.Nifti1Image.from_file_map(fmap)
+        # will automatically use indexed_gzip if nibabel>=2.3.0 is present (much faster than without)
+        nifti_file = nib.load(abs_path_to_nifti)
 
         try:
             slope = nifti_file.dataobj.slope
