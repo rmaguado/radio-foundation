@@ -1,0 +1,4 @@
+indexed_gzip==1.8.7
+nibabel==5.3.2
+pydicom==3.0.1
+python-dotenv==1.0.1
