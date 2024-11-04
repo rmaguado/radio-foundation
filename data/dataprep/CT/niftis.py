@@ -173,13 +173,8 @@ class NiftiProcessor:
         Args:
             nifti_path (str): Path to the NIfTI file.
         """
-        fobj = igzip.IndexedGzipFile(
-            filename=nifti_path, spacing=4194304, readbuf_size=131072
-        )
 
-        fmap = nib.Nifti1Image.make_file_map()
-        fmap["image"].fileobj = fobj
-        nifti_file = nib.Nifti1Image.from_file_map(fmap)
+        nifti_file = nib.load(nifti_path)
         try:
             metadata = self.get_metadata(nifti_file)
         except Exception as e:
