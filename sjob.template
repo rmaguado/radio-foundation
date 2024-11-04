@@ -21,9 +21,7 @@ conda activate dino2t24
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
-mkdir -p outs/$CONF
-
 srun --unbuffered --ntasks=$GPUS --cpus-per-task=16 \
     python3 ${PWD}/dinov2/train/train.py \
             --config-file="${PWD}/configs/$CONF.yaml" \
-            --output-dir="${PWD}/outs/$CONF"
+            --output-dir="${PWD}/runs/$CONF"
