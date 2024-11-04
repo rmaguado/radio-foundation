@@ -32,14 +32,6 @@ class NiftiCtValidation:
             return f"\tSlice thickness is too high: ({slice_thickness}).\n"
         return ""
 
-    def test_spacing(self, metadata: Dict) -> str:
-        spacing_x = metadata["spacing_x"]
-        spacing_y = metadata["spacing_y"]
-        slice_thickness = metadata["slice_thickness"]
-        if spacing_x > slice_thickness or spacing_y > slice_thickness:
-            return f"\tSpacing ({spacing_x}, {spacing_y}) is greater than slice thickness: ({slice_thickness}) .\n"
-        return ""
-
     def test_dimension(self, image: nib.Nifti1Image) -> str:
         if len(image.shape) != 3:
             return "\tImage is not 3D.\n"
@@ -72,7 +64,6 @@ class NiftiCtValidation:
         issues = ""
         issues += self.test_slice_thickness(metadata)
         issues += self.test_image_shape(metadata)
-        issues += self.test_spacing(metadata)
         issues += self.test_rescale(nifti_file)
         issues += self.test_dimension(nifti_file)
 
