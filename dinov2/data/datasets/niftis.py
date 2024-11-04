@@ -155,6 +155,10 @@ class NiftiCtDataset(NiftiVolumes):
             slice_data = nifti_file.dataobj[slice_obj].astype(np.float32)
             slice_data = np.moveaxis(slice_data, axial_dim, 0)
             slice_data = slice_data * slope + intercept
+
+            slice_shape = slice_data.shape
+            assert len(slice_shape) == 3, f"Slice shape is {slice_shape}."
+
             return self.process_ct(slice_data)
         except Exception as e:
             logger.exception(f"Error in loading slice {slice_index} from {nifti_path}.")
