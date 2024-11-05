@@ -8,26 +8,17 @@ import pydicom
 import numpy as np
 import sqlite3
 from tqdm import tqdm
+from typing import Tuple
 import logging
 import warnings
 
+from ..utils import set_logging
+
 
 logger = logging.getLogger("dataprep")
-logger.setLevel(logging.INFO)
-
-os.makedirs("data/database/log", exist_ok=True)
-file_handler = logging.FileHandler("data/index/log/statistics.log")
-file_handler.setLevel(logging.INFO)
-
-formatter = logging.Formatter("%(message)s")
-file_handler.setFormatter(formatter)
-
-logger.addHandler(file_handler)
-
-warnings.filterwarnings("ignore")
 
 
-def get_image(
+def read_dicom_image(
     root_path: str,
     dataset_name: str,
     dcm_path: str,
@@ -53,9 +44,10 @@ def get_mean_std(pixel_array: np.ndarray) -> tuple:
     return mean, std
 
 
-def sample_dcm_paths(db_path: str, n: int) -> list:
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+def sample_paths_dicom(conn, cursor, n: int) -> Tuple[float, flaot]:
+    raise RuntimeError(
+        "Outdated function. Needs to be rewritten for new database format."
+    )
 
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     datasets = [table[0] for table in cursor.fetchall() if table[0] != "global"]
@@ -71,8 +63,28 @@ def sample_dcm_paths(db_path: str, n: int) -> list:
         dcm_paths = cursor.fetchall()
         paths += [(dataset, dcm_path[0]) for dcm_path in dcm_paths]
 
-    conn.close()
-    return paths
+    means = []
+    variances = []
+
+    for dataset, dcm_path in tqdm(dcm_paths):
+        pixel_array = read_dicom_image(root_path, dataset, dcm_path)
+        if pixel_array is not None:
+            mean, std = get_mean_std(pixel_array)
+            means.append(mean)
+            variances.append(std**2)
+
+    mean = np.mean(means)
+    std = np.mean(variances) ** 0.5
+
+    return mean, std
+
+
+def sample_paths_nifti(conn, cursor, n: int) -> Tuple[float, float]:
+    raise NotImplementedError
+
+
+def get_database_storate(conn, cursor):
+    raise NotImplementedError
 
 
 def get_argpase():
@@ -84,10 +96,11 @@ def get_argpase():
         help="Root path to the image dataset.",
     )
     parser.add_argument(
-        "--db_path",
+        "--db_name",
         type=str,
-        required=True,
-        help="Path to the SQLite database.",
+        default="dicom_datasets",
+        required=False,
+        help="The name of the database. Will look in data/index/<db_name>/index.db",
     )
     parser.add_argument(
         "--n",
@@ -99,23 +112,25 @@ def get_argpase():
 
 
 def main(args):
+    set_logging("data/log/statistics.log")
     root_path = args.root_path
-    db_path = args.db_path
     n = args.n
 
-    dcm_paths = sample_dcm_paths(db_path, n)
-    means = []
-    variances = []
+    db_path = os.path.join("data/index", args.db_name, "index.db")
+    if not os.path.exists(db_path):
+        raise FileNotFoundError(f"Cannot find database at {db_path}.")
 
-    for dataset, dcm_path in tqdm(dcm_paths):
-        pixel_array = get_image(root_path, dataset, dcm_path)
-        if pixel_array is not None:
-            mean, std = get_mean_std(pixel_array)
-            means.append(mean)
-            variances.append(std**2)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
 
-    mean = np.mean(means)
-    std = np.mean(variances) ** 0.5
+    storage_type = get_database_storate(conn, cursor)
+
+    if storage_type == "dicom":
+        mean, std = sample_paths_dicom(conn, cursor, n)
+    elif storage_type == "nifti":
+        mean, std = sample_paths_nifti(conn, cursor, n)
+
+    conn.close()
 
     logger.info(f"Mean: {mean}")
     logger.info(f"Standard Deviation: {std}")
