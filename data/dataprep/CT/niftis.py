@@ -32,7 +32,7 @@ class NiftiCtValidation:
             return f"\tSlice thickness is too high: ({slice_thickness}).\n"
         return ""
 
-    def test_dimension(self, image: nib.Nifti1Image) -> str:
+    def test_shape(self, image: nib.Nifti1Image) -> str:
         if len(image.shape) != 3:
             return "\tImage is not 3D.\n"
         return ""
@@ -63,9 +63,8 @@ class NiftiCtValidation:
 
         issues = ""
         issues += self.test_slice_thickness(metadata)
-        issues += self.test_image_shape(metadata)
         issues += self.test_rescale(nifti_file)
-        issues += self.test_dimension(nifti_file)
+        issues += self.test_shape(nifti_file)
 
         assert len(issues) == 0, issues
 
