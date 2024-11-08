@@ -203,6 +203,7 @@ class NiftiProcessor:
         print("Walking dataset directories.")
         total_dirs = sum(1 for _ in walk(self.absolute_dataset_path))
         logger.info(f"{self.dataset_name} total directories: {total_dirs}")
+        volume_counts = 0
 
         for data_folder, dirs, files in tqdm(
             walk(self.absolute_dataset_path), total=total_dirs
@@ -223,8 +224,11 @@ class NiftiProcessor:
                     except Exception as e:
                         logger.exception(f"Error processing nifti {nii_path}: {e}")
                         continue
+                    volume_counts += 1
 
-        logger.info(f"Finished processing {self.dataset_name}. ")
+        logger.info(
+            f"Finished processing {self.dataset_name}. Added {volume_counts} volumes."
+        )
 
     def close_db(self) -> None:
         """
