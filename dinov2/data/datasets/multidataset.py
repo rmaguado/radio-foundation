@@ -21,8 +21,11 @@ class MultiDataset:
     def __len__(self) -> int:
         return self.cumulative_sizes[-1]
 
-    def get_dataset_sizes(self) -> list:
+    def get_dataset_sizes(self) -> List[int]:
         return [len(d) for d in self.datasets]
+
+    def get_dataset_names(self) -> List[str]:
+        return [d.dataset_name for d in self.datasets]
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         """
