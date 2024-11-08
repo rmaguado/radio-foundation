@@ -15,3 +15,16 @@ optim:
   epochs: 80
   warmup_epochs: 10
   base_lr: 0.003
+datasets:
+  - name: ct_niftis
+    root_path: .
+    type: ct
+    storage: nifti
+    augmentation: default_ct
+    channels: 4
+    pixel_range:
+      lower: -1000.0
+      upper: 1900.0
+    norm:
+      mean: -573.8
+      std: 461.3

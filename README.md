@@ -4,13 +4,14 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- Test and merge with main
-
 - Dataloader to eval using entire volume
 - script for running benchmark tests (after I have many datasets)
 - scripts to test transforms (generate samples)
+- Randomise sagital and coronal views for nifti dataloader if spacing is cube.
 
-- write userguide for data processing
+- update userguide for data processing
+
+- Experiment: Remove patches with only black pixels to increase efficiency. 
 
 ## Overview
 

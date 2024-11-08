@@ -5,13 +5,16 @@
 
 import itertools
 from typing import List, Any, Optional
-import warnings
+import logging
 
 import numpy as np
 import torch
 from torch.utils.data.sampler import Sampler
 
 import dinov2.distributed as distributed
+
+
+logger = logging.getLogger("dinov2")
 
 
 def _get_torch_dtype(size: int) -> Any:
@@ -66,7 +69,7 @@ def _new_shuffle_tensor_slice(
     count = stop // step
     drop_count = stop - step * count
     if drop_count:
-        warnings.warn(f"# of dropped samples: {drop_count}")
+        logger.warning(f"# of dropped samples: {drop_count}")
     indices = torch.randperm(count, dtype=torch.int64, generator=generator)
     return tensor[start::step][indices].numpy()
 
@@ -76,21 +79,25 @@ def _make_seed(seed: int, start: int, iter_count: int) -> int:
     return seed + start + (iter_count << 24)
 
 
-def check_weighted_sampler_params(dataset_sizes: List[int], weights: List[float]):
-    min_size = min(dataset_sizes)
-    total_size = sum(dataset_sizes)
-    if min_size < total_size * 0.01:
-        warnings.warn(
-            f"Dataset with size {min_size} is less than 1% of the total data size {total_size}. Weighted sampling may be unstable."
-        )
-
-    if len(dataset_sizes) != len(weights):
+def check_weighted_sampler_params(
+    datasets: List[str], sizes: List[int], weights: List[float]
+):
+    if len(sizes) != len(weights):
         raise ValueError(
-            f"Dataset sizes and weights must have the same length, got {len(dataset_sizes)} and {len(weights)}"
+            f"Dataset sizes and weights must have the same length, got {len(sizes)} and {len(weights)}"
         )
 
     if not all(isinstance(weight, float) for weight in weights):
         raise ValueError("Weights must be floats")
+
+    total_size = sum(sizes)
+    size_threshold = total_size * 0.01
+    for i, dataset_name in enumerate(datasets):
+        dataset_size = sizes[i]
+        if dataset_size < size_threshold:
+            logger.warning(
+                f"Dataset {dataset_name} with size {min_size} is less than 1% of the total data size {total_size}. Weighted sampling may be unstable."
+            )
 
 
 class InfiniteSampler(Sampler):
@@ -129,19 +136,20 @@ class WeightedInfiniteSampler(Sampler):
     def __init__(
         self,
         *,
-        dataset_sizes: List[int],
+        dataset_names: List[str],
+        sizes: List[int],
         weights: List[float],
         seed: int = 0,
         start: Optional[int] = None,
         step: Optional[int] = None,
     ):
-        self._dataset_sizes = dataset_sizes
+        self._dataset_sizes = sizes
         self._weights = weights
         self._seed = seed
         self._start = distributed.get_global_rank() if start is None else start
         self._step = distributed.get_global_size() if step is None else step
 
-        check_weighted_sampler_params(dataset_sizes, weights)
+        check_weighted_sampler_params(dataset_names, sizes, weights)
 
     def __iter__(self):
         iterator = self._iterator()
@@ -205,13 +213,14 @@ class WeightedShardedInfiniteSampler(Sampler):
     def __init__(
         self,
         *,
-        dataset_sizes: List[int],
+        dataset_names: List[int],
+        sizes: List[int],
         weights: List[float],
         seed: int = 0,
         start: Optional[int] = None,
         step: Optional[int] = None,
     ):
-        self._dataset_sizes = dataset_sizes
+        self._dataset_sizes = sizes
         self._weights = weights
         self._seed = seed
         self._start = distributed.get_global_rank() if start is None else start
@@ -219,7 +228,7 @@ class WeightedShardedInfiniteSampler(Sampler):
         self._iter_count = 0
         self._shuffle_tensor_slice_fn = _new_shuffle_tensor_slice
 
-        check_weighted_sampler_params(dataset_sizes, weights)
+        check_weighted_sampler_params(dataset_names, sizes, weights)
 
     def __iter__(self):
         iterator = self._iterator()

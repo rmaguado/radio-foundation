@@ -13,14 +13,21 @@ warnings.filterwarnings("ignore")
 
 
 def walk(root_dir):
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        if "ignore" in filenames:
+    ignorewords = ["ignore"]
+    ignore_folders = ["labels", "segmentations"]
+
+    for dirpath, dirnames, filenames in os.walk(root_dir, followlinks=True):
+        dirnames[:] = [d for d in dirnames if d not in ignore_folders]
+
+        if any(x in filenames for x in ignorewords):
             dirnames[:] = []
 
         yield dirpath, dirnames, filenames
 
 
 def set_logging(log_path):
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
     file_handler = logging.FileHandler(log_path)
     file_handler.setLevel(logging.INFO)
 

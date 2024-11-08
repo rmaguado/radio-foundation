@@ -4,6 +4,7 @@ import os
 import torch
 import numpy as np
 import nibabel as nib
+import indexed_gzip as igzip
 
 from .base import BaseDataset
 
@@ -21,7 +22,7 @@ class NiftiVolumes(BaseDataset):
     def __len__(self) -> int:
         return len(self.entries)
 
-    def get_image_data(self, index: int) -> torch.tensor:
+    def get_image_data(self, index: int) -> torch.Tensor:
         raise NotImplementedError
 
     def create_entries(self) -> np.ndarray:
@@ -58,9 +59,6 @@ class NiftiVolumes(BaseDataset):
         entries_dtype = np.dtype([("rowid", np.int32), ("slice_index", np.int32)])
         entries_array = np.array(entries, dtype=entries_dtype)
 
-        entries_dataset_path = os.path.join(
-            self.entries_path, f"{self.channels}_channels.npy"
-        )
         logger.info(f"Saving entries to {entries_dataset_path}.")
         np.save(entries_dataset_path, entries_array)
         return np.load(entries_dataset_path, mmap_mode="r")
@@ -94,7 +92,9 @@ class NiftiCtDataset(NiftiVolumes):
         """
         super().__init__()
         self.dataset_name = dataset_name
-        self.index_path = os.path.join("data/index", self.dataset_name, "index.db")
+        self.index_path = os.path.join(
+            "file:data/index", self.dataset_name, "index.db?mode=ro"
+        )
         self.entries_path = os.path.join("data/index", self.dataset_name, "entries")
 
         self.root_path = root_path
@@ -110,7 +110,7 @@ class NiftiCtDataset(NiftiVolumes):
         self.open_db()
         self.entries = self.get_entries()
 
-    def get_image_data(self, index: int) -> torch.tensor:
+    def get_image_data(self, index: int) -> torch.Tensor:
         """
         Retrieves the image data for a given index.
 
@@ -118,9 +118,98 @@ class NiftiCtDataset(NiftiVolumes):
             index (int): The index of the image data to retrieve.
 
         Returns:
-            torch.tensor: The image data as a torch tensor.
+            torch.Tensor: The image data as a torch tensor.
         """
         rowid, slice_index = self.entries[index]
+        self.cursor.execute(
+            """
+            SELECT dataset, axial_dim, nifti_path FROM global WHERE rowid = ?
+            """,
+            (int(rowid),),
+        )
+        dataset, axial_dim, nifti_path = self.cursor.fetchone()
+
+        abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
+
+        # will automatically use indexed_gzip if nibabel>=2.3.0 is present (much faster than without)
+        nifti_file = nib.load(abs_path_to_nifti)
+
+        try:
+            slope = nifti_file.dataobj.slope
+            intercept = nifti_file.dataobj.inter
+
+            if not slope or np.isnan(slope):
+                slope = 1.0
+            if not intercept or np.isnan(intercept):
+                intercept = 0.0
+
+        except AttributeError as e:
+            slope = 1.0
+            intercept = 0.0
+
+        slice_obj = [slice(None)] * 3
+        slice_obj[axial_dim] = slice(slice_index, slice_index + self.channels)
+        slice_obj = tuple(slice_obj)
+
+        try:
+            slice_data = nifti_file.dataobj[slice_obj].astype(np.float32)
+            slice_data = np.moveaxis(slice_data, axial_dim, 0)
+            slice_data = slice_data * slope + intercept
+
+            slice_shape = slice_data.shape
+            assert len(slice_shape) == 3, f"Slice shape is {slice_shape}."
+
+            return self.process_ct(slice_data)
+        except Exception as e:
+            logger.exception(f"Error in loading slice {slice_index} from {nifti_path}.")
+
+            return torch.zeros((self.channels, 512, 512), dtype=torch.float32)
+
+    def process_ct(self, volume_data: np.ndarray) -> torch.Tensor:
+        """
+        Processes the CT scan data.
+
+        Args:
+            volume_data (np.ndarray): The CT scan data.
+
+        Returns:
+            torch.Tensor: The processed CT scan data.
+        """
+        volume_data = np.clip(volume_data, self.lower_window, self.upper_window)
+        volume_data = (volume_data - self.lower_window) / (
+            self.upper_window - self.lower_window
+        )
+        return torch.tensor(volume_data, dtype=torch.float32)
+
+
+class NiftiCtVolumesFull(NiftiCtDataset):
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    def create_entries(self) -> np.ndarray:
+        """
+        Generates a numpy memmap object pointing to the sqlite database rows of nifti paths.
+        For collecting various slices of a CT scan (multi-channel) each memmap row contains the ordered rowids of the slices.
+
+        Returns:
+            np.ndarray: The entries dataset (memmap).
+        """
+        logger.info(f"Creating entries for {self.dataset_name}.")
+
+        entries_dataset_path = os.path.join(self.entries_path, f"full.npy")
+
+        entries = self.cursor.execute("SELECT rowid FROM global").fetchall()
+
+        entries_dtype = np.dtype([("rowid", np.int32)])
+        entries_array = np.array(entries, dtype=entries_dtype)
+
+        logger.info(f"Saving entries to {entries_dataset_path}.")
+        np.save(entries_dataset_path, entries_array)
+        return np.load(entries_dataset_path, mmap_mode="r")
+
+    def get_image_data(self, index: int) -> torch.Tensor:
+        rowid = self.entries[index]
         self.cursor.execute(
             """
             SELECT dataset, axial_dim, nifti_path FROM global WHERE rowid = ?
@@ -134,22 +223,9 @@ class NiftiCtDataset(NiftiVolumes):
 
         volume_data = nifti_file.get_fdata().astype(np.float32)
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
-        volume_data = volume_data[slice_index : slice_index + self.channels]
 
         return self.process_ct(volume_data)
 
-    def process_ct(self, volume_data: np.ndarray) -> torch.tensor:
-        """
-        Processes the CT scan data.
-
-        Args:
-            volume_data (np.ndarray): The CT scan data.
-
-        Returns:
-            torch.tensor: The processed CT scan data.
-        """
-        volume_data = np.clip(volume_data, self.lower_window, self.upper_window)
-        volume_data = (volume_data - self.lower_window) / (
-            self.upper_window - self.lower_window
-        )
-        return torch.tensor(volume_data, dtype=torch.float32)
+    def get_target(self, index: int) -> Optional[Any]:
+        """Maybe get it from a csv file"""
+        raise NotImplementedError

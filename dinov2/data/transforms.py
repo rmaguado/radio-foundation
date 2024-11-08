@@ -42,15 +42,15 @@ class ImageTransforms:
             "window": self._window,
         }
 
-    def __call__(self, img: torch.tensor) -> torch.tensor:
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
         """
         Applies the transformations to the image.
 
         Args:
-            img (torch.tensor): The image to be transformed.
+            img (torch.Tensor): The image to be transformed.
 
         Returns:
-            torch.tensor: The transformed image.
+            torch.Tensor: The transformed image.
         """
         for transform in self.transform_list:
             img = transform(img)
@@ -113,29 +113,29 @@ class ImageTransforms:
         return random_apply
 
     def _brightness(
-        self, img: torch.tensor, bounds: Tuple = (0.1, 0.4)
-    ) -> torch.tensor:
+        self, img: torch.Tensor, bounds: Tuple = (0.1, 0.4)
+    ) -> torch.Tensor:
         factor = random.uniform(bounds[0], bounds[1])
         img = img + factor
         return torch.clip(img, self.lower_bound, self.upper_bound)
 
-    def _contrast(self, img: torch.tensor, bounds: Tuple = (0.1, 0.4)) -> torch.tensor:
+    def _contrast(self, img: torch.Tensor, bounds: Tuple = (0.1, 0.4)) -> torch.Tensor:
         mean = torch.mean(img)
         factor = 1.0 + random.uniform(bounds[0], bounds[1])
         img = (img - mean) * factor + mean
         return torch.clip(img, self.lower_bound, self.upper_bound)
 
     def _saturation(
-        self, img: torch.tensor, bounds: Tuple = (0.1, 0.4)
-    ) -> torch.tensor:
+        self, img: torch.Tensor, bounds: Tuple = (0.1, 0.4)
+    ) -> torch.Tensor:
         factor = random.uniform(bounds[0], bounds[1])
         return transforms.functional.adjust_saturation(img, factor)
 
-    def _hue(self, img: torch.tensor) -> torch.tensor:
+    def _hue(self, img: torch.Tensor) -> torch.Tensor:
         factor = random.uniform(-0.5, 0.5)
         return transforms.functional.adjust_hue(img, factor)
 
-    def _sharpness(self, img: torch.tensor, bounds: Tuple = (0.9, 1.5)) -> torch.tensor:
+    def _sharpness(self, img: torch.Tensor, bounds: Tuple = (0.9, 1.5)) -> torch.Tensor:
         img = img.unsqueeze(0)
 
         factor = random.uniform(bounds[0], bounds[1])
@@ -156,21 +156,21 @@ class ImageTransforms:
 
     def _rotate(
         self,
-        img: torch.tensor,
-    ) -> torch.tensor:
+        img: torch.Tensor,
+    ) -> torch.Tensor:
         angle = 180.0 * random.uniform(-1, 1)
         return transforms.functional.rotate(img, angle)
 
-    def _flip(self, img: torch.tensor) -> torch.tensor:
+    def _flip(self, img: torch.Tensor) -> torch.Tensor:
         return transforms.functional.hflip(img)
 
     def _color_jitter(
         self,
-        img: torch.tensor,
+        img: torch.Tensor,
         brightness_bounds: Tuple = (0.1, 0.4),
         contrast_bounds: Tuple = (0.1, 0.4),
         saturation_bounds: Tuple = (0.1, 0.4),
-    ) -> torch.tensor:
+    ) -> torch.Tensor:
 
         img = self._brightness(img, brightness_bounds)
         img = self._contrast(img, contrast_bounds)
@@ -178,36 +178,36 @@ class ImageTransforms:
         return self._hue(img)
 
     def _gaussian_blur(
-        self, img: torch.tensor, bounds: Tuple = (0.1, 2.0)
-    ) -> torch.tensor:
+        self, img: torch.Tensor, bounds: Tuple = (0.1, 2.0)
+    ) -> torch.Tensor:
         sigma = random.uniform(bounds[0], bounds[1])
         return transforms.functional.gaussian_blur(img, kernel_size=3, sigma=sigma)
 
-    def _solarize(self, img: torch.tensor, bounds: Tuple) -> torch.tensor:
+    def _solarize(self, img: torch.Tensor, bounds: Tuple) -> torch.Tensor:
         threshold = random.uniform(bounds[0], bounds[1])
         mask = img > threshold
         img[mask] = self.upper_bound - img[mask]
 
         return img
 
-    def _gray_scale(self, img: torch.tensor) -> torch.tensor:
+    def _gray_scale(self, img: torch.Tensor) -> torch.Tensor:
         return transforms.functional.rgb_to_grayscale(img)
 
     def _noise(
-        self, img: torch.tensor, mean: float = 0.0, std: float = 1.0
-    ) -> torch.tensor:
+        self, img: torch.Tensor, mean: float = 0.0, std: float = 1.0
+    ) -> torch.Tensor:
         noise = torch.normal(mean, std, size=img.size())
         return img + noise
 
     def _gamma_correction(
-        self, img: torch.tensor, bounds: Tuple = (0.1, 2.0)
-    ) -> torch.tensor:
+        self, img: torch.Tensor, bounds: Tuple = (0.1, 2.0)
+    ) -> torch.Tensor:
         gamma = random.uniform(bounds[0], bounds[1])
         return img**gamma
 
     def _window(
-        self, img: torch.tensor, width_bounds: Tuple, height_bounds: Tuple
-    ) -> torch.tensor:
+        self, img: torch.Tensor, width_bounds: Tuple, height_bounds: Tuple
+    ) -> torch.Tensor:
 
         width = int(random.uniform(width_bounds[0], width_bounds[1]))
         height = int(random.uniform(height_bounds[0], height_bounds[1]))

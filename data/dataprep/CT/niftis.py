@@ -6,8 +6,8 @@ import nibabel as nib
 from tqdm import tqdm
 import numpy as np
 
-from ..utils import walk, set_logging
-from .ct_database import CtDatabase
+from data.utils import walk, set_logging
+from data.dataprep import CtDatabase
 
 
 logger = logging.getLogger("dataprep")
@@ -31,17 +31,14 @@ class NiftiCtValidation:
             return f"\tSlice thickness is too high: ({slice_thickness}).\n"
         return ""
 
-    def test_spacing(self, metadata: Dict) -> str:
-        spacing_x = metadata["spacing_x"]
-        spacing_y = metadata["spacing_y"]
-        slice_thickness = metadata["slice_thickness"]
-        if spacing_x > slice_thickness or spacing_y > slice_thickness:
-            return f"\tSpacing is greater than slice thickness: ({spacing_x}, {spacing_y}).\n"
+    def test_shape(self, image: nib.Nifti1Image) -> str:
+        if len(image.shape) != 3:
+            return "\tImage is not 3D.\n"
         return ""
 
-    def test_rescale(self, header: nib.Nifti1Header) -> str:
-        slope = header.get("scl_slope")
-        intercept = header.get("scl_inter")
+    def test_rescale(self, image: nib.Nifti1Image) -> str:
+        slope = image.dataobj.slope
+        intercept = image.dataobj.inter
 
         if np.isnan(slope) or np.isnan(intercept):
             return "\tRescale slope or intercept is NaN.\n"
@@ -62,14 +59,11 @@ class NiftiCtValidation:
         Args:
             metadata (Dict): Metadata extracted from the NIfTI file.
         """
-        volume_data = nifti_file.get_fdata()
-        header = nifti_file.header
 
         issues = ""
         issues += self.test_slice_thickness(metadata)
-        issues += self.test_image_shape(metadata)
-        issues += self.test_spacing(metadata)
-        issues += self.test_rescale(header)
+        issues += self.test_rescale(nifti_file)
+        issues += self.test_shape(nifti_file)
 
         assert len(issues) == 0, issues
 
@@ -177,6 +171,7 @@ class NiftiProcessor:
         Args:
             nifti_path (str): Path to the NIfTI file.
         """
+
         nifti_file = nib.load(nifti_path)
         try:
             metadata = self.get_metadata(nifti_file)
@@ -207,6 +202,7 @@ class NiftiProcessor:
         print("Walking dataset directories.")
         total_dirs = sum(1 for _ in walk(self.absolute_dataset_path))
         logger.info(f"{self.dataset_name} total directories: {total_dirs}")
+        volume_counts = 0
 
         for data_folder, dirs, files in tqdm(
             walk(self.absolute_dataset_path), total=total_dirs
@@ -227,8 +223,11 @@ class NiftiProcessor:
                     except Exception as e:
                         logger.exception(f"Error processing nifti {nii_path}: {e}")
                         continue
+                    volume_counts += 1
 
-        logger.info(f"Finished processing {self.dataset_name}. ")
+        logger.info(
+            f"Finished processing {self.dataset_name}. Added {volume_counts} volumes."
+        )
 
     def close_db(self) -> None:
         """

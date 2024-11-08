@@ -1,4 +1,4 @@
-from ..utils import Database
+from data.utils import Database
 
 
 class CtDatabase(Database):

@@ -74,10 +74,6 @@ class DicomVolumes(BaseDataset):
             entries += stack_rows
 
         entries_array = np.array(entries, dtype=np.uint32)
-
-        entries_dataset_path = os.path.join(
-            self.entries_path, f"{self.channels}_channels.npy"
-        )
         logger.info(f"Saving entries to {entries_dataset_path}.")
         np.save(entries_dataset_path, entries_array)
         return np.load(entries_dataset_path, mmap_mode="r")
@@ -117,7 +113,9 @@ class DicomCtDataset(DicomVolumes):
         """
         super().__init__()
         self.dataset_name = dataset_name
-        self.index_path = os.path.join("data/index", self.dataset_name, "index.db")
+        self.index_path = os.path.join(
+            "file:data/index", self.dataset_name, "index.db?mode=ro"
+        )
         self.entries_path = os.path.join("data/index", self.dataset_name, "entries")
 
         self.root_path = root_path
@@ -133,7 +131,7 @@ class DicomCtDataset(DicomVolumes):
         self.open_db()
         self.entries = self.get_entries()
 
-    def get_image_data(self, index: int) -> torch.tensor:
+    def get_image_data(self, index: int) -> torch.Tensor:
         """
         Retrieves the image data for a given index.
 
@@ -141,7 +139,7 @@ class DicomCtDataset(DicomVolumes):
             index (int): The index of the image data to retrieve.
 
         Returns:
-            torch.tensor: The image data as a torch tensor.
+            torch.Tensor: The image data as a torch tensor.
         """
         stack_rowids = [int(x) for x in self.entries[index]]
         self.cursor.execute(
@@ -174,7 +172,7 @@ class DicomCtDataset(DicomVolumes):
 
         return torch.stack(stack_data)
 
-    def process_ct(self, dcm: pydicom.dataset.FileDataset) -> torch.tensor:
+    def process_ct(self, dcm: pydicom.dataset.FileDataset) -> torch.Tensor:
         """
         Process a CT scan by applying rescaling and windowing.
 
@@ -182,7 +180,7 @@ class DicomCtDataset(DicomVolumes):
             dcm (pydicom.dataset.FileDataset): The DICOM object representing the CT scan.
 
         Returns:
-            torch.tensor: The processed CT scan as a tensor.
+            torch.Tensor: The processed CT scan as a tensor.
 
         """
         slope = getattr(dcm, "RescaleSlope", 1)
@@ -196,3 +194,80 @@ class DicomCtDataset(DicomVolumes):
         )
 
         return torch.tensor(array_data, dtype=torch.float32)
+
+
+class DicomCTVolumesFull(DicomCtDataset):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    def create_entries(self) -> np.ndarray:
+        """
+        Generates a numpy memmap object pointing to the sqlite database rows of dicom paths.
+
+        Returns:
+            np.ndarray: The entries dataset (memmap).
+        """
+        logger.info(f"Creating entries for {self.dataset_name}.")
+
+        entries_dataset_path = os.path.join(self.entries_path, f"full.npy")
+
+        dataset_names = self.cursor.execute(f"SELECT dataset FROM datasets").fetchall()
+
+        entries_dtype = [("dataset", "U256"), ("rowid", np.uint32)]
+        entries = []
+        for dataset_name in dataset_names:
+            dataset_name = dataset_name[0]
+            dataset_series = self.cursor.execute(
+                f"SELECT rowid FROM '{dataset_name}'"
+            ).fetchall()
+            entries += [(dataset_name, rowid) for rowid, in dataset_series]
+        logger.info(f"Total number of scans: {len(entries)}.")
+
+        entries_array = np.array(entries, dtype=entries_dtype)
+        logger.info(f"Saving entries to {entries_dataset_path}.")
+
+        np.save(entries_dataset_path, entries_array)
+        return np.load(entries_dataset_path, mmap_mode="r")
+
+    def get_image_data(self, index: int) -> torch.Tensor:
+        dataset_name, rowid = self.entries[index]
+        series_id = self.cursor.execute(
+            f"SELECT series_id FROM '{dataset_name}' WHERE rowid = ?",
+            (rowid),
+        ).fetchone()
+
+        self.cursor.execute(
+            """
+            SELECT slice_index, dataset, dicom_path
+            FROM global 
+            WHERE series_id = ? 
+            AND dataset = ?
+            """,
+            (series_id, dataset_name),
+        )
+        slice_indexes_rowid = self.cursor.fetchall()
+        slice_indexes_rowid.sort(key=lambda x: x[0])
+
+        try:
+            stack_data = self.create_stack_data(slice_indexes_rowid)
+        except Exception as e:
+            logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
+            stack_data = torch.zeros((10, 512, 512))
+
+        return stack_data
+
+    def create_stack_data(self, stack_rows):
+        stack_data = []
+        for _, dataset, rel_dicom_path in stack_rows:
+            abs_dicom_path = os.path.join(self.root_path, dataset, rel_dicom_path)
+            dcm = pydicom.dcmread(abs_dicom_path)
+            stack_data.append(self.process_ct(dcm))
+
+        return torch.stack(stack_data, dtype=torch.float32)
+
+    def get_target(self, index: int) -> Optional[Any]:
+        """Maybe get it from a csv file"""
+        raise NotImplementedError
+
+    def __len__(self) -> int:
+        return len(self.entries)

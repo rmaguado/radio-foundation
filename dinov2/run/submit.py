@@ -77,6 +77,34 @@ def get_args_parser(
         type=str,
         help="Nodes to exclude",
     )
+    # ODAP
+    parser.add_argument(
+        "--mem",
+        "--mem_gb",
+        default=1,
+        type=int,
+        help="Memory (GB) to request",
+    )
+    parser.add_argument(
+        "--nodelist",
+        default="",
+        type=str,
+        help="Nodes to use",
+    )
+    parser.add_argument(
+        "--gres",
+        default="",
+        type=str,
+        help="Generic resources",
+    )
+    parser.add_argument(
+        "--cpus",
+        "--ncpus",
+        "--cpus_per_task",
+        default=10,
+        type=int,
+        help="CPUs per task",
+    )
     return parser
 
 
@@ -103,15 +131,26 @@ def submit_jobs(task_class, args, name: str):
         kwargs["slurm_comment"] = args.comment
     if args.exclude:
         kwargs["slurm_exclude"] = args.exclude
+    if args.nodelist:
+        kwargs["slurm_nodelist"] = args.nodelist
+    if args.gres:
+        kwargs["slurm_gres"] = args.gres
 
     executor_params = get_slurm_executor_parameters(
         nodes=args.nodes,
         num_gpus_per_node=args.ngpus,
+        mem=args.mem,
+        cpus_per_task=args.cpus,
         timeout_min=args.timeout,  # max is 60 * 72
         slurm_signal_delay_s=120,
         slurm_partition=args.partition,
         **kwargs,
     )
+
+    # gpus-per-node incompatible if gres
+    if args.gres:
+        del executor_params["gpus_per_node"]
+
     executor.update_parameters(name=name, **executor_params)
 
     task = task_class(args)

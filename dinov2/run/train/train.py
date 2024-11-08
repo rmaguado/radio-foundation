@@ -58,4 +58,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if os.environ.get("PYTHONPATH") is not None and not os.path.exists("dinov2"):
+        os.chdir(os.environ["PYTHONPATH"])
+
     sys.exit(main())

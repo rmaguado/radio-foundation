@@ -7,8 +7,8 @@ import ast
 import os
 import logging
 
-from ..utils import walk, set_logging
-from .ct_database import CtDatabase
+from data.utils import walk, set_logging
+from data.dataprep import CtDatabase
 
 
 logger = logging.getLogger("dataprep")
@@ -18,6 +18,7 @@ class DicomCtValidation:
     def __init__(self, config: Dict):
         self.derived_okay = config["derived_okay"]
         self.skip_validation = config["skip_validation"]
+        self.axial_only = config["axial_only"]
 
         self.required_fields = [
             "SeriesInstanceUID",
@@ -110,7 +111,8 @@ class DicomCtValidation:
 
         issues = ""
         issues += self.test_modality(fields)
-        issues += self.test_orientation(fields)
+        if self.axial_only:
+            issues += self.test_orientation(fields)
         issues += self.test_slice_thickness(fields)
         issues += self.test_image_type(fields)
 
@@ -409,6 +411,11 @@ def get_argpase():
         action="store_true",
         help="Specify if validation should be skipped.",
     )
+    parser.add_argument(
+        "--axial_only",
+        action="store_true",
+        help="Specify if should discard non-axial slices.",
+    )
     return parser
 
 
@@ -428,6 +435,7 @@ def main(args):
         "derived_okay": args.derived_okay,
         "validate_only": args.validate_only,
         "skip_validation": args.skip_validation,
+        "axial_only": args.axial_only,
     }
     processor = DicomProcessor(config)
     processor.prepare_dataset()

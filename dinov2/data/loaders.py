@@ -125,8 +125,10 @@ def _make_sampler(
     """
     if isinstance(dataset, MultiDataset):
         dataset_sizes = dataset.get_dataset_sizes()
+        dataset_names = dataset.get_dataset_names()
     else:
         dataset_sizes = [len(dataset)]
+        dataset_names = [dataset.dataset_name]
     sample_count = len(dataset)
 
     if sampler_type in [
@@ -144,12 +146,12 @@ def _make_sampler(
     elif sampler_type == SamplerType.WEIGHTED_INFINITE:
         logger.info("sampler: weighted infinite")
         return WeightedInfiniteSampler(
-            dataset_sizes=dataset_sizes, weights=weights, seed=seed
+            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
         )
     elif sampler_type == SamplerType.WEIGHTED_SHARDED_INFINITE:
         logger.info("sampler: weighted sharded infinite")
         return WeightedShardedInfiniteSampler(
-            dataset_sizes=dataset_sizes, weights=weights, seed=seed
+            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
         )
 
     logger.info("sampler: none")
