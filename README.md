@@ -4,16 +4,12 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- Check that dataprep and dataloader for niftis works fine.
-    - run dataprep on CT-rate and inspect the .db file.
-    - a notebook that emulates creating a dataloader
-
 - Dataloader to eval using entire volume
 - script for running benchmark tests (after I have many datasets)
 - scripts to test transforms (generate samples)
-- Allow sagital and coronal views for niftis.
+- Randomise sagital and coronal views for nifti dataloader if spacing is cube.
 
-- write userguide for data processing
+- update userguide for data processing
 
 - Experiment: Remove patches with only black pixels to increase efficiency. 
 
