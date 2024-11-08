@@ -6,8 +6,8 @@ import pydicom
 import argparse
 import logging
 
-from data.dataprep.utils import set_logging
-from data.dataprep.CT.dicoms import DicomProcessor, DicomDatabase
+from data.utils import set_logging
+from data.dataprep import DicomProcessor, DicomDatabase
 
 
 logger = logging.getLogger("dataprep")
@@ -56,6 +56,7 @@ class LidcIdriDatabase(DicomDatabase):
             metadata,
         )
 
+
 class LidcIdriProcessor(DicomProcessor):
     def __init__(self, config: dict):
         self.dataset_name = config["dataset_name"]
@@ -67,7 +68,10 @@ class LidcIdriProcessor(DicomProcessor):
         set_logging(log_path)
 
     def process_series(
-        self, dicom_paths: List[Tuple[str, pydicom.dataset.FileDataset]], series_id: str, scan_id: str
+        self,
+        dicom_paths: List[Tuple[str, pydicom.dataset.FileDataset]],
+        series_id: str,
+        scan_id: str,
     ) -> None:
         """
         Process a series and return metadata and paths to dicom files.
@@ -111,14 +115,16 @@ class LidcIdriProcessor(DicomProcessor):
         scans = pl.query(pl.Scan).all()
         patient_ids = list(set(scan.patient_id for scan in scans))
         patient_ids.sort()
-        
+
         for patient_id in patient_ids:
-            patient_scans = pl.query(pl.Scan).filter(pl.Scan.patient_id == patient_id).all()
+            patient_scans = (
+                pl.query(pl.Scan).filter(pl.Scan.patient_id == patient_id).all()
+            )
             for scan in patient_scans:
                 try:
                     scan_path = scan.get_path_to_dicom_files()
                     scan_id = scan.id
-    
+
                     paths_ids.append((scan_path, scan_id))
                 except Exception as e:
                     logger.error("failed to get path for patient {patient_id}.")
@@ -129,14 +135,16 @@ class LidcIdriProcessor(DicomProcessor):
         """
         Prepares the dataset by creating necessary tables in the database and inserting data.
         """
-        
+
         included_series_ids = []
-        
+
         paths_ids = self.get_paths_and_ids()
-        
+
         for scan_path, scan_id in tqdm(paths_ids):
             dcm_paths = [
-                os.path.join(scan_path, f) for f in os.listdir(scan_path) if f.endswith(".dcm")
+                os.path.join(scan_path, f)
+                for f in os.listdir(scan_path)
+                if f.endswith(".dcm")
             ]
             if not dcm_paths:
                 logger.warning(f"No dicom files found in {scan_path}. Skipping.")
@@ -198,7 +206,7 @@ def main(args):
     config = {
         "dataset_name": args.dataset_name,
         "dataset_path": dataset_path,
-        "db_path": db_path
+        "db_path": db_path,
     }
     processor = LidcIdriProcessor(config)
     processor.prepare_dataset()

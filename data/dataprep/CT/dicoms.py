@@ -7,8 +7,8 @@ import ast
 import os
 import logging
 
-from ..utils import walk, set_logging
-from .ct_database import CtDatabase
+from data.utils import walk, set_logging
+from data.dataprep import CtDatabase
 
 
 logger = logging.getLogger("dataprep")

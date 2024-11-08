@@ -10,9 +10,8 @@ import sqlite3
 from tqdm import tqdm
 from typing import Tuple
 import logging
-import warnings
 
-from ..utils import set_logging
+from data.utils import set_logging
 
 
 logger = logging.getLogger("dataprep")

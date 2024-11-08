@@ -2,8 +2,8 @@ import sqlite3
 import argparse
 import os
 
-from .dicoms import DicomProcessor
-from .niftis import NiftiProcessor
+from data.dataprep import DicomProcessor
+from data.dataprep import NiftiProcessor
 
 import logging
 

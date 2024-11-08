@@ -3,12 +3,11 @@ from typing import Dict
 import argparse
 import logging
 import nibabel as nib
-import indexed_gzip as igzip
 from tqdm import tqdm
 import numpy as np
 
-from ..utils import walk, set_logging
-from .ct_database import CtDatabase
+from data.utils import walk, set_logging
+from data.dataprep import CtDatabase
 
 
 logger = logging.getLogger("dataprep")
