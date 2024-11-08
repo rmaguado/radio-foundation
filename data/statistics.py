@@ -109,7 +109,7 @@ def sample_paths_dicom(cursor, root_path: str, n: int) -> Tuple[float, float]:
 
 
 def sample_paths_nifti(cursor, root_path: str, n: int) -> Tuple[float, float]:
-    cursor.execute("SELECT dataset, dcm_path FROM datasets;")
+    cursor.execute("SELECT dataset FROM datasets;")
     datasets = cursor.fetchall()
 
     if len(datasets) == 0:
