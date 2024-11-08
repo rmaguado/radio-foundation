@@ -16,7 +16,7 @@ def walk(root_dir):
     ignorewords = ["ignore"]
     ignore_folders = ["labels", "segmentations"]
 
-    for dirpath, dirnames, filenames in os.walk(root_dir):
+    for dirpath, dirnames, filenames in os.walk(root_dir, followlinks=True):
         dirnames[:] = [d for d in dirnames if d not in ignore_folders]
 
         if any(x in filenames for x in ignorewords):
