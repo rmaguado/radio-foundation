@@ -25,8 +25,8 @@ def read_dicom_image(
     lower: float = -1000,
     upper: float = 1900,
 ) -> np.ndarray:
+    abs_path = os.path.join(root_path, dataset_name, dcm_path)
     try:
-        abs_path = os.path.join(root_path, dataset_name, dcm_path)
         dcm = pydicom.dcmread(abs_path)
         rescale_slope = dcm.RescaleSlope
         rescale_intercept = dcm.RescaleIntercept
@@ -45,8 +45,8 @@ def read_nifti_image(
     lower: float = -1000,
     upper: float = 1900,
 ) -> np.ndarray:
+    abs_path = os.path.join(root_path, dataset_name, nii_path)
     try:
-        abs_path = os.path.join(root_path, dataset_name, nii_path)
         nii = nib.load(abs_path)
         array_data = nii.get_fdata()
 
@@ -110,23 +110,28 @@ def sample_paths_dicom(cursor, root_path: str, n: int) -> Tuple[float, float]:
 
 def sample_paths_nifti(cursor, root_path: str, n: int) -> Tuple[float, float]:
     cursor.execute("SELECT dataset FROM datasets;")
-    datasets = cursor.fetchall()
+    datasets = [dataset[0] for dataset in cursor.fetchall()]
+    print(datasets)
 
     if len(datasets) == 0:
         raise ValueError("No datasets found in the database.")
 
     samples_per_dataset = n // len(datasets)
+    print(samples_per_dataset)
 
     nii_paths = []
     for dataset_name in datasets:
         cursor.execute(
             f"""
-            SELECT nifti_path FROM global WHERE dataset = '{dataset_name}'
+            SELECT nifti_path FROM global WHERE dataset = (?)
             ORDER BY RANDOM()
             LIMIT {samples_per_dataset};
-            """
+            """,
+            (dataset_name,),
         )
-        nii_paths.extend([(dataset_name, nii_path) for nii_path in cursor.fetchall()])
+        nii_paths.extend(
+            [(dataset_name, nii_path[0]) for nii_path in cursor.fetchall()]
+        )
 
     means = []
     variances = []
