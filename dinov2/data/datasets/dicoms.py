@@ -211,14 +211,20 @@ class DicomCTVolumesFull(DicomCtDataset):
 
         dataset_names = self.cursor.execute(f"SELECT dataset FROM datasets").fetchall()
 
-        entries_dtype = [("dataset", "U256"), ("rowid", np.uint32)]
+        entries_dtype = [
+            ("dataset", "U256"),
+            ("rowid", np.uint32),
+            ("scan_id", np.uint32),
+        ]
         entries = []
         for dataset_name in dataset_names:
             dataset_name = dataset_name[0]
             dataset_series = self.cursor.execute(
-                f"SELECT rowid FROM '{dataset_name}'"
+                f"SELECT rowid, scan_id FROM '{dataset_name}'"
             ).fetchall()
-            entries += [(dataset_name, rowid) for rowid, in dataset_series]
+            entries += [
+                (dataset_name, rowid, scan_id) for rowid, scan_id in dataset_series
+            ]
         logger.info(f"Total number of scans: {len(entries)}.")
 
         entries_array = np.array(entries, dtype=entries_dtype)
@@ -229,10 +235,11 @@ class DicomCTVolumesFull(DicomCtDataset):
         return np.load(entries_dir, mmap_mode="r")
 
     def get_image_data(self, index: int) -> torch.Tensor:
-        dataset_name, rowid = self.entries[index]
-        series_id = self.cursor.execute(
-            f"SELECT series_id FROM '{dataset_name}' WHERE rowid = ?", (rowid,)
-        ).fetchone()
+        dataset_name, rowid, scan_id = self.entries[index]
+        self.cursor.execute(
+            f"SELECT series_id, scan_id FROM '{dataset_name}' WHERE rowid = ?", (rowid,)
+        )
+        series_id = self.cursor.fetchone()
 
         self.cursor.execute(
             """
