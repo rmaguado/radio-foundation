@@ -70,9 +70,9 @@ class NiftiCtDataset(NiftiVolumes):
         self,
         dataset_name: str,
         root_path: str,
-        channels: int,
-        lower_window: int,
-        upper_window: int,
+        channels: int = 1,
+        lower_window: int = -1000,
+        upper_window: int = -1900,
         transform: Optional[Callable] = lambda _: _,
         target_transform: Optional[Callable] = lambda _: _,
     ) -> None:
