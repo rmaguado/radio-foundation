@@ -43,6 +43,9 @@ class BaseDataset:
 
         self.entries = None
 
+    def get_entries_dir(self) -> str:
+        return os.path.join(self.entries_path, f"{self.channels}_channels.npy")
+
     def get_entries(self) -> np.ndarray:
         """
         Get a numpy memmap object pointing to the sqlite database rows of dicom paths.
@@ -53,18 +56,16 @@ class BaseDataset:
         """
         os.makedirs(self.entries_path, exist_ok=True)
 
-        entries_dataset_path = os.path.join(
-            self.entries_path, f"{self.channels}_channels.npy"
-        )
+        entries_dir = self.get_entries_dir()
 
         if is_main_process():
-            if not os.path.exists(entries_dataset_path):
+            if not os.path.exists(entries_dir):
                 self.create_entries()
 
         if is_enabled():
             dist.barrier()
 
-        return np.load(entries_dataset_path, mmap_mode="r")
+        return np.load(entries_dir, mmap_mode="r")
 
     def open_db(self) -> None:
         """

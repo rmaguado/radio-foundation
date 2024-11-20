@@ -36,9 +36,6 @@ class NiftiVolumes(BaseDataset):
         logger.info(f"Creating entries for {self.dataset_name}.")
 
         slice_stack_num = self.channels
-        entries_dataset_path = os.path.join(
-            self.entries_path, f"{slice_stack_num}_channels.npy"
-        )
 
         nifti_volumes = self.cursor.execute(
             "SELECT rowid, num_slices FROM global"
@@ -59,9 +56,10 @@ class NiftiVolumes(BaseDataset):
         entries_dtype = np.dtype([("rowid", np.int32), ("slice_index", np.int32)])
         entries_array = np.array(entries, dtype=entries_dtype)
 
-        logger.info(f"Saving entries to {entries_dataset_path}.")
-        np.save(entries_dataset_path, entries_array)
-        return np.load(entries_dataset_path, mmap_mode="r")
+        entries_dir = self.get_entries_dir()
+        logger.info(f"Saving entries to {entries_dir}.")
+        np.save(entries_dir, entries_array)
+        return np.load(entries_dir, mmap_mode="r")
 
 
 class NiftiCtDataset(NiftiVolumes):
@@ -184,26 +182,8 @@ class NiftiCtVolumesFull(NiftiCtDataset):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def create_entries(self) -> np.ndarray:
-        """
-        Generates a numpy memmap object pointing to the sqlite database rows of nifti paths.
-        For collecting various slices of a CT scan (multi-channel) each memmap row contains the ordered rowids of the slices.
-
-        Returns:
-            np.ndarray: The entries dataset (memmap).
-        """
-        logger.info(f"Creating entries for {self.dataset_name}.")
-
-        entries_dataset_path = os.path.join(self.entries_path, f"full.npy")
-
-        entries = self.cursor.execute("SELECT rowid FROM global").fetchall()
-
-        entries_dtype = np.dtype([("rowid", np.int32)])
-        entries_array = np.array(entries, dtype=entries_dtype)
-
-        logger.info(f"Saving entries to {entries_dataset_path}.")
-        np.save(entries_dataset_path, entries_array)
-        return np.load(entries_dataset_path, mmap_mode="r")
+    def get_entries_dir(self) -> str:
+        return os.path.join(self.entries_path, f"full.npy")
 
     def get_image_data(self, index: int) -> torch.Tensor:
         rowid = self.entries[index]

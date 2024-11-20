@@ -26,9 +26,6 @@ class DicomVolumes(BaseDataset):
         logger.info(f"Creating entries for {self.dataset_name}.")
 
         slice_stack_num = self.channels
-        entries_dataset_path = os.path.join(
-            self.entries_path, f"{slice_stack_num}_channels.npy"
-        )
 
         dataset_names = self.cursor.execute(f"SELECT dataset FROM datasets").fetchall()
 
@@ -74,9 +71,12 @@ class DicomVolumes(BaseDataset):
             entries += stack_rows
 
         entries_array = np.array(entries, dtype=np.uint32)
-        logger.info(f"Saving entries to {entries_dataset_path}.")
-        np.save(entries_dataset_path, entries_array)
-        return np.load(entries_dataset_path, mmap_mode="r")
+
+        entries_dir = self.get_entries_dir()
+
+        logger.info(f"Saving entries to {entries_dir}.")
+        np.save(entries_dir, entries_array)
+        return np.load(entries_dir, mmap_mode="r")
 
     def get_target(self, index: int) -> Optional[Any]:
         return None
@@ -197,6 +197,9 @@ class DicomCTVolumesFull(DicomCtDataset):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
+    def get_entries_dir(self) -> np.ndarray:
+        return os.path.join(self.entries_path, "full.npy")
+
     def create_entries(self) -> np.ndarray:
         """
         Generates a numpy memmap object pointing to the sqlite database rows of dicom paths.
@@ -205,8 +208,6 @@ class DicomCTVolumesFull(DicomCtDataset):
             np.ndarray: The entries dataset (memmap).
         """
         logger.info(f"Creating entries for {self.dataset_name}.")
-
-        entries_dataset_path = os.path.join(self.entries_path, f"full.npy")
 
         dataset_names = self.cursor.execute(f"SELECT dataset FROM datasets").fetchall()
 
@@ -221,10 +222,11 @@ class DicomCTVolumesFull(DicomCtDataset):
         logger.info(f"Total number of scans: {len(entries)}.")
 
         entries_array = np.array(entries, dtype=entries_dtype)
-        logger.info(f"Saving entries to {entries_dataset_path}.")
 
-        np.save(entries_dataset_path, entries_array)
-        return np.load(entries_dataset_path, mmap_mode="r")
+        entries_dir = self.get_entries_dir()
+        logger.info(f"Saving entries to {entries_dir}.")
+        np.save(entries_dir, entries_array)
+        return np.load(entries_dir, mmap_mode="r")
 
     def get_image_data(self, index: int) -> torch.Tensor:
         dataset_name, rowid = self.entries[index]
