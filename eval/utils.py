@@ -121,7 +121,7 @@ def binary_mask_to_patch_labels(mask: torch.Tensor, patch_size: int) -> torch.Te
     Convert binary masks to patch-level labels.
 
     Parameters:
-    - mask (torch.Tensor): Input binary mask of shape (batch_size, 1, img_size, img_size)
+    - mask (torch.Tensor): Input binary mask of shape (batch_size, channels, img_size, img_size)
     - patch_size (int): Size of the patch (both width and height)
 
     Returns:
@@ -130,9 +130,9 @@ def binary_mask_to_patch_labels(mask: torch.Tensor, patch_size: int) -> torch.Te
     batch_size, _, img_size, _ = mask.shape
     assert img_size % patch_size == 0, "Image size must be divisible by patch size"
 
-    num_patches = img_size // patch_size
+    mask = mask.max(dim=1)[0]
 
-    mask = mask.unfold(2, patch_size, patch_size).unfold(3, patch_size, patch_size)
+    mask = mask.unfold(1, patch_size, patch_size).unfold(2, patch_size, patch_size)
     patch_labels = mask.max(dim=-1)[0].max(dim=-1)[0].squeeze(1)
 
     return patch_labels.view(batch_size, -1)

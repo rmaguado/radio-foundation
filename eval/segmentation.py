@@ -62,8 +62,9 @@ def update_difficult_negatives(
 ):
     """Identify and store difficult negative patches."""
 
+    patch_labels = patch_labels.view(-1)
     predictions = torch.sigmoid(classifier_output).squeeze()
-    negative_indices = (patch_labels == 0).nonzero(as_tuple=True)
+    negative_indices = (patch_labels == 0).nonzero(as_tuple=True)[0]
 
     difficult_negatives = negative_indices[(predictions[negative_indices] > 0.5)]
 
