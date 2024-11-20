@@ -213,7 +213,7 @@ def get_dataloader(dataset, is_infinite=False):
     }
 
     if is_infinite:
-        sampler = InfiniteSampler(sample_count=len(dataset), shuffle=False)
+        sampler = InfiniteSampler(sample_count=len(dataset))
         loader = torch.utils.data.DataLoader(dataset, sampler=sampler, **loader_kwargs)
         return iter(loader)
 
