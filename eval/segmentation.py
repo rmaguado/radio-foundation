@@ -40,15 +40,18 @@ def sample_from_queues(
     return resampled_tokens, resampled_labels, neg_indices
 
 
-def process_batch(feature_model, inputs, targets, embed_dim, patch_size, device):
+def process_batch(
+    feature_model, inputs, targets, embed_dim, patch_size, device, use_n_blocks=4
+):
     """Extract and process patch tokens and labels."""
 
     with torch.no_grad():
-        features = feature_model(inputs.to(device))
+        x_tokens_list = feature_model(inputs.to(device))
+    intermediate_output = x_tokens_list[-use_n_blocks:]
+    patch_tokens = torch.cat(
+        [patch_token for patch_token, _ in intermediate_output], dim=-1
+    ).view(-1, embed_dim)
 
-    patch_tokens = torch.cat([patch_token for patch_token, _ in features], dim=-1).view(
-        -1, embed_dim
-    )
     patch_labels = binary_mask_to_patch_labels(targets.to(device), patch_size).view(-1)
 
     return patch_tokens, patch_labels

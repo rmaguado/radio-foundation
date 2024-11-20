@@ -104,7 +104,9 @@ class DinoSegmentation(nn.Module):
     def forward(self, image):
         x_tokens_list = self.feature_model(image)
         intermediate_output = x_tokens_list[-DinoSegmentation.USE_N_BLOCKS :]
-        patch_tokens = torch.cat([patch_token for patch_token, _ in features], dim=-1)
+        patch_tokens = torch.cat(
+            [patch_token for patch_token, _ in intermediate_output], dim=-1
+        )
         return self.classifier(patch_tokens)
 
 
