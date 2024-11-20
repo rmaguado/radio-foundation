@@ -41,7 +41,6 @@ def get_lidcidri_loader(dataset, channels) -> DataLoader:
     return iter(dataloader)
 
 
-
 def rle_decode(run_lengths, shape):
     pos = np.cumsum(run_lengths)
     decoded = np.zeros(np.prod(shape), dtype=np.int32)
@@ -53,13 +52,34 @@ def rle_decode(run_lengths, shape):
     return decoded.reshape(shape)
 
 
+class LidcIdriTrain:
+    def __init__(self, mask_path: str, root_path: str, transform, split: float = 0.8):
+        self.dataset = LidcIdriNodules(mask_path, root_path, transform)
+
+        self.index_split = int(len(self.dataset) * split)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, index):
+        return self.dataset[index]
+
+
+class LidcIdriVal:
+    def __init__(self, mask_path: str, root_path: str, transform, split: float = 0.8):
+        self.dataset = LidcIdriNodules(mask_path, root_path, transform)
+
+        self.index_split = int(len(self.dataset) * split)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, index):
+        return self.dataset[self.index_split + index]
+
+
 class LidcIdriNodules(DicomCTVolumesFull):
-    def __init__(
-        self,
-        mask_path: str,
-        root_path: str,
-        transform,
-    ):
+    def __init__(self, mask_path: str, root_path: str, transform):
         super().__init__(
             dataset_name="LIDC-IDRI",
             root_path=root_path,
@@ -129,7 +149,7 @@ class LidcIdriNodules(DicomCTVolumesFull):
             stack_data = torch.zeros((10, 512, 512))
 
         return stack_data, scan_id
-        
+
     @staticmethod
     def load_dicom(row, root_path):
         _, dataset, rel_dicom_path = row
@@ -168,4 +188,3 @@ class LidcIdriNodules(DicomCTVolumesFull):
         target = self.get_target(scanid)
 
         return self.transform(image, target)
-

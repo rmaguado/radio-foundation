@@ -1,1 +1,1 @@
-from .lidc_idri import LidcIdriNodules, get_lidcidri_loader
+from .lidc_idri import LidcIdriNodules, LidcIdriTrain, LidcIdriVal, get_lidcidri_loader
