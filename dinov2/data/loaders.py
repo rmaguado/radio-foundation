@@ -84,7 +84,6 @@ def build_dataset_from_cfg(
     dataset_kwargs = {
         "dataset_name": dataset_config.name,
         "root_path": dataset_config.root_path,
-        "output_path": config.train.output_dir,
         "transform": transform,
     }
 

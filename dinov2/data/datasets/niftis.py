@@ -70,7 +70,6 @@ class NiftiCtDataset(NiftiVolumes):
         self,
         dataset_name: str,
         root_path: str,
-        output_path: str,
         channels: int,
         lower_window: int,
         upper_window: int,
@@ -83,7 +82,6 @@ class NiftiCtDataset(NiftiVolumes):
         Args:
             dataset_name (str): The name of the dataset.
             root_path (str): The root path of the dataset.
-            output_path (str): The output path for the dataset.
             channels (int): The number of channels to use.
             lower_window (int): The lower window value.
             upper_window (int): The upper window value.
@@ -98,7 +96,6 @@ class NiftiCtDataset(NiftiVolumes):
         self.entries_path = os.path.join("data/index", self.dataset_name, "entries")
 
         self.root_path = root_path
-        self.output_path = output_path
         self.channels = channels
 
         self.transform = transform

@@ -22,7 +22,6 @@ class BaseDataset:
         - dataset_name (str): The name of the dataset.
         - index_path (str): The path to the index file.
         - root_path (str): The root path of the dataset.
-        - output_path (str): The path to save the output.
         - entries_path (str): The path to the entries.
         - transform (function): A function to transform the data.
         - target_transform (function): A function to transform the target.
@@ -33,7 +32,6 @@ class BaseDataset:
         self.dataset_name = "DatasetNotGiven"
         self.index_path = "IndexPathNotGiven"
         self.root_path = "RootPathNotGiven"
-        self.output_path = "OutputPathNotGiven"
         self.entries_path = "path/to/entries"
         self.channels = 1
 
