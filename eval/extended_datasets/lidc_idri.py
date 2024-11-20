@@ -3,6 +3,7 @@ import torch
 from typing import Tuple, Any
 import numpy as np
 import pydicom
+from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 import logging
 
@@ -11,6 +12,34 @@ from dinov2.data.datasets.dicoms import DicomCTVolumesFull
 from torch.utils.data import DataLoader
 
 logger = logging.getLogger("dinov2")
+
+
+def get_lidcidri_loader(dataset, channels) -> DataLoader:
+
+    def collate_fn(inputs):
+        img = inputs[0][0]
+        labels = inputs[0][1]
+
+        num_slices = img.shape[0]
+        num_batches = num_slices // channels
+        use_slice = num_batches * channels
+
+        images = img[:use_slice].view(num_batches, channels, *img.shape[1:])
+        labels = labels[:use_slice].view(num_batches, channels, *labels.shape[1:])
+
+        return images, labels
+
+    loader_kwargs = {
+        "batch_size": 1,
+        "pin_memory": True,
+        "collate_fn": collate_fn,
+        "num_workers": 0,
+    }
+
+    sampler = InfiniteSampler(sample_count=len(dataset))
+    dataloader = torch.utils.data.DataLoader(dataset, sampler=sampler, **loader_kwargs)
+    return iter(dataloader)
+
 
 
 def rle_decode(run_lengths, shape):
@@ -100,16 +129,21 @@ class LidcIdriNodules(DicomCTVolumesFull):
             stack_data = torch.zeros((10, 512, 512))
 
         return stack_data, scan_id
+        
+    @staticmethod
+    def load_dicom(row, root_path):
+        _, dataset, rel_dicom_path = row
+        abs_dicom_path = os.path.join(root_path, dataset, rel_dicom_path)
+        dcm = pydicom.dcmread(abs_dicom_path)
+        return dcm
 
     def create_stack_data(self, stack_rows):
-        def load_dicom(row):
-            _, dataset, rel_dicom_path = row
-            abs_dicom_path = os.path.join(self.root_path, dataset, rel_dicom_path)
-            dcm = pydicom.dcmread(abs_dicom_path)
-            return self.process_ct(dcm)
+        load_dicom_partial = partial(self.load_dicom, root_path=self.root_path)
 
         with ProcessPoolExecutor(max_workers=os.cpu_count() - 1) as executor:
-            stack_data = list(executor.map(load_dicom, stack_rows))
+            dicom_files = list(executor.map(load_dicom_partial, stack_rows))
+
+        stack_data = [self.process_ct(dcm) for dcm in dicom_files]
 
         return torch.stack(stack_data)
 
@@ -135,28 +169,3 @@ class LidcIdriNodules(DicomCTVolumesFull):
 
         return self.transform(image, target)
 
-
-def get_lidcidri_loader(dataset, channels) -> DataLoader:
-
-    def collate_fn(inputs):
-        img = inputs[0][0]
-        labels = inputs[1][0]
-
-        num_slices = img.shape[0]
-        num_batches = num_slices // channels
-        use_slice = num_batches * channels
-
-        images = img[:use_slice].view(num_batches, channels, *img.shape[1:])
-        labels = labels[:use_slice].view(num_batches, channels, *labels.shape[1:])
-
-        return images, labels
-
-    loader_kwargs = {
-        "batch_size": 1,
-        "pin_memory": True,
-        "collate_fn": collate_fn,
-        "num_workers": 4,
-    }
-
-    sampler = InfiniteSampler(sample_count=len(dataset))
-    return torch.utils.data.DataLoader(dataset, sampler=sampler, **loader_kwargs)
