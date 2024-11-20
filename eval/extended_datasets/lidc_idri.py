@@ -71,10 +71,11 @@ class LidcIdriNodules(DicomCTVolumesFull):
 
     def get_image_data(self, index: int) -> torch.Tensor:
         dataset_name, rowid, scan_id = self.entries[index]
+
         self.cursor.execute(
-            f"SELECT series_id, scan_id FROM '{dataset_name}' WHERE rowid = ?", (rowid,)
+            f"SELECT series_id, scan_id FROM '{dataset_name}' WHERE rowid = {rowid}"
         )
-        series_id = self.cursor.fetchone()
+        series_id, scan_id = self.cursor.fetchone()
 
         self.cursor.execute(
             """
@@ -85,11 +86,11 @@ class LidcIdriNodules(DicomCTVolumesFull):
             """,
             (series_id, dataset_name),
         )
-        slice_indexes_rowid = self.cursor.fetchall()
-        slice_indexes_rowid.sort(key=lambda x: x[0])
+        stack_rows = self.cursor.fetchall()
+        stack_rows.sort(key=lambda x: x[0])
 
         try:
-            stack_data = self.create_stack_data(slice_indexes_rowid)
+            stack_data = self.create_stack_data(stack_rows)
         except Exception as e:
             logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
             stack_data = torch.zeros((10, 512, 512))
@@ -106,7 +107,7 @@ class LidcIdriNodules(DicomCTVolumesFull):
 
         mask = rle_decode(rle_mask, shape)
 
-        return mask
+        return torch.tensor(mask, dtype=torch.float32)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
@@ -116,4 +117,4 @@ class LidcIdriNodules(DicomCTVolumesFull):
 
         target = self.get_target(scanid)
 
-        return self.apply_transforms(image, target)
+        return self.transform(image, target)
