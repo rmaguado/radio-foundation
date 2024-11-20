@@ -261,7 +261,7 @@ class DicomCTVolumesFull(DicomCtDataset):
             dcm = pydicom.dcmread(abs_dicom_path)
             stack_data.append(self.process_ct(dcm))
 
-        return torch.stack(stack_data, dtype=torch.float32)
+        return torch.stack(stack_data)
 
     def get_target(self, index: int) -> Optional[Any]:
         """Maybe get it from a csv file"""
