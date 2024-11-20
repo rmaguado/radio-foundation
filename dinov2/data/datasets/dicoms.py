@@ -234,7 +234,7 @@ class DicomCTVolumesFull(DicomCtDataset):
     def get_image_data(self, index: int) -> torch.Tensor:
         dataset_name, rowid = self.entries[index]
         self.cursor.execute(
-            f"SELECT series_id FROM '{dataset_name}' WHERE rowid = ?", (rowid,)
+            f"SELECT series_id FROM '{dataset_name}' WHERE rowid = {rowid}"
         )
         series_id = self.cursor.fetchone()
 
@@ -247,11 +247,11 @@ class DicomCTVolumesFull(DicomCtDataset):
             """,
             (series_id, dataset_name),
         )
-        slice_indexes_rowid = self.cursor.fetchall()
-        slice_indexes_rowid.sort(key=lambda x: x[0])
+        stack_rows = self.cursor.fetchall()
+        stack_rows.sort(key=lambda x: x[0])
 
         try:
-            stack_data = self.create_stack_data(slice_indexes_rowid)
+            stack_data = self.create_stack_data(stack_rows)
         except Exception as e:
             logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
             stack_data = torch.zeros((10, 512, 512))
