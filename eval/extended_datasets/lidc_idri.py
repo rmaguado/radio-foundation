@@ -2,9 +2,13 @@ import os
 import torch
 from typing import Tuple, Any
 import numpy as np
+import pydicom
+from concurrent.futures import ProcessPoolExecutor
 import logging
 
+from dinov2.data.samplers import InfiniteSampler
 from dinov2.data.datasets.dicoms import DicomCTVolumesFull
+from torch.utils.data import DataLoader
 
 logger = logging.getLogger("dinov2")
 
@@ -97,6 +101,18 @@ class LidcIdriNodules(DicomCTVolumesFull):
 
         return stack_data, scan_id
 
+    def create_stack_data(self, stack_rows):
+        def load_dicom(row):
+            _, dataset, rel_dicom_path = row
+            abs_dicom_path = os.path.join(self.root_path, dataset, rel_dicom_path)
+            dcm = pydicom.dcmread(abs_dicom_path)
+            return self.process_ct(dcm)
+
+        with ProcessPoolExecutor(max_workers=os.cpu_count() - 1) as executor:
+            stack_data = list(executor.map(load_dicom, stack_rows))
+
+        return torch.stack(stack_data)
+
     def get_target(self, scanid: str) -> torch.Tensor:
 
         mask_path = os.path.join(self.root_mask_path, f"{scanid}.npz")
@@ -118,3 +134,29 @@ class LidcIdriNodules(DicomCTVolumesFull):
         target = self.get_target(scanid)
 
         return self.transform(image, target)
+
+
+def get_lidcidri_loader(dataset, channels) -> DataLoader:
+
+    def collate_fn(inputs):
+        img = inputs[0][0]
+        labels = inputs[1][0]
+
+        num_slices = img.shape[0]
+        num_batches = num_slices // channels
+        use_slice = num_batches * channels
+
+        images = img[:use_slice].view(num_batches, channels, *img.shape[1:])
+        labels = labels[:use_slice].view(num_batches, channels, *labels.shape[1:])
+
+        return images, labels
+
+    loader_kwargs = {
+        "batch_size": 1,
+        "pin_memory": True,
+        "collate_fn": collate_fn,
+        "num_workers": 4,
+    }
+
+    sampler = InfiniteSampler(sample_count=len(dataset))
+    return torch.utils.data.DataLoader(dataset, sampler=sampler, **loader_kwargs)
