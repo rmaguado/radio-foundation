@@ -17,8 +17,17 @@ def rle_decode(run_lengths, shape):
 
 
 class LidcIdriNodules(DicomCTVolumesFull):
-    def __init__(self, mask_path, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        mask_path: str,
+        root_path: str,
+        transform,
+    ):
+        super().__init__(
+            dataset_name="LIDC-IDRI",
+            root_path=root_path,
+            transform=transform,
+        )
 
         self.root_mask_path = mask_path
 
@@ -33,37 +42,6 @@ class LidcIdriNodules(DicomCTVolumesFull):
         mask = rle_decode(rle_mask, shape)
 
         return mask
-
-    def get_image_data(self, index: int) -> Tuple[torch.Tensor, str]:
-        """default copied from dinov2/data/datasets/dicoms.py
-
-        returns image tensor and scanid
-        """
-        dataset_name, rowid = self.entries[index]
-        series_id, scanid = self.cursor.execute(
-            f"SELECT series_id, scanid FROM '{dataset_name}' WHERE rowid = ?",
-            (rowid),
-        ).fetchone()
-
-        self.cursor.execute(
-            """
-            SELECT slice_index, dataset, dicom_path
-            FROM global 
-            WHERE series_id = ? 
-            AND dataset = ?
-            """,
-            (series_id, dataset_name),
-        )
-        slice_indexes_rowid = self.cursor.fetchall()
-        slice_indexes_rowid.sort(key=lambda x: x[0])
-
-        try:
-            stack_data = self.create_stack_data(slice_indexes_rowid)
-        except Exception as e:
-            logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
-            stack_data = torch.zeros((10, 512, 512))
-
-        return stack_data, scanid
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
