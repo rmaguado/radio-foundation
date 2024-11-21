@@ -41,6 +41,8 @@ class NiftiVolumes(BaseDataset):
             "SELECT rowid, num_slices FROM global"
         ).fetchall()
 
+        logger.info(f"Total number of series: {len(nifti_volumes)}.")
+
         entries = []
         for rowid, num_slices in nifti_volumes:
 
