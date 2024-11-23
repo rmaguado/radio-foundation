@@ -111,7 +111,10 @@ class DinoSegmentation(nn.Module):
 
 
 def show_mask(image_slice, mask_slice):
-    color_image = np.stack([np.array(image_slice).astype(np.float32)] * 3, axis=-1)
+    rescale_image = image_slice - np.min(image_slice)
+    rescale_image /= np.max(rescale_image)
+    
+    color_image = np.stack([np.array(rescale_image).astype(np.float32)] * 3, axis=-1)
     color_image[:, :, 0] += np.array(mask_slice).astype(np.float32)
     return np.clip(color_image, 0, 1)
 
@@ -183,21 +186,19 @@ def multiclass_accuracy_logits(outputs, targets):
 
 
 def binary_accuracy_logits(outputs, targets):
-    predicted_labels = (outputs.detach().cpu() > 0).int()
-    targets = targets.cpu().int()
+    predicted_labels = (outputs > 0).int()
+    targets = targets.int()
 
-    total_samples = targets.size(0)
+    true_pred_positives = (predicted_labels * targets).sum().item()
+    true_pred_negatives = ((1 - predicted_labels) * (1 - targets)).sum().item()
 
-    positives = (targets == 1).sum().item()
-    negatives = (targets == 0).sum().item()
+    positives = targets.sum().item()
+    negatives = targets.numel() - positives
 
-    true_pred_positives = ((predicted_labels == 1) & (targets == 1)).sum().item()
-    true_pred_negatives = ((predicted_labels == 0) & (targets == 0)).sum().item()
-
-    correct_predictions = (predicted_labels == targets).sum().item()
-    accuracy = correct_predictions / total_samples if total_samples > 0 else 0
+    accuracy = (predicted_labels == targets).float().mean().item()
 
     return accuracy, [positives, true_pred_positives, negatives, true_pred_negatives]
+
 
 
 def get_dataloader(dataset, is_infinite=False):

@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 logger = logging.getLogger("dinov2")
 
 
-def get_lidcidri_loader(dataset, channels) -> DataLoader:
+def get_dataloader(dataset, channels, split="train") -> DataLoader:
 
     def collate_fn(inputs):
         img = inputs[0][0]
@@ -36,9 +36,13 @@ def get_lidcidri_loader(dataset, channels) -> DataLoader:
         "num_workers": 0,
     }
 
-    sampler = InfiniteSampler(sample_count=len(dataset))
-    dataloader = torch.utils.data.DataLoader(dataset, sampler=sampler, **loader_kwargs)
-    return iter(dataloader)
+    if split == "train":
+        sampler = InfiniteSampler(sample_count=len(dataset))
+        return torch.utils.data.DataLoader(dataset, sampler=sampler, **loader_kwargs)
+    elif split == "val":
+        return torch.utils.data.DataLoader(dataset, **loader_kwargs)
+    else:
+        raise ValueError("train")
 
 
 def rle_decode(run_lengths, shape):
@@ -52,39 +56,49 @@ def rle_decode(run_lengths, shape):
     return decoded.reshape(shape)
 
 
-class LidcIdriTrain:
-    def __init__(self, mask_path: str, root_path: str, transform, split: float = 0.8):
-        self.dataset = LidcIdriNodules(mask_path, root_path, transform)
+class LidcIdriSplit:
+    def __init__(
+        self,
+        mask_path: str,
+        root_path: str,
+        transform,
+        max_workers: int,
+        split: str = "train",
+        train_val_split: float = 0.8,
+    ):
+        self.dataset = LidcIdriNodules(
+            mask_path=mask_path,
+            root_path=root_path,
+            transform=transform,
+            max_workers=max_workers
+        )
 
-        self.index_split = int(len(self.dataset) * split)
+        self.train_len = int(len(self.dataset) * train_val_split)
+        self.val_len = len(self.dataset) - self.train_len
+        if split == "train":
+            self.get_function = lambda index: self.dataset[index]
+            self.subset_len = self.train_len
+        elif split == "val":
+            self.get_function = lambda index: self.dataset[index + self.train_len]
+            self.subset_len = self.val_len
+        else:
+            raise ValueError('split should be either "train" or "val"')
 
     def __len__(self):
-        return len(self.dataset)
+        return self.subset_len
 
     def __getitem__(self, index):
-        return self.dataset[index]
-
-
-class LidcIdriVal:
-    def __init__(self, mask_path: str, root_path: str, transform, split: float = 0.8):
-        self.dataset = LidcIdriNodules(mask_path, root_path, transform)
-
-        self.index_split = int(len(self.dataset) * split)
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, index):
-        return self.dataset[self.index_split + index]
+        return self.get_function(index)
 
 
 class LidcIdriNodules(DicomCTVolumesFull):
-    def __init__(self, mask_path: str, root_path: str, transform):
+    def __init__(self, mask_path: str, root_path: str, transform, max_workers: int):
         super().__init__(
             dataset_name="LIDC-IDRI",
             root_path=root_path,
             transform=transform,
         )
+        self.max_workers = max_workers
 
         self.root_mask_path = mask_path
 
@@ -160,7 +174,7 @@ class LidcIdriNodules(DicomCTVolumesFull):
     def create_stack_data(self, stack_rows):
         load_dicom_partial = partial(self.load_dicom, root_path=self.root_path)
 
-        with ProcessPoolExecutor(max_workers=os.cpu_count() - 1) as executor:
+        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
             dicom_files = list(executor.map(load_dicom_partial, stack_rows))
 
         stack_data = [self.process_ct(dcm) for dcm in dicom_files]
