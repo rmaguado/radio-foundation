@@ -9,8 +9,33 @@ from omegaconf import OmegaConf
 
 from dinov2.data.samplers import InfiniteSampler
 from dinov2.models import build_model_from_cfg
-from dinov2.eval.utils import ModelWithIntermediateLayers
 from dinov2.utils.utils import load_pretrained_weights
+
+
+class ModelWithIntermediateLayers(nn.Module):
+    """
+    Copyright (c) Meta Platforms, Inc. and affiliates.
+
+    This source code is licensed under the Apache License, Version 2.0
+    found in the LICENSE file in the root directory of this source tree.
+
+    taken from from dinov2.eval.utils.py
+    """
+
+    def __init__(self, feature_model, n_last_blocks, autocast_ctx):
+        super().__init__()
+        self.feature_model = feature_model
+        self.feature_model.eval()
+        self.n_last_blocks = n_last_blocks
+        self.autocast_ctx = autocast_ctx
+
+    def forward(self, images):
+        with torch.inference_mode():
+            with self.autocast_ctx():
+                features = self.feature_model.get_intermediate_layers(
+                    images, self.n_last_blocks, return_class_token=True
+                )
+        return features
 
 
 class ImageTransform:
@@ -113,7 +138,7 @@ class DinoSegmentation(nn.Module):
 def show_mask(image_slice, mask_slice):
     rescale_image = image_slice - np.min(image_slice)
     rescale_image /= np.max(rescale_image)
-    
+
     color_image = np.stack([np.array(rescale_image).astype(np.float32)] * 3, axis=-1)
     color_image[:, :, 0] += np.array(mask_slice).astype(np.float32)
     return np.clip(color_image, 0, 1)
@@ -198,7 +223,6 @@ def binary_accuracy_logits(outputs, targets):
     accuracy = (predicted_labels == targets).float().mean().item()
 
     return accuracy, [positives, true_pred_positives, negatives, true_pred_negatives]
-
 
 
 def get_dataloader(dataset, is_infinite=False):

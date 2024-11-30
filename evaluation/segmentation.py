@@ -1,7 +1,7 @@
 import torch
 import random
 
-from eval.utils import binary_mask_to_patch_labels
+from evaluation.utils import binary_mask_to_patch_labels
 
 
 def sample_from_queues(
