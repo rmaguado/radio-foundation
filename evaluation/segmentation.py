@@ -5,7 +5,7 @@ from evaluation.utils import binary_mask_to_patch_labels
 
 
 def sample_from_queues(
-    patch_embedding_cache,
+    positive_patch_cache,
     negative_patch_queue,
     patch_tokens,
     patch_labels,
@@ -14,30 +14,56 @@ def sample_from_queues(
 ):
     """Sample tokens and labels from both caches and new tokens."""
 
-    cache_sample_size = num_resample // 2
-    neg_sample_size = num_resample // 4
-    new_sample_size = num_resample // 4
+    num_positive_samples = num_resample // 2
+    num_hard_negative_samples = num_resample // 4
+    num_new_samples = num_resample // 4
 
-    cache_indices = random.sample(range(len(patch_embedding_cache)), cache_sample_size)
-    cache_tokens = torch.stack(
-        [patch_embedding_cache[idx].to(device) for idx in cache_indices], dim=0
+    positive_indices = random.sample(
+        range(len(positive_patch_cache)), num_positive_samples
     )
-    cache_labels = torch.ones(len(cache_tokens), 1, device=device)
-
-    neg_indices = random.sample(range(len(negative_patch_queue)), neg_sample_size)
-    neg_tokens = torch.stack(
-        [negative_patch_queue[idx].to(device) for idx in neg_indices], dim=0
+    positive_tokens = torch.stack(
+        [positive_patch_cache[idx].to(device) for idx in positive_indices], dim=0
     )
-    neg_labels = torch.zeros(len(neg_tokens), 1, device=device)
+    positive_labels = torch.ones(len(positive_tokens), 1, device=device)
 
-    new_indices = random.sample(range(len(patch_labels)), new_sample_size)
+    if len(negative_patch_queue) >= num_hard_negative_samples:
+        hard_negative_indices = random.sample(
+            range(len(negative_patch_queue)), num_hard_negative_samples
+        )
+        hard_negative_tokens = torch.stack(
+            [negative_patch_queue[idx].to(device) for idx in hard_negative_indices],
+            dim=0,
+        )
+    else:
+        hard_negative_indices = list(range(len(negative_patch_queue)))
+        hard_negative_tokens = torch.stack(
+            [negative_patch_queue[idx].to(device) for idx in hard_negative_indices],
+            dim=0,
+        )
+        remaining_neg_sample_size = num_hard_negative_samples - len(
+            hard_negative_tokens
+        )
+        additional_indices = random.sample(
+            range(len(patch_tokens)), remaining_neg_sample_size
+        )
+        additional_tokens = patch_tokens[additional_indices]
+        hard_negative_tokens = torch.cat(
+            (hard_negative_tokens, additional_tokens), dim=0
+        )
+        hard_negative_indices.extend(additional_indices)
+
+    neg_labels = torch.zeros(len(hard_negative_tokens), 1, device=device)
+
+    new_indices = random.sample(range(len(patch_labels)), num_new_samples)
     new_tokens = patch_tokens[new_indices]
     new_labels = patch_labels[new_indices].view(-1, 1)
 
-    resampled_tokens = torch.cat((cache_tokens, neg_tokens, new_tokens), dim=0)
-    resampled_labels = torch.cat((cache_labels, neg_labels, new_labels), dim=0)
+    resampled_tokens = torch.cat(
+        (positive_tokens, hard_negative_tokens, new_tokens), dim=0
+    )
+    resampled_labels = torch.cat((positive_labels, neg_labels, new_labels), dim=0)
 
-    return resampled_tokens, resampled_labels, neg_indices
+    return resampled_tokens, resampled_labels, hard_negative_indices
 
 
 def process_batch(
