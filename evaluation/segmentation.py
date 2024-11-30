@@ -12,12 +12,25 @@ def sample_from_queues(
     num_resample,
     device,
 ):
-    """Sample tokens and labels from both caches and new tokens."""
+    """
+    Sample tokens and labels from both caches and new tokens.
+    For very unbalanced datasets.
+    """
 
+    if len(positive_patch_cache) < 2:
+        return
+
+    # number of new samples to add
     num_positive_samples = num_resample // 2
     num_hard_negative_samples = num_resample // 4
-    num_new_samples = num_resample // 4
+    num_new_negative_samples = num_resample // 4
 
+    if len(negative_patch_queue) < num_hard_negative_samples:
+        difference = num_hard_negative_samples - len(negative_patch_queue)
+        num_hard_negative_samples = len(negative_patch_queue)
+        num_new_negative_samples += difference
+
+    # sample positive tokens
     positive_indices = random.sample(
         range(len(positive_patch_cache)), num_positive_samples
     )
@@ -26,7 +39,8 @@ def sample_from_queues(
     )
     positive_labels = torch.ones(len(positive_tokens), 1, device=device)
 
-    if len(negative_patch_queue) >= num_hard_negative_samples:
+    # sample hard negative tokens
+    if num_hard_negative_samples > 0:
         hard_negative_indices = random.sample(
             range(len(negative_patch_queue)), num_hard_negative_samples
         )
@@ -34,34 +48,29 @@ def sample_from_queues(
             [negative_patch_queue[idx].to(device) for idx in hard_negative_indices],
             dim=0,
         )
+
+    # if there are not enough hard negative samples
     else:
-        hard_negative_indices = list(range(len(negative_patch_queue)))
-        hard_negative_tokens = torch.stack(
-            [negative_patch_queue[idx].to(device) for idx in hard_negative_indices],
-            dim=0,
-        )
-        remaining_neg_sample_size = num_hard_negative_samples - len(
-            hard_negative_tokens
-        )
-        additional_indices = random.sample(
-            range(len(patch_tokens)), remaining_neg_sample_size
-        )
-        additional_tokens = patch_tokens[additional_indices]
-        hard_negative_tokens = torch.cat(
-            (hard_negative_tokens, additional_tokens), dim=0
-        )
-        hard_negative_indices.extend(additional_indices)
+        hard_negative_tokens = torch.tensor([]).to(device)
+        hard_negative_indices = []
 
-    neg_labels = torch.zeros(len(hard_negative_tokens), 1, device=device)
-
-    new_indices = random.sample(range(len(patch_labels)), num_new_samples)
-    new_tokens = patch_tokens[new_indices]
-    new_labels = patch_labels[new_indices].view(-1, 1)
-
-    resampled_tokens = torch.cat(
-        (positive_tokens, hard_negative_tokens, new_tokens), dim=0
+    # sample new negative tokens
+    negative_indices = torch.where(patch_labels == 0)[0]
+    new_negative_indices = random.sample(
+        negative_indices.tolist(), num_new_negative_samples
     )
-    resampled_labels = torch.cat((positive_labels, neg_labels, new_labels), dim=0)
+    new_negative_tokens = patch_tokens[new_negative_indices]
+
+    # create negative labels
+    negative_labels = torch.zeros(
+        num_new_negative_samples + num_hard_negative_samples, 1
+    ).to(device)
+
+    # concatenate all samples
+    resampled_tokens = torch.cat(
+        (positive_tokens, hard_negative_tokens, new_negative_tokens), dim=0
+    )
+    resampled_labels = torch.cat((positive_labels, negative_labels), dim=0)
 
     return resampled_tokens, resampled_labels, hard_negative_indices
 
