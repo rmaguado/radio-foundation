@@ -268,8 +268,9 @@ class DicomCTVolumesFull(DicomCtDataset):
         return torch.stack(stack_data)
 
     def get_target(self, index: int) -> Optional[Any]:
-        """Maybe get it from a csv file"""
-        raise NotImplementedError
+        raise NotImplementedError(
+            "get_target is an abstract method and needs to be implemented."
+        )
 
     def __len__(self) -> int:
         return len(self.entries)

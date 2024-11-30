@@ -23,7 +23,9 @@ class NiftiVolumes(BaseDataset):
         return len(self.entries)
 
     def get_image_data(self, index: int) -> torch.Tensor:
-        raise NotImplementedError
+        raise NotImplementedError(
+            "get_image_data is an abstract method and needs to be implemented."
+        )
 
     def create_entries(self) -> np.ndarray:
         """
@@ -206,5 +208,6 @@ class NiftiCtVolumesFull(NiftiCtDataset):
         return self.process_ct(volume_data)
 
     def get_target(self, index: int) -> Optional[Any]:
-        """Maybe get it from a csv file"""
-        raise NotImplementedError
+        raise NotImplementedError(
+            "get_target is an abstract method and needs to be implemented."
+        )

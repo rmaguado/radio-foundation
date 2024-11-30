@@ -93,7 +93,9 @@ class BaseDataset:
         Returns:
             np.ndarray: The entries dataset (memmap).
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            "create_entries is an abstract method and needs to be implemented."
+        )
 
     def get_image_data(self, index: int) -> torch.Tensor:
         """
@@ -105,7 +107,9 @@ class BaseDataset:
         Returns:
             torch.Tensor: The image data as a tensor.
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            "get_image_data is an abstract method and needs to be implemented."
+        )
 
     def get_target(self, index: int) -> Optional[Any]:
         """
@@ -117,13 +121,17 @@ class BaseDataset:
         Returns:
             Optional[Any]: The target value for the given index, or None if not available.
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            "get_target is an abstract method and needs to be implemented."
+        )
 
     def get_targets(self) -> Optional[any]:
         return [self.get_target(i) for i in len(self)]
 
     def __len__(self) -> int:
-        raise NotImplementedError
+        raise NotImplementedError(
+            "The __len__ method must be implemented in the subclass."
+        )
 
     def apply_transforms(self, image, target):
         return self.transform(image), self.target_transform(target)
