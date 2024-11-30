@@ -96,7 +96,7 @@ def check_weighted_sampler_params(
         dataset_size = sizes[i]
         if dataset_size < size_threshold:
             logger.warning(
-                f"Dataset {dataset_name} with size {min_size} is less than 1% of the total data size {total_size}. Weighted sampling may be unstable."
+                f"Dataset {dataset_name} with size {dataset_size} is less than 1% of the total data size {total_size}. Weighted sampling may be unstable."
             )
 
 
