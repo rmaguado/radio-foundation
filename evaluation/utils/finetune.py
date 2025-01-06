@@ -1,7 +1,6 @@
 import os
 import torch
 import torch.nn as nn
-import numpy as np
 
 from functools import partial
 from omegaconf import OmegaConf
@@ -35,52 +34,22 @@ class ModelWithIntermediateLayers(nn.Module):
                 )
         return features
 
-class LinearClassifier(nn.Module):
-    def __init__(self, embed_dim, hidden_dim, num_labels, dropout=0.5):
-        super().__init__()
 
-        self.mlp = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
-            nn.LeakyReLU(),
-            nn.Dropout(p=dropout),
-            nn.Linear(hidden_dim, num_labels),
-        )
-
-    def forward(self, x):
-        return self.mlp(x)
-
-    def _initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+def extract_class_tokens(x_tokens_list, n_last_blocks=4):
+    class_tokens = torch.cat(
+        [class_token for _, class_token in x_tokens_list[-n_last_blocks:]],
+        dim=-1,
+    )
+    class_tokens = class_tokens.unsqueeze(0)
+    return class_tokens
 
 
-class DinoClassifier(nn.Module):
-    USE_N_BLOCKS = 4
-
-    def __init__(
-        self,
-        feature_model,
-        embed_dim=384 * 4,
-        hidden_dim=2048,
-        num_labels=2,
-        device=torch.device("cpu"),
-    ):
-        super().__init__()
-
-        self.feature_model = feature_model
-        self.classifier = LinearClassifier(embed_dim, hidden_dim, num_labels).to(device)
-
-    def forward(self, image):
-        with torch.no_grad():
-            x_tokens_list = self.feature_model(image)
-        intermediate_output = x_tokens_list[-DinoClassifier.USE_N_BLOCKS :]
-        class_tokens = torch.cat(
-            [class_token for _, class_token in intermediate_output], dim=-1
-        )
-        return self.classifier(class_tokens)
+def extract_patch_tokens(x_tokens_list, n_last_blocks=4):
+    patch_tokens = torch.cat(
+        [patch_token for patch_token, _ in x_tokens_list[-n_last_blocks:]],
+        dim=-1,
+    )
+    return patch_tokens
 
 
 def get_config(path_to_run):
@@ -140,4 +109,3 @@ def binary_accuracy_logits(outputs, targets):
     accuracy = (predicted_labels == targets).float().mean().item()
 
     return accuracy, [positives, true_pred_positives, negatives, true_pred_negatives]
-

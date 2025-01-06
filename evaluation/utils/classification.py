@@ -16,9 +16,29 @@ class ImageTransform:
         return normalized, target
 
 
-class AggregateClassTokens(nn.Module):
-    USE_N_BLOCKS = 4
+class LinearClassifier(nn.Module):
+    def __init__(self, embed_dim, hidden_dim, num_labels, dropout=0.5):
+        super().__init__()
 
+        self.mlp = nn.Sequential(
+            nn.Linear(embed_dim, hidden_dim),
+            nn.LeakyReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_dim, num_labels),
+        )
+
+    def forward(self, x):
+        return self.mlp(x)
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
+
+class AggregateClassTokens(nn.Module):
     def __init__(
         self,
         embed_dim=384 * 4,
@@ -31,12 +51,7 @@ class AggregateClassTokens(nn.Module):
 
         self.classifier = nn.Linear(embed_dim, num_labels).to(device)
 
-    def forward(self, x_tokens_list):
-        class_tokens = torch.cat(
-            [class_token for _, class_token in x_tokens_list[-self.USE_N_BLOCKS :]],
-            dim=-1,
-        )
-        class_tokens = class_tokens.unsqueeze(0)
+    def forward(self, class_tokens):
         cls_token = self.cls_token.expand(class_tokens.size(0), -1, -1)
         query = cls_token.permute(1, 0, 2)
         key = value = class_tokens.permute(1, 0, 2)

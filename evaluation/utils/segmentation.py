@@ -19,31 +19,6 @@ class ImageTargetTransform:
         return self.normalize(image_resized), target_resized
 
 
-class DinoSegmentation(nn.Module):
-    USE_N_BLOCKS = 4
-
-    def __init__(
-        self,
-        feature_model,
-        embed_dim=384 * 4,
-        hidden_dim=2048,
-        num_labels=2,
-        device=torch.device("cpu"),
-    ):
-        super().__init__()
-
-        self.feature_model = feature_model
-        self.classifier = LinearClassifier(embed_dim, hidden_dim, num_labels).to(device)
-
-    def forward(self, image):
-        x_tokens_list = self.feature_model(image)
-        intermediate_output = x_tokens_list[-DinoSegmentation.USE_N_BLOCKS :]
-        patch_tokens = torch.cat(
-            [patch_token for patch_token, _ in intermediate_output], dim=-1
-        )
-        return self.classifier(patch_tokens)
-
-
 def show_mask(image_slice, mask_slice):
     rescale_image = image_slice - np.min(image_slice)
     rescale_image /= np.max(rescale_image)
