@@ -10,10 +10,10 @@ class ImageTransform:
         self.resize = transforms.Resize((img_size, img_size))
         self.normalize = transforms.Normalize(mean=mean, std=std)
 
-    def __call__(self, image, target=None):
+    def __call__(self, image):
         resized = self.resize(image)
         normalized = self.normalize(resized)
-        return normalized, target
+        return normalized
 
 
 class LinearClassifier(nn.Module):

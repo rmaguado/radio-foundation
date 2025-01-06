@@ -42,7 +42,7 @@ def get_dataloader(dataset, channels, split="train") -> DataLoader:
     elif split == "val":
         return torch.utils.data.DataLoader(dataset, **loader_kwargs)
     else:
-        raise ValueError("train")
+        raise ValueError('split should be either "train" or "val"')
 
 
 class DeepRDTSplit:
@@ -53,8 +53,12 @@ class DeepRDTSplit:
         transform,
         max_workers: int,
         split: str = "train",
+        labels: bool = False,
         train_val_split: float = 0.8,
     ):
+        assert isinstance(labels, bool), "labels should be bool"
+        assert split in ["train", "val"], 'split should be either "train" or "val"'
+        
         self.dataset = DeepRDT_Responses(
             metadata_path=metadata_path,
             root_path=root_path,
@@ -62,8 +66,16 @@ class DeepRDTSplit:
             max_workers=max_workers
         )
 
+        # get number of positive and negative entries in the dataset
+        num_positives = 0
+        num_negatives = 0
+
         self.train_len = int(len(self.dataset) * train_val_split)
         self.val_len = len(self.dataset) - self.train_len
+
+        # divide up train and val to have equal (or almost) positives and negatives
+
+        
         if split == "train":
             self.get_function = lambda index: self.dataset[index]
             self.subset_len = self.train_len
@@ -106,6 +118,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
             ("dataset", "U256"),
             ("rowid", np.uint32),
             ("mapid", "U256"),
+            ("response", np.bool)
         ]
         entries = []
         for dataset_name in dataset_names:
@@ -113,8 +126,15 @@ class DeepRDT_Responses(DicomCTVolumesFull):
             dataset_series = self.cursor.execute(
                 f"SELECT rowid, mapid FROM '{dataset_name}'"
             ).fetchall()
+            
+            matches = self.metadata[self.metadata["MAPID"] == int(mapid)]["respuesta"]
+            if matches.shape[0] != 1:
+                raise ValueError(f"Expected exactly one match for MAPID={mapid}, but found {matches.shape[0]}.")
+            response_text = matches.iloc[0]
+            response = response_text in ["1-Completa", "2-Parcial"]
+            
             entries += [
-                (dataset_name, rowid, mapid) for rowid, mapid in dataset_series
+                (dataset_name, rowid, mapid, response) for rowid, mapid in dataset_series
             ]
         logger.info(f"Total number of scans: {len(entries)}.")
 
@@ -126,7 +146,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
         return np.load(entries_dir, mmap_mode="r")
 
     def get_image_data(self, index: int) -> Tuple[torch.Tensor, str]:
-        dataset_name, rowid, mapid = self.entries[index]
+        dataset_name, rowid, mapid, response = self.entries[index]
 
         self.cursor.execute(
             f"SELECT series_id, mapid FROM '{dataset_name}' WHERE rowid = {rowid}"
@@ -151,7 +171,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
             logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
             stack_data = torch.zeros((10, 512, 512))
 
-        return stack_data, mapid
+        return stack_data, mapid, response
 
     @staticmethod
     def load_dicom(row, root_path):
@@ -170,23 +190,12 @@ class DeepRDT_Responses(DicomCTVolumesFull):
 
         return torch.stack(stack_data)
 
-    def get_target(self, mapid: str) -> torch.Tensor:
-
-        matches = self.metadata[self.metadata["MAPID"] == int(mapid)]["respuesta"]
-
-        if matches.shape[0] != 1:
-            raise ValueError(f"Expected exactly one match for MAPID={mapid}, but found {matches.shape[0]}.")
-        
-        target = matches.iloc[0]
-
-        return target
-
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
-            image, mapid = self.get_image_data(index)
+            image, mapid, response = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
-
-        target = self.get_target(mapid)
-
-        return self.transform(image, target)
+            
+        transformed_image = self.transform(image)
+        
+        return transformed_image, response
