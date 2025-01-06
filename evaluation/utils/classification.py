@@ -17,29 +17,31 @@ class ImageTransform:
 
 
 class AggregateClassTokens(nn.Module):
+    USE_N_BLOCKS = 4
+
     def __init__(
         self,
-        feature_dim=384 * 4,
-        embed_dim=2048,
-        num_labels=2,
+        embed_dim=384 * 4,
+        num_labels=1,
         device=torch.device("cpu"),
     ):
         super().__init__()
-        self.multihead_attn = nn.MultiheadAttention(
-            embed_dim=embed_dim, num_heads=8, kdim=feature_dim, vdim=feature_dim
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=8)
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
+
+        self.classifier = nn.Linear(embed_dim, num_labels).to(device)
+
+    def forward(self, x_tokens_list):
+        class_tokens = torch.cat(
+            [class_token for _, class_token in x_tokens_list[-self.USE_N_BLOCKS :]],
+            dim=-1,
         )
-        self.cls_token = nn.Parameter(torch.randn(1, 1, feature_dim))
-
-        self.classifier = nn.Linear(feature_dim, num_labels).to(device)
-
-    def forward(self, features):
-        cls_tokens = self.cls_token.expand(features.size(1), -1, -1)
-        cls_tokens = cls_tokens.permute(1, 0, 2)
-
-        attn_output, _ = self.multihead_attn(cls_tokens, features, features)
-        attn_output = attn_output.permute(1, 0, 2)
-
-        return self.classifier(attn_output)
+        class_tokens = class_tokens.unsqueeze(0)
+        cls_token = self.cls_token.expand(class_tokens.size(0), -1, -1)
+        query = cls_token.permute(1, 0, 2)
+        key = value = class_tokens.permute(1, 0, 2)
+        attn_output, _ = self.multihead_attn(query, key, value)
+        return self.classifier(attn_output.squeeze(0))
 
 
 def _genertic_dataloader(dataset, is_infinite=False):
