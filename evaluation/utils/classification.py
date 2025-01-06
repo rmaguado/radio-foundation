@@ -1,6 +1,7 @@
 from torchvision import transforms
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from dinov2.data.samplers import InfiniteSampler
 
 
@@ -46,17 +47,24 @@ class AggregateClassTokens(nn.Module):
         device=torch.device("cpu"),
     ):
         super().__init__()
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=8)
-        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
+        self.query = nn.Parameter(torch.randn(embed_dim))
+        self.scale = embed_dim**0.5
 
-        self.classifier = nn.Linear(embed_dim, num_labels).to(device)
+        self.key_layer = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.value_layer = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        self.classifier = nn.Linear(embed_dim, num_labels)
 
     def forward(self, class_tokens):
-        cls_token = self.cls_token.expand(class_tokens.size(0), -1, -1)
-        query = cls_token.permute(1, 0, 2)
-        key = value = class_tokens.permute(1, 0, 2)
-        attn_output, _ = self.multihead_attn(query, key, value)
-        return self.classifier(attn_output.squeeze(0))
+        keys = self.key_layer(class_tokens)
+        values = self.value_layer(class_tokens)
+
+        scores = torch.matmul(keys, self.query) / self.scale
+        weights = F.softmax(scores, dim=0)
+
+        attention_output = torch.sum(weights.unsqueeze(-1) * values, dim=0)
+
+        return self.classifier(attention_output)
 
 
 def _genertic_dataloader(dataset, is_infinite=False):

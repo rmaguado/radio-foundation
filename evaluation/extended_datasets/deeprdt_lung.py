@@ -8,14 +8,13 @@ from concurrent.futures import ProcessPoolExecutor
 import logging
 import pandas as pd
 
-from dinov2.data.samplers import InfiniteSampler
 from dinov2.data.datasets.dicoms import DicomCTVolumesFull
 from torch.utils.data import DataLoader
 
 logger = logging.getLogger("dinov2")
 
 
-def get_dataloader(dataset, channels, split="train") -> DataLoader:
+def get_dataloaders(dataset_kwargs, channels, train_val_split=0.9) -> DataLoader:
 
     def collate_fn(inputs):
         img = inputs[0][0]
@@ -36,60 +35,57 @@ def get_dataloader(dataset, channels, split="train") -> DataLoader:
         "num_workers": 0,
     }
 
-    if split == "train":
-        sampler = InfiniteSampler(sample_count=len(dataset))
-        return torch.utils.data.DataLoader(dataset, sampler=sampler, **loader_kwargs)
-    elif split == "val":
-        return torch.utils.data.DataLoader(dataset, **loader_kwargs)
-    else:
-        raise ValueError('split should be either "train" or "val"')
+    dataset = DeepRDT_Responses(**dataset_kwargs)
+
+    total_entries = len(dataset)
+    labels = dataset.entries["response"]
+
+    indexes = np.arange(total_entries)
+    positive_indexes = indexes[labels]
+    negative_indexes = indexes[~labels]
+
+    np.random.shuffle(positive_indexes)
+    np.random.shuffle(negative_indexes)
+
+    num_positives = np.sum(labels)
+    num_negatives = total_entries - num_positives
+
+    train_positives = int(num_positives * train_val_split)
+    train_negatives = int(num_negatives * train_val_split)
+
+    train_positives_indexes = positive_indexes[:train_positives]
+    val_positives_indexes = positive_indexes[train_positives:]
+
+    train_negatives_indexes = negative_indexes[:train_negatives]
+    val_negatives_indexes = negative_indexes[train_negatives:]
+
+    def get_loader(indexes):
+        subset = DeepRDTSplit(dataset, indexes)
+        torch.utils.data.DataLoader(subset, **loader_kwargs)
+
+    return {
+        "train_positives": get_loader(train_positives_indexes),
+        "val_positives": get_loader(val_positives_indexes),
+        "train_negatives": get_loader(train_negatives_indexes),
+        "val_negatives": get_loader(val_negatives_indexes),
+    }
 
 
 class DeepRDTSplit:
     def __init__(
         self,
-        metadata_path: str,
-        root_path: str,
-        transform,
-        max_workers: int,
-        split: str = "train",
-        labels: bool = False,
-        train_val_split: float = 0.8,
+        dataset,
+        indexes,
     ):
-        assert isinstance(labels, bool), "labels should be bool"
-        assert split in ["train", "val"], 'split should be either "train" or "val"'
-        
-        self.dataset = DeepRDT_Responses(
-            metadata_path=metadata_path,
-            root_path=root_path,
-            transform=transform,
-            max_workers=max_workers
-        )
-
-        # get number of positive and negative entries in the dataset
-        num_positives = 0
-        num_negatives = 0
-
-        self.train_len = int(len(self.dataset) * train_val_split)
-        self.val_len = len(self.dataset) - self.train_len
-
-        # divide up train and val to have equal (or almost) positives and negatives
-
-        
-        if split == "train":
-            self.get_function = lambda index: self.dataset[index]
-            self.subset_len = self.train_len
-        elif split == "val":
-            self.get_function = lambda index: self.dataset[index + self.train_len]
-            self.subset_len = self.val_len
-        else:
-            raise ValueError('split should be either "train" or "val"')
+        self.dataset = dataset
+        self.indexes = indexes
+        self.subset_len = len(indexes)
 
     def __len__(self):
         return self.subset_len
 
     def __getitem__(self, index):
-        return self.get_function(index)
+        return self.dataset[self.indexes[index]]
 
 
 class DeepRDT_Responses(DicomCTVolumesFull):
@@ -118,7 +114,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
             ("dataset", "U256"),
             ("rowid", np.uint32),
             ("mapid", "U256"),
-            ("response", np.bool)
+            ("response", np.bool),
         ]
         entries = []
         for dataset_name in dataset_names:
@@ -126,16 +122,23 @@ class DeepRDT_Responses(DicomCTVolumesFull):
             dataset_series = self.cursor.execute(
                 f"SELECT rowid, mapid FROM '{dataset_name}'"
             ).fetchall()
-            
-            matches = self.metadata[self.metadata["MAPID"] == int(mapid)]["respuesta"]
-            if matches.shape[0] != 1:
-                raise ValueError(f"Expected exactly one match for MAPID={mapid}, but found {matches.shape[0]}.")
-            response_text = matches.iloc[0]
-            response = response_text in ["1-Completa", "2-Parcial"]
-            
-            entries += [
-                (dataset_name, rowid, mapid, response) for rowid, mapid in dataset_series
-            ]
+
+            for rowid, mapid in dataset_series:
+
+                matches = self.metadata[self.metadata["MAPID"] == int(mapid)][
+                    "respuesta"
+                ]
+                if matches.shape[0] != 1:
+                    raise ValueError(
+                        f"Expected exactly one match for MAPID={mapid}, but found {matches.shape[0]}."
+                    )
+                response_text = matches.iloc[0]
+
+                # 1-Completa, 2-Parcial, 3-Estable, 4-Progresion
+                response = response_text in ["1-Completa", "2-Parcial"]
+
+                entries.append((dataset_name, rowid, mapid, response))
+
         logger.info(f"Total number of scans: {len(entries)}.")
 
         entries_array = np.array(entries, dtype=entries_dtype)
@@ -195,7 +198,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
             image, mapid, response = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
-            
+
         transformed_image = self.transform(image)
-        
+
         return transformed_image, response
