@@ -122,7 +122,7 @@ class DeepRDTProcessor(DicomProcessor):
             if os.path.isdir(scan_path):
                 paths_ids.append((scan_path, mapid))
     
-            return paths_ids
+        return paths_ids
 
     def prepare_dataset(self) -> None:
         """
