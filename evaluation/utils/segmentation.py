@@ -1,7 +1,78 @@
 import torch
+import torch.nn as nn
+import numpy as np
+
+from torchvision import transforms
+
 import random
 
-from evaluation.utils import binary_mask_to_patch_labels
+
+class ImageTargetTransform:
+    def __init__(self, img_size, mean, std):
+        self.img_size = img_size
+        self.resize = transforms.Resize((img_size, img_size))
+        self.normalize = transforms.Normalize(mean=mean, std=std)
+
+    def __call__(self, image, target):
+        image_resized = self.resize(image)
+        target_resized = self.resize(target)
+        return self.normalize(image_resized), target_resized
+
+
+class DinoSegmentation(nn.Module):
+    USE_N_BLOCKS = 4
+
+    def __init__(
+        self,
+        feature_model,
+        embed_dim=384 * 4,
+        hidden_dim=2048,
+        num_labels=2,
+        device=torch.device("cpu"),
+    ):
+        super().__init__()
+
+        self.feature_model = feature_model
+        self.classifier = LinearClassifier(embed_dim, hidden_dim, num_labels).to(device)
+
+    def forward(self, image):
+        x_tokens_list = self.feature_model(image)
+        intermediate_output = x_tokens_list[-DinoSegmentation.USE_N_BLOCKS :]
+        patch_tokens = torch.cat(
+            [patch_token for patch_token, _ in intermediate_output], dim=-1
+        )
+        return self.classifier(patch_tokens)
+
+
+def show_mask(image_slice, mask_slice):
+    rescale_image = image_slice - np.min(image_slice)
+    rescale_image /= np.max(rescale_image)
+
+    color_image = np.stack([np.array(rescale_image).astype(np.float32)] * 3, axis=-1)
+    color_image[:, :, 0] += np.array(mask_slice).astype(np.float32)
+    return np.clip(color_image, 0, 1)
+
+
+def binary_mask_to_patch_labels(mask: torch.Tensor, patch_size: int) -> torch.Tensor:
+    """
+    Convert binary masks to patch-level labels.
+
+    Parameters:
+    - mask (torch.Tensor): Input binary mask of shape (batch_size, channels, img_size, img_size)
+    - patch_size (int): Size of the patch (both width and height)
+
+    Returns:
+    - patch_labels (torch.Tensor): Patch-level labels of shape (batch_size, num_patches * num_patches. 1)
+    """
+    batch_size, _, img_size, _ = mask.shape
+    assert img_size % patch_size == 0, "Image size must be divisible by patch size"
+
+    mask = mask.max(dim=1)[0]
+
+    mask = mask.unfold(1, patch_size, patch_size).unfold(2, patch_size, patch_size)
+    patch_labels = mask.max(dim=-1)[0].max(dim=-1)[0].squeeze(1)
+
+    return patch_labels.view(batch_size, -1)
 
 
 def sample_from_queues(
