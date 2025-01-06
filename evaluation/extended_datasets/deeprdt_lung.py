@@ -61,7 +61,7 @@ def get_dataloaders(dataset_kwargs, channels, train_val_split=0.9) -> DataLoader
 
     def get_loader(indexes):
         subset = DeepRDTSplit(dataset, indexes)
-        torch.utils.data.DataLoader(subset, **loader_kwargs)
+        return torch.utils.data.DataLoader(subset, **loader_kwargs)
 
     return {
         "train_positives": get_loader(train_positives_indexes),
@@ -90,14 +90,13 @@ class DeepRDTSplit:
 
 class DeepRDT_Responses(DicomCTVolumesFull):
     def __init__(self, metadata_path: str, root_path: str, transform, max_workers: int):
+        self.metadata = pd.read_csv(metadata_path)
         super().__init__(
             dataset_name="DeepRDT-lung",
             root_path=root_path,
             transform=transform,
         )
         self.max_workers = max_workers
-
-        self.metadata = pd.read_csv(metadata_path)
 
     def create_entries(self) -> np.ndarray:
         """
