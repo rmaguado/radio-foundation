@@ -40,13 +40,7 @@ class LinearClassifier(nn.Module):
 
 
 class AggregateClassTokens(nn.Module):
-    def __init__(
-        self,
-        embed_dim=384 * 4,
-        hidden_dim=1024,
-        num_labels=1,
-        device=torch.device("cpu"),
-    ):
+    def __init__(self, embed_dim=384 * 4, hidden_dim=1024, num_labels=1):
         super().__init__()
         self.linear = nn.Linear(embed_dim, hidden_dim, bias=False)
         self.attention_weights = nn.Linear(hidden_dim, 1)
@@ -55,8 +49,9 @@ class AggregateClassTokens(nn.Module):
     def forward(self, class_tokens):
         x = self.linear(class_tokens)
         weights = self.attention_weights(x).squeeze(-1)
-        weights = torch.softmax(weights, dim=0)
-        attention_output = torch.sum(weights[:, None] * x, dim=0)
+        weights = torch.softmax(weights, dim=0).unsqueeze(-1)
+
+        attention_output = torch.sum(weights * x, dim=1)
 
         return self.classifier(attention_output)
 
