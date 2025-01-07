@@ -98,7 +98,7 @@ class ImageTransforms:
             mean (float): The mean value of the image pixel.
             std (float): The standard deviation of the image pixel.
         """
-        return transforms.Normalize(mean=mean, std=std)
+        self.transform_list.append(transforms.Normalize(mean=mean, std=std))
 
     def _get_random_transform(self, transform_name: str, kwargs: dict) -> Callable:
         kwargs = copy.deepcopy(kwargs)

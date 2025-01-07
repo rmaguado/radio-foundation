@@ -4,14 +4,10 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- Dataloader to eval using entire volume
-- script for running benchmark tests (after I have many datasets)
-- scripts to test transforms (generate samples)
-- Randomise sagital and coronal views for nifti dataloader if spacing is cube.
-
-- update userguide for data processing
-
-- Experiment: Remove patches with only black pixels to increase efficiency. 
+- [ ] tests for COVID-19-NY-SBU
+- [ ] script for running benchmark tests
+- [ ] Randomise sagital and coronal views for nifti dataloader if spacing is cube.
+- [ ] update userguide for data processing
 
 ## Overview
 
@@ -37,20 +33,12 @@ augmentations:
     - name: globalcrop
     - name: flip
       p: 0.5
-    - name: contrast
-      p: 0.8
-    - name: brightness
-      p: 0.8
     - name: gaussian_blur
       p: 1.0
     global_2:
     - name: globalcrop
     - name: flip
       p: 0.5
-    - name: contrast
-      p: 0.8
-    - name: brightness
-      p: 0.8
     - name: noise
       p: 0.5
       mean: 0.0
@@ -61,10 +49,6 @@ augmentations:
     - name: localcrop
     - name: flip
       p: 0.5
-    - name: contrast
-      p: 0.8
-    - name: brightness
-      p: 0.8
     - name: gaussian_blur
       p: 0.5
 ```
