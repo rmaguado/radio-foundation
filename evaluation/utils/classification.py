@@ -53,7 +53,7 @@ class AggregateClassTokens(nn.Module):
 
         attention_output = torch.sum(weights * x, dim=1)
 
-        return self.classifier(attention_output)
+        return self.classifier(attention_output).view(-1)
 
 
 def _genertic_dataloader(dataset, is_infinite=False):
