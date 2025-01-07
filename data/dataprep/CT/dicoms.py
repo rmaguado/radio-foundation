@@ -83,7 +83,7 @@ class DicomCtValidation:
         else:
             if image_type[0] != "ORIGINAL" and not self.derived_okay:
                 return f"\tImage type is not ORIGINAL: ({image_type}).\n"
-            if image_type[1] != "PRIMARY":
+            if image_type[1] != "PRIMARY" and not self.derived_okay:
                 return f"\tImage type is not PRIMARY: ({image_type[1]}).\n"
         if len(image_type) > 2:
             if image_type[2] == "LOCALIZER":

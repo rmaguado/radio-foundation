@@ -146,20 +146,12 @@ augmentations:
     - name: globalcrop
     - name: flip
       p: 0.5
-    - name: contrast
-      p: 0.8
-    - name: brightness
-      p: 0.8
     - name: gaussian_blur
       p: 1.0
     global_2:
     - name: globalcrop
     - name: flip
       p: 0.5
-    - name: contrast
-      p: 0.8
-    - name: brightness
-      p: 0.8
     - name: noise
       p: 0.5
       mean: 0.0
@@ -170,9 +162,5 @@ augmentations:
     - name: localcrop
     - name: flip
       p: 0.5
-    - name: contrast
-      p: 0.8
-    - name: brightness
-      p: 0.8
     - name: gaussian_blur
       p: 0.5

@@ -23,7 +23,9 @@ class NiftiVolumes(BaseDataset):
         return len(self.entries)
 
     def get_image_data(self, index: int) -> torch.Tensor:
-        raise NotImplementedError
+        raise NotImplementedError(
+            "get_image_data is an abstract method and needs to be implemented."
+        )
 
     def create_entries(self) -> np.ndarray:
         """
@@ -36,13 +38,12 @@ class NiftiVolumes(BaseDataset):
         logger.info(f"Creating entries for {self.dataset_name}.")
 
         slice_stack_num = self.channels
-        entries_dataset_path = os.path.join(
-            self.entries_path, f"{slice_stack_num}_channels.npy"
-        )
 
         nifti_volumes = self.cursor.execute(
             "SELECT rowid, num_slices FROM global"
         ).fetchall()
+
+        logger.info(f"Total number of series: {len(nifti_volumes)}.")
 
         entries = []
         for rowid, num_slices in nifti_volumes:
@@ -59,9 +60,10 @@ class NiftiVolumes(BaseDataset):
         entries_dtype = np.dtype([("rowid", np.int32), ("slice_index", np.int32)])
         entries_array = np.array(entries, dtype=entries_dtype)
 
-        logger.info(f"Saving entries to {entries_dataset_path}.")
-        np.save(entries_dataset_path, entries_array)
-        return np.load(entries_dataset_path, mmap_mode="r")
+        entries_dir = self.get_entries_dir()
+        logger.info(f"Saving entries to {entries_dir}.")
+        np.save(entries_dir, entries_array)
+        return np.load(entries_dir, mmap_mode="r")
 
 
 class NiftiCtDataset(NiftiVolumes):
@@ -70,10 +72,9 @@ class NiftiCtDataset(NiftiVolumes):
         self,
         dataset_name: str,
         root_path: str,
-        output_path: str,
-        channels: int,
-        lower_window: int,
-        upper_window: int,
+        channels: int = 1,
+        lower_window: int = -1000,
+        upper_window: int = -1900,
         transform: Optional[Callable] = lambda _: _,
         target_transform: Optional[Callable] = lambda _: _,
     ) -> None:
@@ -83,7 +84,6 @@ class NiftiCtDataset(NiftiVolumes):
         Args:
             dataset_name (str): The name of the dataset.
             root_path (str): The root path of the dataset.
-            output_path (str): The output path for the dataset.
             channels (int): The number of channels to use.
             lower_window (int): The lower window value.
             upper_window (int): The upper window value.
@@ -98,7 +98,6 @@ class NiftiCtDataset(NiftiVolumes):
         self.entries_path = os.path.join("data/index", self.dataset_name, "entries")
 
         self.root_path = root_path
-        self.output_path = output_path
         self.channels = channels
 
         self.transform = transform
@@ -176,9 +175,9 @@ class NiftiCtDataset(NiftiVolumes):
             torch.Tensor: The processed CT scan data.
         """
         volume_data = np.clip(volume_data, self.lower_window, self.upper_window)
-        volume_data = (volume_data - self.lower_window) / (
-            self.upper_window - self.lower_window
-        )
+        # volume_data = (volume_data - self.lower_window) / (
+        #    self.upper_window - self.lower_window
+        # )
         return torch.tensor(volume_data, dtype=torch.float32)
 
 
@@ -187,26 +186,8 @@ class NiftiCtVolumesFull(NiftiCtDataset):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def create_entries(self) -> np.ndarray:
-        """
-        Generates a numpy memmap object pointing to the sqlite database rows of nifti paths.
-        For collecting various slices of a CT scan (multi-channel) each memmap row contains the ordered rowids of the slices.
-
-        Returns:
-            np.ndarray: The entries dataset (memmap).
-        """
-        logger.info(f"Creating entries for {self.dataset_name}.")
-
-        entries_dataset_path = os.path.join(self.entries_path, f"full.npy")
-
-        entries = self.cursor.execute("SELECT rowid FROM global").fetchall()
-
-        entries_dtype = np.dtype([("rowid", np.int32)])
-        entries_array = np.array(entries, dtype=entries_dtype)
-
-        logger.info(f"Saving entries to {entries_dataset_path}.")
-        np.save(entries_dataset_path, entries_array)
-        return np.load(entries_dataset_path, mmap_mode="r")
+    def get_entries_dir(self) -> str:
+        return os.path.join(self.entries_path, f"full.npy")
 
     def get_image_data(self, index: int) -> torch.Tensor:
         rowid = self.entries[index]
@@ -227,5 +208,6 @@ class NiftiCtVolumesFull(NiftiCtDataset):
         return self.process_ct(volume_data)
 
     def get_target(self, index: int) -> Optional[Any]:
-        """Maybe get it from a csv file"""
-        raise NotImplementedError
+        raise NotImplementedError(
+            "get_target is an abstract method and needs to be implemented."
+        )

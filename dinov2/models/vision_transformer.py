@@ -68,7 +68,9 @@ def get_embedding_layer(
             conv_channels=conv_channels,
         )
     else:
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"Embedding layer '{embed_layer}' is not implemented. Use 'patch' or 'conv'."
+        )
 
 
 class BlockChunk(nn.ModuleList):
@@ -181,7 +183,9 @@ class DinoVisionTransformer(nn.Module):
 
             ffn_layer = f
         else:
-            raise NotImplementedError
+            raise NotImplementedError(
+                f"FFN layer '{ffn_layer}' is not implemented. Use 'mlp', 'swiglu', or 'identity'."
+            )
 
         blocks_list = [
             block_fn(
