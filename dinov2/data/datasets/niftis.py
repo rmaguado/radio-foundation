@@ -175,9 +175,9 @@ class NiftiCtDataset(NiftiVolumes):
             torch.Tensor: The processed CT scan data.
         """
         volume_data = np.clip(volume_data, self.lower_window, self.upper_window)
-        volume_data = (volume_data - self.lower_window) / (
-            self.upper_window - self.lower_window
-        )
+        # volume_data = (volume_data - self.lower_window) / (
+        #    self.upper_window - self.lower_window
+        # )
         return torch.tensor(volume_data, dtype=torch.float32)
 
 

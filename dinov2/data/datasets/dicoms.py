@@ -186,9 +186,9 @@ class DicomCtDataset(DicomVolumes):
         array_data = dcm.pixel_array.astype(np.float32) * slope + intercept
 
         array_data = np.clip(array_data, self.lower_window, self.upper_window)
-        array_data = (array_data - self.lower_window) / (
-            self.upper_window - self.lower_window
-        )
+        # array_data = (array_data - self.lower_window) / (
+        #    self.upper_window - self.lower_window
+        # )
 
         return torch.tensor(array_data, dtype=torch.float32)
 
