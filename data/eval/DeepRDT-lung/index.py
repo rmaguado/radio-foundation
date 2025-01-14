@@ -1,3 +1,7 @@
+"""
+Indexing script for evaluation with DeepRDT-lung
+"""
+
 from typing import List, Tuple
 import os
 from tqdm import tqdm
@@ -12,7 +16,7 @@ from data.dataprep import DicomProcessor, DicomDatabase
 logger = logging.getLogger("dataprep")
 
 
-class DeepRDTDatabase(DicomDatabase):
+class Database(DicomDatabase):
     def __init__(self, config):
         super().__init__(config)
 
@@ -56,12 +60,12 @@ class DeepRDTDatabase(DicomDatabase):
         )
 
 
-class DeepRDTProcessor(DicomProcessor):
+class Processor(DicomProcessor):
     def __init__(self, config: dict):
         self.dataset_name = config["dataset_name"]
         self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
 
-        self.database = DeepRDTDatabase(config)
+        self.database = Database(config)
 
         log_path = f"data/log/eval/{self.dataset_name}.log"
         set_logging(log_path)
@@ -112,16 +116,17 @@ class DeepRDTProcessor(DicomProcessor):
         paths_ids = []
 
         mapids = [
-            folder for folder in os.listdir(self.absolute_dataset_path) \
+            folder
+            for folder in os.listdir(self.absolute_dataset_path)
             if os.path.isdir(os.path.join(self.absolute_dataset_path, folder))
         ]
 
         for mapid in mapids:
-            scan_path = os.path.join(self.absolute_dataset_path, mapid, 'pCT')
-    
+            scan_path = os.path.join(self.absolute_dataset_path, mapid, "pCT")
+
             if os.path.isdir(scan_path):
                 paths_ids.append((scan_path, mapid))
-    
+
         return paths_ids
 
     def prepare_dataset(self) -> None:
@@ -174,34 +179,26 @@ def get_argpase():
     parser.add_argument(
         "--root_path", type=str, required=True, help="The root path of the dataset."
     )
-    parser.add_argument(
-        "--dataset_name", type=str, required=True, help="The name of the dataset."
-    )
-    parser.add_argument(
-        "--db_name",
-        type=str,
-        default="dicom_datasets",
-        required=False,
-        help="The name of the database. Will be saved in data/index/<db_name>/index.db",
-    )
     return parser
 
 
 def main(args):
-    dataset_path = os.path.join(args.root_path, args.dataset_name)
+    dataset_name = "DeepRDT-lung"
+    db_name = "DeepRDT-lung"
+    dataset_path = os.path.join(args.root_path, dataset_name)
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
 
-    db_dir = os.path.join("data/index", args.db_name)
+    db_dir = os.path.join("data/index", db_name)
     os.makedirs(db_dir, exist_ok=True)
     db_path = os.path.join(db_dir, "index.db")
 
     config = {
-        "dataset_name": args.dataset_name,
+        "dataset_name": dataset_name,
         "dataset_path": dataset_path,
         "db_path": db_path,
     }
-    processor = DeepRDTProcessor(config)
+    processor = Processor(config)
     processor.prepare_dataset()
 
 
