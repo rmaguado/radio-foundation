@@ -57,6 +57,7 @@ def sample_from_queues(
     patch_labels,
     num_resample,
     device,
+    hard_negative_fraction = 0.5
 ):
     """
     Sample tokens and labels from both caches and new tokens.
@@ -68,8 +69,8 @@ def sample_from_queues(
 
     # number of new samples to add
     num_positive_samples = num_resample // 2
-    num_hard_negative_samples = num_resample // 4
-    num_new_negative_samples = num_resample // 4
+    num_hard_negative_samples = int(num_resample // 2 * hard_negative_fraction)
+    num_new_negative_samples = num_resample - num_positive_samples - num_hard_negative_samples
 
     if len(negative_patch_queue) < num_hard_negative_samples:
         difference = num_hard_negative_samples - len(negative_patch_queue)
