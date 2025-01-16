@@ -38,7 +38,8 @@ def get_dataloaders(dataset_kwargs, channels, train_val_split=0.9) -> DataLoader
     dataset = DeepRDT_Responses(**dataset_kwargs)
 
     total_entries = len(dataset)
-    labels = dataset.entries["response"]
+    target_field = dataset_kwargs["target_field"]
+    labels = dataset.entries[target_field]
 
     indexes = np.arange(total_entries)
     positive_indexes = indexes[labels]
@@ -89,13 +90,14 @@ class DeepRDTSplit:
 
 
 class DeepRDT_Responses(DicomCTVolumesFull):
-    def __init__(self, metadata_path: str, root_path: str, transform, max_workers: int):
+    def __init__(self, metadata_path: str, root_path: str, transform, max_workers: int, target_field="response"):
         self.metadata = pd.read_csv(metadata_path)
         super().__init__(
             dataset_name="DeepRDT-lung",
             root_path=root_path,
             transform=transform,
         )
+        self.target_field = target_field
         self.max_workers = max_workers
 
     def create_entries(self) -> np.ndarray:
@@ -114,6 +116,8 @@ class DeepRDT_Responses(DicomCTVolumesFull):
             ("rowid", np.uint32),
             ("mapid", "U256"),
             ("response", np.bool),
+            ("tabaco", np.bool),
+            ("sexo", np.bool)
         ]
         entries = []
         for dataset_name in dataset_names:
@@ -124,19 +128,20 @@ class DeepRDT_Responses(DicomCTVolumesFull):
 
             for rowid, mapid in dataset_series:
 
-                matches = self.metadata[self.metadata["MAPID"] == int(mapid)][
-                    "respuesta"
-                ]
-                if matches.shape[0] != 1:
-                    raise ValueError(
-                        f"Expected exactly one match for MAPID={mapid}, but found {matches.shape[0]}."
-                    )
-                response_text = matches.iloc[0]
-
+                metadata_row = self.metadata[self.metadata["MAPID"] == int(mapid)].iloc[0]
+                
+                response_text = metadata_row["respuesta"]
                 # 1-Completa, 2-Parcial, 3-Estable, 4-Progresion
                 response = response_text in ["1-Completa", "2-Parcial"]
 
-                entries.append((dataset_name, rowid, mapid, response))
+                sexo_text = metadata_row["sexo"]
+                assert sexo_text in ["Hombre", "Mujer"]
+                sexo = sexo_text == "Hombre"
+
+                tabaco_text = metadata_row["tabaco"]
+                tabaco = tabaco_text != "Nunca"
+
+                entries.append((dataset_name, rowid, mapid, response, tabaco, sexo))
 
         logger.info(f"Total number of scans: {len(entries)}.")
 
@@ -148,7 +153,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
         return np.load(entries_dir, mmap_mode="r")
 
     def get_image_data(self, index: int) -> Tuple[torch.Tensor, str]:
-        dataset_name, rowid, mapid, response = self.entries[index]
+        dataset_name, rowid, mapid, response, tabaco, sexo = self.entries[index]
 
         self.cursor.execute(
             f"SELECT series_id, mapid FROM '{dataset_name}' WHERE rowid = {rowid}"
@@ -173,7 +178,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
             logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
             stack_data = torch.zeros((10, 512, 512))
 
-        return stack_data, mapid, response
+        return stack_data, mapid, response, tabaco, sexo
 
     @staticmethod
     def load_dicom(row, root_path):
@@ -194,10 +199,19 @@ class DeepRDT_Responses(DicomCTVolumesFull):
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
-            image, mapid, response = self.get_image_data(index)
+            image, mapid, response, tabaco, sexo = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
 
+        if self.target_field == "response":
+            target = response
+        elif self.target_field == "tabaco":
+            target = tabaco
+        elif self.target_field == "sexo":
+            target = sexo
+        else:
+            raise RuntimeError(f"Unknown field {self.target_field}")
+
         transformed_image = self.transform(image)
 
-        return transformed_image, response
+        return transformed_image, target
