@@ -88,24 +88,3 @@ def load_model(path_to_run, checkpoint_name, device):
     feature_model = ModelWithIntermediateLayers(model, 4, autocast_ctx)
 
     return feature_model, config
-
-
-def multiclass_accuracy_logits(outputs, targets):
-    predicted_labels = torch.argmax(outputs.detach().cpu(), dim=1)
-    correct_predictions = predicted_labels == targets.cpu()
-    return correct_predictions.sum().item() / targets.size(0)
-
-
-def binary_accuracy_logits(outputs, targets):
-    predicted_labels = (outputs > 0).int()
-    targets = targets.int()
-
-    true_pred_positives = (predicted_labels * targets).sum().item()
-    true_pred_negatives = ((1 - predicted_labels) * (1 - targets)).sum().item()
-
-    positives = targets.sum().item()
-    negatives = targets.numel() - positives
-
-    accuracy = (predicted_labels == targets).float().mean().item()
-
-    return accuracy, [positives, true_pred_positives, negatives, true_pred_negatives]
