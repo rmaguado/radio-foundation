@@ -1,5 +1,7 @@
 """
-Indexing script for evaluation with DeepRDT-lung
+Base indexing classes for evaluating a dataset.
+Extends scripts in data/dataprep.
+Includes map_id in the SQLite database to reference metadata.
 """
 
 from typing import List, Tuple
@@ -16,20 +18,21 @@ from data.dataprep import DicomProcessor, DicomDatabase
 logger = logging.getLogger("dataprep")
 
 
-class Database(DicomDatabase):
+class DicomEvalBase(DicomDatabase):
     def __init__(self, config):
         super().__init__(config)
 
     def create_dataset_info_table(self, dataset_name) -> None:
         """
         Create a dataset table in the database.
+        Includes additional column, 'map_id', to find metadata.
         """
         dataset_name_str = f'"{dataset_name}"'
         self.cursor.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {dataset_name_str} (
                 series_id TEXT PRIMARY KEY,
-                mapid TEXT,
+                map_id TEXT,
                 num_slices INTEGER,
                 image_shape_x INTEGER,
                 image_shape_y INTEGER,
@@ -51,7 +54,7 @@ class Database(DicomDatabase):
         self.cursor.execute(
             f"""
             INSERT INTO {dataset_name_str} (
-                series_id, mapid, num_slices, image_shape_x, image_shape_y,
+                series_id, map_id, num_slices, image_shape_x, image_shape_y,
                 slice_thickness, spacing_x, spacing_y
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -60,12 +63,12 @@ class Database(DicomDatabase):
         )
 
 
-class Processor(DicomProcessor):
-    def __init__(self, config: dict):
+class DicomProcessorBase(DicomProcessor):
+    def __init__(self, config: dict, database):
         self.dataset_name = config["dataset_name"]
         self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
 
-        self.database = Database(config)
+        self.database = database
 
         log_path = f"data/log/eval/{self.dataset_name}.log"
         set_logging(log_path)
@@ -74,7 +77,7 @@ class Processor(DicomProcessor):
         self,
         dicom_paths: List[Tuple[str, pydicom.dataset.FileDataset]],
         series_id: str,
-        mapid: str,
+        map_id: str,
     ) -> None:
         """
         Process a series and return metadata and paths to dicom files.
@@ -82,7 +85,7 @@ class Processor(DicomProcessor):
         Args:
             dicom_paths (List[Tuple[str, pydicom.dataset.FileDataset]]): A list of tuples containing the path and the dicom object.
             series_id (str): Series ID.
-            mapid (str): ID to link the scan to its metadata.
+            map_id (str): ID to link the scan to its metadata.
         """
         first_dicom = dicom_paths[0][1]
         num_slices = len(dicom_paths)
@@ -91,7 +94,7 @@ class Processor(DicomProcessor):
 
         metadata = (
             series_id,
-            mapid,
+            map_id,
             num_slices,
             image_shape[0],
             image_shape[1],
@@ -183,8 +186,8 @@ def get_argpase():
 
 
 def main(args):
-    dataset_name = "DeepRDT-lung"
-    db_name = "DeepRDT-lung"
+    dataset_name = "DemoDatasetName"
+    db_name = "DemoDatasetName-Eval"
     dataset_path = os.path.join(args.root_path, dataset_name)
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
@@ -198,7 +201,8 @@ def main(args):
         "dataset_path": dataset_path,
         "db_path": db_path,
     }
-    processor = Processor(config)
+    database = DicomEvalBase(config)
+    processor = DicomProcessorBase(config, database)
     processor.prepare_dataset()
 
 
