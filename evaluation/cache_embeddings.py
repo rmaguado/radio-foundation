@@ -3,6 +3,7 @@ import argparse
 from dotenv import load_dotenv
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from evaluation.utils.finetune import (
     load_model,
@@ -34,7 +35,7 @@ def generate_embeddings(model, dataset, output_path, embed_patches, embed_cls, d
     else:
         raise ValueError("Must save at least path or class token embeddings.")
 
-    for i in range(len(dataset)):
+    for i in tqdm(range(len(dataset))):
         volume, map_id = dataset[i]
         output_file = os.path.join(output_path, f"{map_id}.npy")
 
