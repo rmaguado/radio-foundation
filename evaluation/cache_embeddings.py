@@ -39,7 +39,7 @@ def generate_embeddings(model, dataset, output_path, embed_patches, embed_cls, d
         output_file = os.path.join(output_path, f"{map_id}.npy")
 
         with torch.no_grad():
-            x_tokens_list = model(inputs.to(device))
+            x_tokens_list = model(volume.to(device))
         embeddings = embed_fcn(x_tokens_list)
         embeddings = embeddings.cpu().numpy()
         np.save(output_file, embeddings)
@@ -55,7 +55,7 @@ def main():
     load_dotenv()
     project_path = os.getenv("PROJECTPATH")
 
-    model, config = get_model(project_path, args.run_name, args.checkpoint_name, "cpu")
+    model, config = get_model(project_path, args.run_name, args.checkpoint_name, device)
     full_image_size = config.student.full_image_size  # 504
     data_mean = -573.8
     data_std = 461.3
