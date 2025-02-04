@@ -2,6 +2,7 @@ import os
 import argparse
 from dotenv import load_dotenv
 import numpy as np
+import torch
 
 from evaluation.utils.finetune import (
     load_model,
@@ -23,7 +24,7 @@ def get_model(project_path, run_name, checkpoint_name, device):
     return feature_model, config
 
 
-def generate_embeddings(model, dataset, output_path, embed_patches, embed_cls):
+def generate_embeddings(model, dataset, output_path, embed_patches, embed_cls, device):
     if embed_patches and embed_cls:
         embed_fcn = extract_all_tokens
     elif embed_patches:
@@ -37,7 +38,8 @@ def generate_embeddings(model, dataset, output_path, embed_patches, embed_cls):
         volume, map_id = dataset[i]
         output_file = os.path.join(output_path, f"{map_id}.npy")
 
-        x_tokens_list = model(volume)
+        with torch.no_grad():
+            x_tokens_list = model(inputs.to(device))
         embeddings = embed_fcn(x_tokens_list)
         embeddings = embeddings.cpu().numpy()
         np.save(output_file, embeddings)
@@ -46,10 +48,9 @@ def generate_embeddings(model, dataset, output_path, embed_patches, embed_cls):
 def main():
     parser = get_argpase()
     args = parser.parse_args()
-    if args.device_name == "cpu":
-        print(
-            "Running on CPU. This will be slow. Set --device_name to cuda to run on GPU."
-        )
+    if not torch.cuda.is_available():
+        raise RuntimeError("Cuda not available.")
+    device = torch.device("cuda:0")
 
     load_dotenv()
     project_path = os.getenv("PROJECTPATH")
@@ -80,7 +81,9 @@ def main():
         max_workers=max_workers,
     )
 
-    generate_embeddings(model, dataset, output_path, args.embed_patches, args.embed_cls)
+    generate_embeddings(
+        model, dataset, output_path, args.embed_patches, args.embed_cls, device
+    )
 
 
 def get_argpase():
@@ -107,15 +110,13 @@ def get_argpase():
         help="The name of the checkpoint to load.",
     )
     parser.add_argument(
-        "--device_name",
-        type=str,
-        default="cpu",
-        help="The name of the checkpoint to load.",
-    )
-    parser.add_argument(
         "--embed_patches", action="store_true", help="Wether to save patch embeddings."
     )
     parser.add_argument(
         "--embed_cls", action="store_true", help="Wether to save class embeddings."
     )
     return parser
+
+
+if __name__ == "__main__":
+    main()
