@@ -92,7 +92,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
     def __init__(self, metadata_path: str, root_path: str, transform, max_workers: int):
         self.metadata = pd.read_csv(metadata_path)
         super().__init__(
-            dataset_name="DeepRDT-lung",
+            dataset_name="DeepRDT-lung_eval",
             root_path=root_path,
             transform=transform,
         )
@@ -112,31 +112,31 @@ class DeepRDT_Responses(DicomCTVolumesFull):
         entries_dtype = [
             ("dataset", "U256"),
             ("rowid", np.uint32),
-            ("mapid", "U256"),
+            ("map_id", "U256"),
             ("response", np.bool),
         ]
         entries = []
         for dataset_name in dataset_names:
             dataset_name = dataset_name[0]
             dataset_series = self.cursor.execute(
-                f"SELECT rowid, mapid FROM '{dataset_name}'"
+                f"SELECT rowid, map_id FROM '{dataset_name}'"
             ).fetchall()
 
-            for rowid, mapid in dataset_series:
+            for rowid, map_id in dataset_series:
 
-                matches = self.metadata[self.metadata["MAPID"] == int(mapid)][
+                matches = self.metadata[self.metadata["MAPID"] == int(map_id)][
                     "respuesta"
                 ]
                 if matches.shape[0] != 1:
                     raise ValueError(
-                        f"Expected exactly one match for MAPID={mapid}, but found {matches.shape[0]}."
+                        f"Expected exactly one match for MAPID={map_id}, but found {matches.shape[0]}."
                     )
                 response_text = matches.iloc[0]
 
                 # 1-Completa, 2-Parcial, 3-Estable, 4-Progresion
                 response = response_text in ["1-Completa", "2-Parcial"]
 
-                entries.append((dataset_name, rowid, mapid, response))
+                entries.append((dataset_name, rowid, map_id, response))
 
         logger.info(f"Total number of scans: {len(entries)}.")
 
@@ -148,12 +148,12 @@ class DeepRDT_Responses(DicomCTVolumesFull):
         return np.load(entries_dir, mmap_mode="r")
 
     def get_image_data(self, index: int) -> Tuple[torch.Tensor, str]:
-        dataset_name, rowid, mapid, response = self.entries[index]
+        dataset_name, rowid, map_id, response = self.entries[index]
 
         self.cursor.execute(
-            f"SELECT series_id, mapid FROM '{dataset_name}' WHERE rowid = {rowid}"
+            f"SELECT series_id, map_id FROM '{dataset_name}' WHERE rowid = {rowid}"
         )
-        series_id, mapid = self.cursor.fetchone()
+        series_id, map_id = self.cursor.fetchone()
 
         self.cursor.execute(
             """
@@ -173,7 +173,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
             logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
             stack_data = torch.zeros((10, 512, 512))
 
-        return stack_data, mapid, response
+        return stack_data, map_id, response
 
     @staticmethod
     def load_dicom(row, root_path):
@@ -194,7 +194,7 @@ class DeepRDT_Responses(DicomCTVolumesFull):
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
-            image, mapid, response = self.get_image_data(index)
+            image, map_id, response = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
 
