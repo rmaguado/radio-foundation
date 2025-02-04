@@ -89,7 +89,7 @@ class FullVolumeEval(DicomCTVolumesFull):
             stack_data = self.create_stack_data(stack_rows)
         except Exception as e:
             logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
-            stack_data = torch.zeros((10, 512, 512))
+            stack_data = torch.zeros((10, 512, 512), dtype=torch.float32)
 
         return stack_data, map_id
 
@@ -108,7 +108,16 @@ class FullVolumeEval(DicomCTVolumesFull):
 
         stack_data = [self.process_ct(dcm) for dcm in dicom_files]
 
-        return torch.stack(stack_data)
+        num_slices = len(stack_data)
+        num_stacks = num_slices // self.channels
+
+        num_slices = num_stacks * self.channels
+
+        stack_data = torch.stack(stack_data)
+
+        stack_data = stack_data[:num_slices].view(num_stacks, self.channels, 512, 512)
+
+        return stack_data.type(torch.float32)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
