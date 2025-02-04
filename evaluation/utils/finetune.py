@@ -4,9 +4,34 @@ import torch.nn as nn
 
 from functools import partial
 from omegaconf import OmegaConf
+from torchvision import transforms
 
 from dinov2.models import build_model_from_cfg
 from dinov2.utils.utils import load_pretrained_weights
+
+
+class ImageTransform:
+    def __init__(self, img_size, mean, std):
+        self.img_size = img_size
+        self.resize = transforms.Resize((img_size, img_size))
+        self.normalize = transforms.Normalize(mean=mean, std=std)
+
+    def __call__(self, image):
+        resized = self.resize(image)
+        normalized = self.normalize(resized)
+        return normalized
+
+
+class ImageTargetTransform:
+    def __init__(self, img_size, mean, std):
+        self.img_size = img_size
+        self.resize = transforms.Resize((img_size, img_size))
+        self.normalize = transforms.Normalize(mean=mean, std=std)
+
+    def __call__(self, image, target):
+        image_resized = self.resize(image)
+        target_resized = self.resize(target)
+        return self.normalize(image_resized), target_resized
 
 
 class ModelWithIntermediateLayers(nn.Module):
@@ -46,10 +71,24 @@ def extract_class_tokens(x_tokens_list, n_last_blocks=4):
 
 def extract_patch_tokens(x_tokens_list, n_last_blocks=4):
     patch_tokens = torch.cat(
-        [patch_token for patch_token, _ in x_tokens_list[-n_last_blocks:]],
+        [
+            layer_patch_tokens
+            for layer_patch_tokens, _ in x_tokens_list[-n_last_blocks:]
+        ],
         dim=-1,
     )
     return patch_tokens
+
+
+def extract_all_tokens(x_tokens_list, n_last_blocks=4):
+    all_tokens = torch.cat(
+        [
+            [class_token] + layer_patch_tokens
+            for layer_patch_tokens, class_token in x_tokens_list[-n_last_blocks:]
+        ],
+        dim=-1,
+    )
+    return all_tokens
 
 
 def get_config(path_to_run):

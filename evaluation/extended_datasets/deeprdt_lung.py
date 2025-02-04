@@ -2,216 +2,65 @@ import os
 import torch
 from typing import Tuple, Any
 import numpy as np
-import pydicom
-from functools import partial
-from concurrent.futures import ProcessPoolExecutor
-import logging
 import pandas as pd
 
-from dinov2.data.datasets.dicoms import DicomCTVolumesFull
-from torch.utils.data import DataLoader
 
-logger = logging.getLogger("dinov2")
-
-
-def get_dataloaders(dataset_kwargs, channels, train_val_split=0.9) -> DataLoader:
-
-    def collate_fn(inputs):
-        img = inputs[0][0]
-        label = inputs[0][1]
-
-        num_slices = img.shape[0]
-        num_batches = num_slices // channels
-        use_slice = num_batches * channels
-
-        images = img[:use_slice].view(num_batches, channels, *img.shape[1:])
-
-        return images, label
-
-    loader_kwargs = {
-        "batch_size": 1,
-        "pin_memory": True,
-        "collate_fn": collate_fn,
-        "num_workers": 0,
-    }
-
-    dataset = DeepRDT_Responses(**dataset_kwargs)
-
-    total_entries = len(dataset)
-    target_field = dataset_kwargs["target_field"]
-    labels = dataset.entries[target_field]
-
-    indexes = np.arange(total_entries)
-    positive_indexes = indexes[labels]
-    negative_indexes = indexes[~labels]
-
-    np.random.shuffle(positive_indexes)
-    np.random.shuffle(negative_indexes)
-
-    num_positives = np.sum(labels)
-    num_negatives = total_entries - num_positives
-
-    train_positives = int(num_positives * train_val_split)
-    train_negatives = int(num_negatives * train_val_split)
-
-    train_positives_indexes = positive_indexes[:train_positives]
-    val_positives_indexes = positive_indexes[train_positives:]
-
-    train_negatives_indexes = negative_indexes[:train_negatives]
-    val_negatives_indexes = negative_indexes[train_negatives:]
-
-    def get_loader(indexes):
-        subset = DeepRDTSplit(dataset, indexes)
-        return torch.utils.data.DataLoader(subset, **loader_kwargs)
-
-    return {
-        "train_positives": get_loader(train_positives_indexes),
-        "val_positives": get_loader(val_positives_indexes),
-        "train_negatives": get_loader(train_negatives_indexes),
-        "val_negatives": get_loader(val_negatives_indexes),
-    }
-
-
-class DeepRDTSplit:
+class DeepRDT_lung:
     def __init__(
         self,
-        dataset,
-        indexes,
+        metadata_path: str,
+        project_path: str,
+        run_name: str,
+        checkpoint_name: str,
+        label: str,
     ):
-        self.dataset = dataset
-        self.indexes = indexes
-        self.subset_len = len(indexes)
-
-    def __len__(self):
-        return self.subset_len
-
-    def __getitem__(self, index):
-        return self.dataset[self.indexes[index]]
-
-
-class DeepRDT_Responses(DicomCTVolumesFull):
-    def __init__(self, metadata_path: str, root_path: str, transform, max_workers: int, target_field="response"):
+        self.embeddings_path = os.path.join(
+            project_path,
+            "evaluation/cache",
+            "deeprdt_lung",
+            run_name,
+            checkpoint_name,
+        )
         self.metadata = pd.read_csv(metadata_path)
-        super().__init__(
-            dataset_name="DeepRDT-lung",
-            root_path=root_path,
-            transform=transform,
-        )
-        self.target_field = target_field
-        self.max_workers = max_workers
+        self.map_ids = os.listdir(self.embeddings_path)
 
-    def create_entries(self) -> np.ndarray:
-        """
-        Generates a numpy memmap object pointing to the sqlite database rows of dicom paths.
+        if label == "response":
+            self.get_target = self.get_response
+        elif label == "sex":
+            self.get_target = self.get_sex
+        elif label == "tabaco":
+            self.get_target = self.get_tabaco
+        else:
+            raise ValueError(f"Label {label} not recognized.")
 
-        Returns:
-            np.ndarray: The entries dataset (memmap).
-        """
-        logger.info(f"Creating entries for {self.dataset_name}.")
+    def get_embeddings(self, map_id: str):
+        return np.load(os.path.join(self.embeddings_path, f"{map_id}.npy"))
 
-        dataset_names = self.cursor.execute(f"SELECT dataset FROM datasets").fetchall()
+    def get_metadata(self, map_id) -> np.ndarray:
+        return self.metadata[self.metadata["MAPID"] == int(map_id)].iloc[0]
 
-        entries_dtype = [
-            ("dataset", "U256"),
-            ("rowid", np.uint32),
-            ("mapid", "U256"),
-            ("response", np.bool),
-            ("tabaco", np.bool),
-            ("sexo", np.bool)
-        ]
-        entries = []
-        for dataset_name in dataset_names:
-            dataset_name = dataset_name[0]
-            dataset_series = self.cursor.execute(
-                f"SELECT rowid, mapid FROM '{dataset_name}'"
-            ).fetchall()
+    def get_response(self, metadata_row: pd.Series) -> bool:
+        response_text = metadata_row["respuesta"]
+        # 1-Completa, 2-Parcial, 3-Estable, 4-Progresion
+        return response_text in ["1-Completa", "2-Parcial"]
 
-            for rowid, mapid in dataset_series:
+    def get_sex(self, metadata_row: pd.Series) -> bool:
+        sexo_text = metadata_row["sexo"]
+        assert sexo_text in ["Hombre", "Mujer"]
+        return sexo_text == "Hombre"
 
-                metadata_row = self.metadata[self.metadata["MAPID"] == int(mapid)].iloc[0]
-                
-                response_text = metadata_row["respuesta"]
-                # 1-Completa, 2-Parcial, 3-Estable, 4-Progresion
-                response = response_text in ["1-Completa", "2-Parcial"]
+    def get_tabaco(self, metadata_row: pd.Series) -> bool:
+        tabaco_text = metadata_row["tabaco"]
+        return tabaco_text != "Nunca"
 
-                sexo_text = metadata_row["sexo"]
-                assert sexo_text in ["Hombre", "Mujer"]
-                sexo = sexo_text == "Hombre"
-
-                tabaco_text = metadata_row["tabaco"]
-                tabaco = tabaco_text != "Nunca"
-
-                entries.append((dataset_name, rowid, mapid, response, tabaco, sexo))
-
-        logger.info(f"Total number of scans: {len(entries)}.")
-
-        entries_array = np.array(entries, dtype=entries_dtype)
-
-        entries_dir = self.get_entries_dir()
-        logger.info(f"Saving entries to {entries_dir}.")
-        np.save(entries_dir, entries_array)
-        return np.load(entries_dir, mmap_mode="r")
-
-    def get_image_data(self, index: int) -> Tuple[torch.Tensor, str]:
-        dataset_name, rowid, mapid, response, tabaco, sexo = self.entries[index]
-
-        self.cursor.execute(
-            f"SELECT series_id, mapid FROM '{dataset_name}' WHERE rowid = {rowid}"
-        )
-        series_id, mapid = self.cursor.fetchone()
-
-        self.cursor.execute(
-            """
-            SELECT slice_index, dataset, dicom_path
-            FROM global 
-            WHERE series_id = ? 
-            AND dataset = ?
-            """,
-            (series_id, dataset_name),
-        )
-        stack_rows = self.cursor.fetchall()
-        stack_rows.sort(key=lambda x: x[0])
-
-        try:
-            stack_data = self.create_stack_data(stack_rows)
-        except Exception as e:
-            logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
-            stack_data = torch.zeros((10, 512, 512))
-
-        return stack_data, mapid, response, tabaco, sexo
-
-    @staticmethod
-    def load_dicom(row, root_path):
-        _, dataset, rel_dicom_path = row
-        abs_dicom_path = os.path.join(root_path, dataset, rel_dicom_path)
-        dcm = pydicom.dcmread(abs_dicom_path)
-        return dcm
-
-    def create_stack_data(self, stack_rows):
-        load_dicom_partial = partial(self.load_dicom, root_path=self.root_path)
-
-        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-            dicom_files = list(executor.map(load_dicom_partial, stack_rows))
-
-        stack_data = [self.process_ct(dcm) for dcm in dicom_files]
-
-        return torch.stack(stack_data)
+    def __len__(self) -> int:
+        return len(self.map_ids)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
-        try:
-            image, mapid, response, tabaco, sexo = self.get_image_data(index)
-        except Exception as e:
-            raise RuntimeError(f"can not read image for sample {index}") from e
+        map_id = self.map_ids[index]
+        embeddings = self.get_embeddings(map_id)
+        metadata = self.get_metadata(map_id)
 
-        if self.target_field == "response":
-            target = response
-        elif self.target_field == "tabaco":
-            target = tabaco
-        elif self.target_field == "sexo":
-            target = sexo
-        else:
-            raise RuntimeError(f"Unknown field {self.target_field}")
+        label = self.get_target(metadata)
 
-        transformed_image = self.transform(image)
-
-        return transformed_image, target
+        return torch.tensor(embeddings), label
