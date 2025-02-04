@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class LinearClassifier(nn.Module):
@@ -24,26 +25,43 @@ class LinearClassifier(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
 
-class AggregateClassTokens(nn.Module):
-    def __init__(self, embed_dim=384 * 4, hidden_dim=1024, num_labels=1):
+class PerceiverResampler(nn.Module):
+    def __init__(self, embed_dim, latent_dim, num_queries, num_heads=8, dropout=0.1):
+        """
+        Perceiver Resampler module. Resamples the input tokens by attending to them with a set of learnable queries.
+
+        Args:
+            embed_dim (int): Dimensionality of input tokens.
+            latent_dim (int): Dimensionality of latent representations.
+            num_queries (int): Number of queries.
+            num_heads (int): Number of attention heads.
+            dropout (float): Dropout rate.
+        """
         super().__init__()
-        self.linear = nn.Linear(embed_dim, hidden_dim, bias=True)
-        self.attention_weights = nn.Linear(hidden_dim, 1)
-        self.classifier = nn.Linear(hidden_dim, num_labels)
-        self.dropout = nn.Dropout(0.5)
 
-    def forward(self, class_tokens, mask=None):
-        x = self.linear(class_tokens)
-        x = self.dropout(x)
+        self.num_queries = num_queries
 
-        attn_scores = self.attention_weights(x).squeeze(-1)
+        self.query = nn.Parameter(torch.randn(num_queries, latent_dim))
+        self.key = nn.Linear(embed_dim, latent_dim)
+        self.value = nn.Linear(embed_dim, latent_dim)
 
-        if mask is not None:
-            attn_scores = attn_scores.masked_fill(~mask, float("-inf"))
+        self.attn = nn.MultiheadAttention(latent_dim, num_heads, dropout=dropout)
 
-        attn_weights = torch.softmax(attn_scores, dim=1).unsqueeze(-1)
+    def forward(self, x, mask=None):
+        """
+        Args:
+            x (torch.Tensor): Input tokens of shape (batch_size, seq_len, input_dim).
+            mask (torch.Tensor): Attention mask of shape (batch_size, num_queries, seq_len).
 
-        attention_output = torch.sum(attn_weights * x, dim=1)
-        attention_output = self.dropout(attention_output)
+        Returns:
+            torch.Tensor: Resampled tokens of shape (batch_size, num_queries, latent_dim).
+        """
+        batch_size, seq_len, _ = x.size()
 
-        return self.classifier(attention_output)
+        q = self.query.unsqueeze(1).repeat(1, batch_size, 1)
+        k = self.key(x).permute(1, 0, 2)
+        v = self.value(x).permute(1, 0, 2)
+
+        attn_output, _ = self.attn(q, k, v, key_padding_mask=mask)
+
+        return attn_output.permute(1, 0, 2)
