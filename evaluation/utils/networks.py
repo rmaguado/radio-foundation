@@ -59,9 +59,39 @@ class PerceiverResampler(nn.Module):
         batch_size, seq_len, _ = x.size()
 
         q = self.query.unsqueeze(1).repeat(1, batch_size, 1)
-        k = self.key(x).permute(1, 0, 2)
-        v = self.value(x).permute(1, 0, 2)
+        k = self.key(x).transpose(0, 1)
+        v = self.value(x).transpose(0, 1)
 
         attn_output, _ = self.attn(q, k, v, key_padding_mask=mask)
 
-        return attn_output.permute(1, 0, 2)
+        return attn_output.transpose(0, 1)
+
+
+class FullScanPredictor(nn.Module):
+    def __init__(self, embed_dim, hidden_dim, num_labels, patch_resample_dim=64, dropout=0.5):
+        super().__init__()
+
+        self.patch_resample_dim = patch_resample_dim
+
+        self.token_resampler = PerceiverResampler(
+            embed_dim=embed_dim, latent_dim=hidden_dim, num_queries=patch_resample_dim
+        )
+        self.axial_resampler = PerceiverResampler(
+            embed_dim=hidden_dim, latent_dim=hidden_dim, num_queries=1
+        )
+        self.mlp = nn.Linear(hidden_dim, num_labels)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        _, axial_dim, num_tokens, embed_dim = x.size()
+        x = x.view(axial_dim, num_tokens, embed_dim)
+        x = self.token_resampler(x)
+
+        axial_dim, resample_len, resample_dim = x.size()
+
+        x = x.reshape(1, axial_dim * resample_len, resample_dim)
+        x = self.axial_resampler(x)
+        x = self.dropout(x)
+
+        x = x.squeeze(0)
+        return self.mlp(x)
