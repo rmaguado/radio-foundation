@@ -83,7 +83,7 @@ def extract_patch_tokens(x_tokens_list, n_last_blocks=4):
 def extract_all_tokens(x_tokens_list, n_last_blocks=4):
     all_tokens = torch.cat(
         [
-            [class_token] + layer_patch_tokens
+            torch.cat([class_token.unsqueeze(1), layer_patch_tokens], dim=1)
             for layer_patch_tokens, class_token in x_tokens_list[-n_last_blocks:]
         ],
         dim=-1,
