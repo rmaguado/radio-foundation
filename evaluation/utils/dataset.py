@@ -45,7 +45,10 @@ class BalancedSampler(Sampler):
         positive_indices = np.random.choice(self.positive_indices, self.n_samples)
         negative_indices = np.random.choice(self.negative_indices, self.n_samples)
 
-        return iter(positive_indices + negative_indices)
+        combined_indices = np.concatenate([positive_indices, negative_indices])
+        np.random.shuffle(combined_indices)
+
+        return iter(combined_indices)
 
     def __len__(self):
         return 2 * self.n_samples
