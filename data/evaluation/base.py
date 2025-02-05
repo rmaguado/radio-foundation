@@ -1,7 +1,12 @@
+"""
+Base indexing classes for evaluating a dataset.
+Extends scripts in data/dataprep.
+Includes map_id in the SQLite database to reference metadata.
+"""
+
 from typing import List, Tuple
 import os
 from tqdm import tqdm
-import pylidc as pl
 import pydicom
 import argparse
 import logging
@@ -13,20 +18,21 @@ from data.dataprep import DicomProcessor, DicomDatabase
 logger = logging.getLogger("dataprep")
 
 
-class LidcIdriDatabase(DicomDatabase):
+class DicomEvalBase(DicomDatabase):
     def __init__(self, config):
         super().__init__(config)
 
     def create_dataset_info_table(self, dataset_name) -> None:
         """
         Create a dataset table in the database.
+        Includes additional column, 'map_id', to find metadata.
         """
         dataset_name_str = f'"{dataset_name}"'
         self.cursor.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {dataset_name_str} (
                 series_id TEXT PRIMARY KEY,
-                scan_id TEXT,
+                map_id TEXT,
                 num_slices INTEGER,
                 image_shape_x INTEGER,
                 image_shape_y INTEGER,
@@ -48,7 +54,7 @@ class LidcIdriDatabase(DicomDatabase):
         self.cursor.execute(
             f"""
             INSERT INTO {dataset_name_str} (
-                series_id, scan_id, num_slices, image_shape_x, image_shape_y,
+                series_id, map_id, num_slices, image_shape_x, image_shape_y,
                 slice_thickness, spacing_x, spacing_y
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -57,12 +63,12 @@ class LidcIdriDatabase(DicomDatabase):
         )
 
 
-class LidcIdriProcessor(DicomProcessor):
-    def __init__(self, config: dict):
+class DicomProcessorBase(DicomProcessor):
+    def __init__(self, config: dict, database):
         self.dataset_name = config["dataset_name"]
         self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
 
-        self.database = LidcIdriDatabase(config)
+        self.database = database
 
         log_path = f"data/log/eval/{self.dataset_name}.log"
         set_logging(log_path)
@@ -71,7 +77,7 @@ class LidcIdriProcessor(DicomProcessor):
         self,
         dicom_paths: List[Tuple[str, pydicom.dataset.FileDataset]],
         series_id: str,
-        scan_id: str,
+        map_id: str,
     ) -> None:
         """
         Process a series and return metadata and paths to dicom files.
@@ -79,7 +85,7 @@ class LidcIdriProcessor(DicomProcessor):
         Args:
             dicom_paths (List[Tuple[str, pydicom.dataset.FileDataset]]): A list of tuples containing the path and the dicom object.
             series_id (str): Series ID.
-            scan_id (str): Scan ID.
+            map_id (str): ID to link the scan to its metadata.
         """
         first_dicom = dicom_paths[0][1]
         num_slices = len(dicom_paths)
@@ -88,7 +94,7 @@ class LidcIdriProcessor(DicomProcessor):
 
         metadata = (
             series_id,
-            scan_id,
+            map_id,
             num_slices,
             image_shape[0],
             image_shape[1],
@@ -106,28 +112,23 @@ class LidcIdriProcessor(DicomProcessor):
         self.database.insert_dataset_data(metadata, self.dataset_name)
         logger.info(f"Processed series {series_id}.")
 
-    def get_paths_and_ids(self) -> List[Tuple[str, str]]:
+    def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
         """
-        Get paths to dicom files and their corresponding scans IDs used by LIDC-IDRI.
+        Get paths to dicom files and their corresponding mapids.
         """
         paths_ids = []
 
-        scans = pl.query(pl.Scan).all()
-        patient_ids = list(set(scan.patient_id for scan in scans))
-        patient_ids.sort()
+        mapids = [
+            folder
+            for folder in os.listdir(self.absolute_dataset_path)
+            if os.path.isdir(os.path.join(self.absolute_dataset_path, folder))
+        ]
 
-        for patient_id in patient_ids:
-            patient_scans = (
-                pl.query(pl.Scan).filter(pl.Scan.patient_id == patient_id).all()
-            )
-            for scan in patient_scans:
-                try:
-                    scan_path = scan.get_path_to_dicom_files()
-                    scan_id = scan.id
+        for mapid in mapids:
+            scan_path = os.path.join(self.absolute_dataset_path, mapid, "pCT")
 
-                    paths_ids.append((scan_path, scan_id))
-                except Exception as e:
-                    logger.exception(f"failed to get path for patient {patient_id}.")
+            if os.path.isdir(scan_path):
+                paths_ids.append((scan_path, mapid))
 
         return paths_ids
 
@@ -138,9 +139,9 @@ class LidcIdriProcessor(DicomProcessor):
 
         included_series_ids = []
 
-        paths_ids = self.get_paths_and_ids()
+        paths_ids = self.get_paths_and_mapids()
 
-        for scan_path, scan_id in tqdm(paths_ids):
+        for scan_path, mapid in tqdm(paths_ids):
             dcm_paths = [
                 os.path.join(scan_path, f)
                 for f in os.listdir(scan_path)
@@ -165,7 +166,7 @@ class LidcIdriProcessor(DicomProcessor):
             for series_id, dicoms in grouped_series.items():
 
                 try:
-                    self.process_series(dicoms, series_id, scan_id)
+                    self.process_series(dicoms, series_id, mapid)
                     included_series_ids.append(series_id)
                 except Exception as e:
                     logger.exception(f"Error processing series {series_id}: {e}")
@@ -181,34 +182,27 @@ def get_argpase():
     parser.add_argument(
         "--root_path", type=str, required=True, help="The root path of the dataset."
     )
-    parser.add_argument(
-        "--dataset_name", type=str, required=True, help="The name of the dataset."
-    )
-    parser.add_argument(
-        "--db_name",
-        type=str,
-        default="dicom_datasets",
-        required=False,
-        help="The name of the database. Will be saved in data/index/<db_name>/index.db",
-    )
     return parser
 
 
 def main(args):
-    dataset_path = os.path.join(args.root_path, args.dataset_name)
+    dataset_name = "DemoDatasetName"
+    db_name = "DemoDatasetName-Eval"
+    dataset_path = os.path.join(args.root_path, dataset_name)
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
 
-    db_dir = os.path.join("data/index", args.db_name)
+    db_dir = os.path.join("data/index", db_name)
     os.makedirs(db_dir, exist_ok=True)
     db_path = os.path.join(db_dir, "index.db")
 
     config = {
-        "dataset_name": args.dataset_name,
+        "dataset_name": dataset_name,
         "dataset_path": dataset_path,
         "db_path": db_path,
     }
-    processor = LidcIdriProcessor(config)
+    database = DicomEvalBase(config)
+    processor = DicomProcessorBase(config, database)
     processor.prepare_dataset()
 
 

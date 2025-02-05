@@ -5,8 +5,8 @@
 !dataprep/
 !dataprep/**
 
-!eval/
-!eval/**
+!evaluation/
+!evaluation/**
 
 !__init__.py
 !statistics.py
@@ -16,6 +16,6 @@ dataprep/**/__pycache__
 dataprep/**/.ipynb_checkpoints/
 dataprep/**/.DS_Store
 
-eval/**/__pycache__
-eval/**/.ipynb_checkpoints/
-eval/**/.DS_Store
+evaluation/**/__pycache__
+evaluation/**/.ipynb_checkpoints/
+evaluation/**/.DS_Store
