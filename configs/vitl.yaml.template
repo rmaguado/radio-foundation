@@ -1,0 +1,17 @@
+train:
+  batch_size_per_gpu: 56
+  grad_accum_steps: 9
+  full_image:
+    epochs: 5
+    batch_size_per_gpu: 14
+    grad_accum_steps: 36
+student:
+  arch: vit_large
+  ffn_layer: mlp
+  drop_path_rate: 0.4
+teacher:
+  warmup_teacher_temp_epochs: 20
+optim:
+  epochs: 100
+  warmup_epochs: 10
+  base_lr: 0.003
