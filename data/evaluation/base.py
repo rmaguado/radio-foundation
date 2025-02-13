@@ -115,6 +115,7 @@ class DicomProcessorBase(DicomProcessor):
     def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
         """
         Get paths to dicom files and their corresponding mapids.
+        Mapids are taken from the folder in the first level of the dataset.
         """
         paths_ids = []
 
@@ -125,10 +126,14 @@ class DicomProcessorBase(DicomProcessor):
         ]
 
         for mapid in mapids:
-            scan_path = os.path.join(self.absolute_dataset_path, mapid, "pCT")
+            for scan_path, dirs, files in os.walk(
+                os.path.join(self.absolute_dataset_path, mapid)
+            ):
 
-            if os.path.isdir(scan_path):
-                paths_ids.append((scan_path, mapid))
+                if len(files) > 0:
+                    if files[0].endswith(".dcm"):
+                        paths_ids.append((scan_path, mapid))
+                        break
 
         return paths_ids
 
