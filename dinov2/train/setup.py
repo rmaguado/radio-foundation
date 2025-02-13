@@ -152,8 +152,9 @@ def setup_training_components(cfg, model, resume):
         train_step = start_iter // cfg.train.grad_accum_steps
     else:
         train_step = (
-            start_iter - cropped_iter
-        ) // cfg.train.full_image.grad_accum_steps
+            cropped_iter // cfg.train.grad_accum_steps
+            + (start_iter - cropped_iter) // cfg.train.full_image.grad_accum_steps
+        )
 
     checkpointer = PeriodicCheckpointer(
         fsdp_checkpointer,
