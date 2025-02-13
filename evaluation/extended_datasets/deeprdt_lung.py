@@ -18,9 +18,11 @@ class DeepRDT_lung:
             run_name,
             checkpoint_name,
         )
-        
+
         self.metadata = pd.read_csv(metadata_path)
-        self.map_ids = [file.split(".npy")[0] for file in os.listdir(self.embeddings_path)]
+        self.map_ids = [
+            file.split(".npy")[0] for file in os.listdir(self.embeddings_path)
+        ]
 
         if label == "response":
             self.target_fnc = self.get_response
@@ -28,6 +30,10 @@ class DeepRDT_lung:
             self.target_fnc = self.get_sex
         elif label == "tabaco":
             self.target_fnc = self.get_tabaco
+        elif label == "True":
+            self.target_fnc = lambda x: True
+        elif label == "False":
+            self.target_fnc = lambda x: False
         else:
             raise ValueError(f"Label {label} not recognized.")
 
@@ -62,7 +68,7 @@ class DeepRDT_lung:
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         map_id = self.map_ids[index]
         embeddings = self.get_embeddings(map_id)
-        
+
         label = self.get_target(index)
 
         return torch.tensor(embeddings), label
