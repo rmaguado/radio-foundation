@@ -4,8 +4,8 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- [ ] tests for COVID-19-NY-SBU
 - [ ] script for running benchmark tests
+- [ ] resample dicom slices in runtime
 - [ ] Randomise sagital and coronal views for nifti dataloader if spacing is cube.
 - [ ] update userguide for data processing
 
