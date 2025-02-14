@@ -11,6 +11,12 @@ class COVID_19_NY_SBU:
         run_name: str,
         checkpoint_name: str,
     ):
+        self.embeddings_path = os.path.join(
+            "evaluation/cache/COVID-19-NY-SBU_eval",
+            run_name,
+            checkpoint_name,
+        )
+        
         self.map_ids = [
             file.split(".npy")[0] for file in os.listdir(self.embeddings_path)
         ]
