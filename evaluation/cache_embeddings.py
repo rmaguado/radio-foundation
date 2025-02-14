@@ -25,7 +25,9 @@ def get_model(project_path, run_name, checkpoint_name, device):
     return feature_model, config
 
 
-def generate_embeddings(model, dataset, output_path, embed_patches, embed_cls, device):
+def generate_embeddings(
+    model, dataset, output_path, embed_patches, embed_cls, device, max_batch_size
+):
     if embed_patches and embed_cls:
         embed_fcn = extract_all_tokens
     elif embed_patches:
@@ -39,10 +41,15 @@ def generate_embeddings(model, dataset, output_path, embed_patches, embed_cls, d
         volume, map_id = dataset[i]
         output_file = os.path.join(output_path, f"{map_id}.npy")
 
-        with torch.no_grad():
-            x_tokens_list = model(volume.to(device))
-        embeddings = embed_fcn(x_tokens_list)
-        embeddings = embeddings.cpu().numpy()
+        embeddings = []
+        for i in range(0, volume.shape[0], max_batch_size):
+            upper_range = min(i + max_batch_size, volume.shape[0])
+            with torch.no_grad():
+                x_tokens_list = model(volume[i:upper_range].to(device))
+            embeddings.append(embed_fcn(x_tokens_list).cpu().numpy())
+
+        embeddings = np.concatenate(embeddings, axis=0)
+
         np.save(output_file, embeddings)
 
 
@@ -83,7 +90,13 @@ def main():
     )
 
     generate_embeddings(
-        model, dataset, output_path, args.embed_patches, args.embed_cls, device
+        model,
+        dataset,
+        output_path,
+        args.embed_patches,
+        args.embed_cls,
+        device,
+        args.max_batch_size,
     )
 
 
@@ -115,6 +128,9 @@ def get_argpase():
     )
     parser.add_argument(
         "--embed_cls", action="store_true", help="Wether to save class embeddings."
+    )
+    parser.add_argument(
+        "--max_batch_size", type=int, default=64, help="The maximum batch size."
     )
     return parser
 
