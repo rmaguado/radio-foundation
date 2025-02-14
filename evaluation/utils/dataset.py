@@ -14,7 +14,7 @@ def split_dataset(dataset, split_ratio):
 
 
 class CombinedDataset(Dataset):
-    def __init__(self, datasets):
+    def __init__(self, *datasets):
         self.datasets = datasets
         self.lengths = [len(d) for d in datasets]
         self.cumulative_lengths = [
@@ -22,14 +22,22 @@ class CombinedDataset(Dataset):
         ]
         self.total_length = sum(self.lengths)
 
-    def __len__(self):
-        return self.total_length
-
-    def __getitem__(self, index):
+    def get_relative_item(self, index):
         for dataset_idx, cum_length in enumerate(self.cumulative_lengths):
             if index < cum_length:
                 dataset_offset = index - (cum_length - self.lengths[dataset_idx])
-                return self.datasets[dataset_idx][dataset_offset]
+                return self.datasets[dataset_idx], dataset_offset
+
+    def get_target(self, index):
+        dataset, dataset_index = self.get_relative_item(index)
+        return dataset.get_target(dataset_index)
+
+    def __getitem__(self, index):
+        dataset, dataset_index = self.get_relative_item(index)
+        return dataset[dataset_index]
+
+    def __len__(self):
+        return self.total_length
 
 
 class DatasetSplit(Dataset):
