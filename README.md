@@ -4,6 +4,7 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
+- [ ] benchmark on CT-RATE multiabnormality labels
 - [ ] script for running benchmark tests
 - [ ] resample dicom slices in runtime
 - [ ] Randomise sagital and coronal views for nifti dataloader if spacing is cube.
