@@ -5,3 +5,5 @@
 /datasets*
 *.tmp
 .env
+.bck
+/runs
