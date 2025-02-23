@@ -18,7 +18,6 @@ class NiftiFullVolumeEval(NiftiCtVolumesFull):
         dataset_name: str,
         channels: int = 1,
         transform=None,
-        max_workers=4,
     ):
         super().__init__(
             dataset_name=dataset_name,
@@ -26,7 +25,6 @@ class NiftiFullVolumeEval(NiftiCtVolumesFull):
             channels=channels,
             transform=transform,
         )
-        self.max_workers = max_workers
 
     def create_entries(self) -> np.ndarray:
         """
