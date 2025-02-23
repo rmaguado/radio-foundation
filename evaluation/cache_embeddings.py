@@ -12,7 +12,7 @@ from evaluation.utils.finetune import (
     extract_patch_tokens,
     extract_all_tokens,
 )
-from evaluation.extended_datasets.dicoms import FullVolumeEval
+from evaluation.extended_datasets import DicomFullVolumeEval, NiftiFullVolumeEval
 
 
 def get_model(project_path, run_name, checkpoint_name, device):
@@ -81,13 +81,20 @@ def main():
     )
     os.makedirs(output_path, exist_ok=True)
 
-    dataset = FullVolumeEval(
-        root_path=args.root_path,
-        dataset_name=args.db_name,
-        channels=channels,
-        transform=img_processor,
-        max_workers=max_workers,
-    )
+    db_params = {
+        "root_path": args.root_path,
+        "dataset_name": args.db_name,
+        "channels": channels,
+        "transform": img_processor,
+    }
+    if args.db_storage == "dicom":
+        dataset = DicomFullVolumeEval(**db_params, max_workers=max_workers)
+    elif args.db_storage == "nifti":
+        dataset = NiftiFullVolumeEval(**db_params)
+    else:
+        raise ValueError(
+            "Invalid database storage type (--db_storage should be dicom or nifti)."
+        )
 
     generate_embeddings(
         model,
@@ -131,6 +138,12 @@ def get_argpase():
     )
     parser.add_argument(
         "--max_batch_size", type=int, default=64, help="The maximum batch size."
+    )
+    parser.add_argument(
+        "--db_storage",
+        type=str,
+        default="dicom",
+        help="The type of database (dicom or nifti).",
     )
     return parser
 
