@@ -198,7 +198,7 @@ class DicomCTVolumesFull(DicomCtDataset):
         super().__init__(*args, **kwargs)
 
     def get_entries_dir(self) -> np.ndarray:
-        return os.path.join(self.entries_path, "full.npy")
+        return os.path.join(self.entries_path, f"{self.channels}_channels_full.npy")
 
     def create_entries(self) -> np.ndarray:
         """
@@ -254,7 +254,7 @@ class DicomCTVolumesFull(DicomCtDataset):
             stack_data = self.create_stack_data(stack_rows)
         except Exception as e:
             logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
-            stack_data = torch.zeros((10, 512, 512))
+            stack_data = torch.zeros((self.channels, 512, 512))
 
         return stack_data
 
