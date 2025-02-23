@@ -13,7 +13,7 @@ from dinov2.data.datasets.dicoms import DicomCTVolumesFull
 logger = logging.getLogger("dinov2")
 
 
-class FullVolumeEval(DicomCTVolumesFull):
+class DicomFullVolumeEval(DicomCTVolumesFull):
     def __init__(
         self,
         root_path: str,
@@ -42,7 +42,6 @@ class FullVolumeEval(DicomCTVolumesFull):
         dataset_names = self.cursor.execute(f"SELECT dataset FROM datasets").fetchall()
 
         entries_dtype = [
-            ("dataset", "U256"),
             ("rowid", np.uint32),
             ("map_id", "U256"),
         ]
@@ -50,11 +49,11 @@ class FullVolumeEval(DicomCTVolumesFull):
         for dataset_name in dataset_names:
             dataset_name = dataset_name[0]
             dataset_series = self.cursor.execute(
-                f"SELECT rowid, map_id FROM '{dataset_name}'"
+                f"SELECT rowid, map_id FROM '{self.dataset_name}'"
             ).fetchall()
 
             for rowid, map_id in dataset_series:
-                entries.append((dataset_name, rowid, map_id))
+                entries.append((rowid, map_id))
 
         logger.info(f"Total number of scans: {len(entries)}.")
 
@@ -66,10 +65,10 @@ class FullVolumeEval(DicomCTVolumesFull):
         return np.load(entries_dir, mmap_mode="r")
 
     def get_image_data(self, index: int) -> Tuple[torch.Tensor, str]:
-        dataset_name, rowid, map_id = self.entries[index]
+        rowid, map_id = self.entries[index]
 
         self.cursor.execute(
-            f"SELECT series_id, map_id FROM '{dataset_name}' WHERE rowid = {rowid}"
+            f"SELECT series_id, map_id FROM '{self.dataset_name}' WHERE rowid = {rowid}"
         )
         series_id, map_id = self.cursor.fetchone()
 
@@ -80,7 +79,7 @@ class FullVolumeEval(DicomCTVolumesFull):
             WHERE series_id = ? 
             AND dataset = ?
             """,
-            (series_id, dataset_name),
+            (series_id, self.dataset_name),
         )
         stack_rows = self.cursor.fetchall()
         stack_rows.sort(key=lambda x: x[0])
