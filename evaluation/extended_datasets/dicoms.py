@@ -42,6 +42,7 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
         dataset_names = self.cursor.execute(f"SELECT dataset FROM datasets").fetchall()
 
         entries_dtype = [
+            ("dataset", "U256"),
             ("rowid", np.uint32),
             ("map_id", "U256"),
         ]
@@ -49,11 +50,11 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
         for dataset_name in dataset_names:
             dataset_name = dataset_name[0]
             dataset_series = self.cursor.execute(
-                f"SELECT rowid, map_id FROM '{self.dataset_name}'"
+                f"SELECT rowid, map_id FROM '{dataset_name}'"
             ).fetchall()
 
             for rowid, map_id in dataset_series:
-                entries.append((rowid, map_id))
+                entries.append((dataset_name, rowid, map_id))
 
         logger.info(f"Total number of scans: {len(entries)}.")
 
@@ -65,21 +66,21 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
         return np.load(entries_dir, mmap_mode="r")
 
     def get_image_data(self, index: int) -> Tuple[torch.Tensor, str]:
-        rowid, map_id = self.entries[index]
+        dataset, rowid, map_id = self.entries[index]
 
         self.cursor.execute(
-            f"SELECT series_id, map_id FROM '{self.dataset_name}' WHERE rowid = {rowid}"
+            f"SELECT row_id, map_id FROM '{dataset}' WHERE rowid = {rowid}"
         )
-        series_id, map_id = self.cursor.fetchone()
+        row_id, map_id = self.cursor.fetchone()
 
         self.cursor.execute(
             """
-            SELECT slice_index, dataset, dicom_path
+            SELECT slice_index, dicom_path
             FROM global 
-            WHERE series_id = ? 
+            WHERE row_id = ? 
             AND dataset = ?
             """,
-            (series_id, self.dataset_name),
+            (row_id, dataset),
         )
         stack_rows = self.cursor.fetchall()
         stack_rows.sort(key=lambda x: x[0])
@@ -87,7 +88,7 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
         try:
             stack_data = self.create_stack_data(stack_rows)
         except Exception as e:
-            logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
+            logger.exception(f"Error processing stack (map_id: {map_id}) \n{e}")
             stack_data = torch.zeros((10, 512, 512), dtype=torch.float32)
 
         return stack_data, map_id
