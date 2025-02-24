@@ -19,19 +19,21 @@ from evaluation.extended_datasets import (
 )
 
 
-def get_model(project_path, run_name, checkpoint_name, device):
+def get_model(project_path, run_name, checkpoint_name):
     load_dotenv()
     project_path = os.getenv("PROJECTPATH")
 
     path_to_run = os.path.join(project_path, "runs", run_name)
+    device = torch.device("cuda")
     feature_model, config = load_model(path_to_run, checkpoint_name, device)
 
     return feature_model, config
 
 
 def generate_embeddings(
-    model, dataset, output_path, embed_patches, embed_cls, device, max_batch_size
+    model, dataset, output_path, embed_patches, embed_cls, max_batch_size
 ):
+    device = torch.device("cuda")
     if embed_patches and embed_cls:
         embed_fcn = extract_all_tokens
     elif embed_patches:
@@ -40,6 +42,9 @@ def generate_embeddings(
         embed_fcn = extract_class_tokens
     else:
         raise ValueError("Must save at least path or class token embeddings.")
+    
+    model = torch.nn.DataParallel(model)
+    model.to(device)
 
     for i in tqdm(range(len(dataset))):
         volume, map_id = dataset[i]
@@ -62,12 +67,11 @@ def main():
     args = parser.parse_args()
     if not torch.cuda.is_available():
         raise RuntimeError("Cuda not available.")
-    device = torch.device("cuda:0")
 
     load_dotenv()
     project_path = os.getenv("PROJECTPATH")
 
-    model, config = get_model(project_path, args.run_name, args.checkpoint_name, device)
+    model, config = get_model(project_path, args.run_name, args.checkpoint_name)
     full_image_size = config.student.full_image_size  # 504
     data_mean = -573.8
     data_std = 461.3
@@ -108,7 +112,6 @@ def main():
         output_path,
         args.embed_patches,
         args.embed_cls,
-        device,
         args.max_batch_size,
     )
 
