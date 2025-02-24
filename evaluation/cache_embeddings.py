@@ -12,7 +12,11 @@ from evaluation.utils.finetune import (
     extract_patch_tokens,
     extract_all_tokens,
 )
-from evaluation.extended_datasets import DicomFullVolumeEval, NiftiFullVolumeEval
+from evaluation.extended_datasets import (
+    DicomFullVolumeEval,
+    NiftiFullVolumeEval,
+    NpzFullVolumeEval,
+)
 
 
 def get_model(project_path, run_name, checkpoint_name, device):
@@ -67,7 +71,7 @@ def main():
     full_image_size = config.student.full_image_size  # 504
     data_mean = -573.8
     data_std = 461.3
-    channels = 4
+    channels = config.student.channels
     max_workers = 4
 
     img_processor = ImageTransform(full_image_size, data_mean, data_std)
@@ -75,7 +79,7 @@ def main():
     output_path = os.path.join(
         project_path,
         "evaluation/cache",
-        args.db_name,
+        args.dataset_name,
         args.run_name,
         args.checkpoint_name,
     )
@@ -83,7 +87,7 @@ def main():
 
     db_params = {
         "root_path": args.root_path,
-        "dataset_name": args.db_name,
+        "dataset_name": args.dataset_name,
         "channels": channels,
         "transform": img_processor,
     }
@@ -91,9 +95,11 @@ def main():
         dataset = DicomFullVolumeEval(**db_params, max_workers=max_workers)
     elif args.db_storage == "nifti":
         dataset = NiftiFullVolumeEval(**db_params)
+    elif args.db_storage == "npz":
+        dataset = NpzFullVolumeEval(**db_params)
     else:
         raise ValueError(
-            "Invalid database storage type (--db_storage should be dicom or nifti)."
+            "Invalid database storage type (--db_storage should be dicom, nifti, or npz)."
         )
 
     generate_embeddings(
@@ -113,10 +119,10 @@ def get_argpase():
         "--root_path", type=str, required=True, help="The root path of the dataset."
     )
     parser.add_argument(
-        "--db_name",
+        "--dataset_name",
         type=str,
         required=True,
-        help="The name of the .db file found in data/index.",
+        help="The name of the dataset folder in the root path. Also the base name of the database file.",
     )
     parser.add_argument(
         "--run_name",
@@ -143,7 +149,7 @@ def get_argpase():
         "--db_storage",
         type=str,
         default="dicom",
-        help="The type of database (dicom or nifti).",
+        help="The type of database (dicom, nifti, or npz).",
     )
     return parser
 
