@@ -5,7 +5,7 @@ import nibabel as nib
 from typing import Tuple, Any
 import os
 
-from dinov2.data.datasets.dicoms import NiftiCtVolumesFull
+from dinov2.data.datasets.niftis import NiftiCtVolumesFull
 
 
 logger = logging.getLogger("dinov2")
@@ -35,21 +35,15 @@ class NiftiFullVolumeEval(NiftiCtVolumesFull):
         """
         logger.info(f"Creating entries for {self.dataset_name}.")
 
-        dataset_names = self.cursor.execute(f"SELECT dataset FROM datasets").fetchall()
-
         entries_dtype = [
             ("rowid", np.uint32),
             ("map_id", "U256"),
         ]
         entries = []
-        for dataset_name in dataset_names:
-            dataset_name = dataset_name[0]
-            dataset_series = self.cursor.execute(
-                f"SELECT rowid, map_id FROM '{self.dataset_name}'"
-            ).fetchall()
+        row_map_id = self.cursor.execute(f"SELECT rowid, map_id FROM global").fetchall()
 
-            for rowid, map_id in dataset_series:
-                entries.append((rowid, map_id))
+        for rowid, map_id in row_map_id:
+            entries.append((rowid, map_id))
 
         logger.info(f"Total number of scans: {len(entries)}.")
 
@@ -64,17 +58,28 @@ class NiftiFullVolumeEval(NiftiCtVolumesFull):
         rowid, map_id = self.entries[index]
         self.cursor.execute(
             """
-            SELECT dataset, axial_dim, nifti_path FROM global WHERE rowid = ?
+            SELECT axial_dim, nifti_path FROM global WHERE rowid = ?
             """,
             (int(rowid),),
         )
-        dataset, axial_dim, nifti_path = self.cursor.fetchone()
+        axial_dim, nifti_path = self.cursor.fetchone()
 
-        abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
+        abs_path_to_nifti = os.path.join(self.root_path, self.dataset_name, nifti_path)
         nifti_file = nib.load(abs_path_to_nifti)
 
         volume_data = nifti_file.get_fdata().astype(np.float32)
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
+
+        num_slices = volume_data.shape[0]
+        num_stacks = num_slices // self.channels
+        num_slices = num_stacks * self.channels
+
+        image_width = volume_data.shape[1]
+        image_height = volume_data.shape[2]
+
+        volume_data = volume_data[:num_slices].view(
+            num_stacks, self.channels, image_width, image_height
+        )
 
         return self.process_ct(volume_data), map_id
 
