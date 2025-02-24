@@ -13,7 +13,7 @@ import argparse
 import logging
 
 from data.utils import set_logging
-from data.dataprep import DicomProcessor, DicomDatabase, NiftiProcessor, NiftiDatabase
+from data.dataprep import DicomProcessor, DicomDatabase, NiftiProcessor, NiftiDatabase, NpzProcessor, NpzDatabase
 
 
 logger = logging.getLogger("dataprep")
@@ -309,6 +309,110 @@ class NiftiProcessorBase(NiftiProcessor):
         logger.info(
             f"Finished processing {self.dataset_name}. Added {volume_counts} volumes."
         )
+
+
+class NpzEvalBase(NpzDatabase):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def create_global_table(self) -> None:
+        """
+        Creates a global table in the database for NIfTI files.
+        """
+        self.cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS global (
+                dataset TEXT,
+                map_id TEXT,
+                volume_path TEXT
+            )
+            """
+        )
+
+    def insert_global_data(
+        self, dataset_name: str, map_id: str, volume_path: str
+    ) -> None:
+        self.cursor.execute(
+            """
+            INSERT INTO "global" (dataset, map_id, volume_path)
+            VALUES (?, ?, ?)
+            """,
+            (dataset_name, map_id, volume_path),
+        )
+
+
+class NpzProcessorBase(NpzProcessor):
+    def __init__(self, config: dict, database):
+        self.dataset_name = config["dataset_name"]
+        self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
+
+        self.database = database
+
+        log_path = f"data/log/{self.dataset_name}_eval.log"
+        set_logging(log_path)
+
+    def process_volume(self, volume_path: str, map_id: str) -> None:
+        """
+        Process a Npz volume, extract metadata, and store it in the database.
+
+        Args:
+            volume_path (str): Path to the Npz file.
+            map_id (str): ID to link the scan to its metadata.
+        """
+        rel_nifti_path = os.path.relpath(volume_path, self.absolute_dataset_path)
+        self.database.insert_global_data(self.dataset_name, map_id, rel_nifti_path)
+
+        logger.info(f"Processed npz volume: {volume_path} (map_id: {map_id}).")
+
+    def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
+        """
+        Get paths to files and their corresponding mapids.
+        Mapids are taken from the name of the file.
+        """
+        paths_ids = []
+
+        for data_folder, dirs, files in os.walk(self.absolute_dataset_path):
+            paths = [
+                os.path.join(data_folder, f)
+                for f in files
+                if f.endswith(".npz")
+            ]
+
+            if not paths:
+                continue
+
+            for path in paths:
+                map_id = os.path.basename(path).split(".")[0]
+                paths_ids.append((path, map_id))
+
+        return paths_ids
+
+    def prepare_dataset(self) -> None:
+        """
+        Prepares the dataset by scanning the directories and processing files.
+        """
+
+        logger.info(f"Processing dataset: {self.dataset_name}")
+
+        paths_ids = self.get_paths_and_mapids()
+        total_files = len(paths_ids)
+        logger.info(f"Total files: {total_files}")
+
+        volume_counts = 0
+
+        for path, map_id in tqdm(paths_ids):
+            try:
+                self.process_volume(path, map_id)
+                volume_counts += 1
+            except Exception as e:
+                logger.exception(
+                    f"Error processing {path} (map_id: {map_id}): {e}"
+                )
+
+        logger.info(
+            f"Finished processing {self.dataset_name}. Added {volume_counts} volumes."
+        )
+
 
 
 def get_argpase():
