@@ -135,24 +135,23 @@ class NpzCtDataset(NpzVolumes):
             slice_shape = slice_data.shape
             assert len(slice_shape) == 3, f"Slice shape is {slice_shape}."
 
-            return self.process_ct(slice_data)
+            return self.process_ct(torch.tensor(slice_data, dtype=torch.float32))
         except Exception as e:
             logger.exception(f"Error in loading slice {slice_index} from {volume_path}.")
 
             return torch.zeros((self.channels, 512, 512), dtype=torch.float32)
 
-    def process_ct(self, volume_data: np.ndarray) -> torch.Tensor:
+    def process_ct(self, volume_data: torch.Tensor) -> torch.Tensor:
         """
         Processes the CT scan data.
 
         Args:
-            volume_data (np.ndarray): The CT scan data.
+            volume_data (torch.Tensor): The CT scan data.
 
         Returns:
             torch.Tensor: The processed CT scan data.
         """
-        volume_data = np.clip(volume_data, self.lower_window, self.upper_window)
-        return torch.tensor(volume_data, dtype=torch.float32)
+        return torch.clip(volume_data, self.lower_window, self.upper_window)
 
 
 class NpzCtVolumesFull(NpzCtDataset):
