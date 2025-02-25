@@ -4,6 +4,7 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     roc_auc_score,
+    average_precision_score,
 )
 
 import numpy as np
@@ -18,12 +19,14 @@ def compute_metrics(logits, labels):
     precision = precision_score(labels, binary_predictions)
     recall = recall_score(labels, binary_predictions)
     f1 = f1_score(labels, binary_predictions)
-    aucroc = roc_auc_score(labels, probabilities)
+    roc_auc = roc_auc_score(labels, probabilities)
+    pr_auc = average_precision_score(labels, probabilities)
 
     return {
         "accuracy": accuracy,
         "precision": precision,
         "recall": recall,
         "f1_score": f1,
-        "aucroc": aucroc,
+        "roc_auc": roc_auc,
+        "pr_auc": pr_auc,
     }
