@@ -158,27 +158,23 @@ class NiftiCtDataset(NiftiVolumes):
             slice_shape = slice_data.shape
             assert len(slice_shape) == 3, f"Slice shape is {slice_shape}."
 
-            return self.process_ct(slice_data)
+            return self.process_ct(torch.tensor(slice_data, dtype=torch.float32))
         except Exception as e:
             logger.exception(f"Error in loading slice {slice_index} from {nifti_path}.")
 
             return torch.zeros((self.channels, 512, 512), dtype=torch.float32)
 
-    def process_ct(self, volume_data: np.ndarray) -> torch.Tensor:
+    def process_ct(self, volume_data: torch.Tensor) -> torch.Tensor:
         """
         Processes the CT scan data.
 
         Args:
-            volume_data (np.ndarray): The CT scan data.
+            volume_data (torch.Tensor): The CT scan data.
 
         Returns:
             torch.Tensor: The processed CT scan data.
         """
-        volume_data = np.clip(volume_data, self.lower_window, self.upper_window)
-        # volume_data = (volume_data - self.lower_window) / (
-        #    self.upper_window - self.lower_window
-        # )
-        return torch.tensor(volume_data, dtype=torch.float32)
+        return torch.clip(volume_data, self.lower_window, self.upper_window)
 
 
 class NiftiCtVolumesFull(NiftiCtDataset):
@@ -205,7 +201,7 @@ class NiftiCtVolumesFull(NiftiCtDataset):
         volume_data = nifti_file.get_fdata().astype(np.float32)
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
 
-        return self.process_ct(volume_data)
+        return self.process_ct(torch.tensor(volume_data, dtype=torch.float32))
 
     def get_target(self, index: int) -> Optional[Any]:
         raise NotImplementedError(
