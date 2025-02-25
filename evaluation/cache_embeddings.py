@@ -46,8 +46,13 @@ def generate_embeddings(
     model = torch.nn.DataParallel(model)
     model.to(device)
 
-    for i in tqdm(range(len(dataset))):
-        volume, map_id = dataset[i]
+    dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=1, shuffle=False, num_workers=16
+    )
+
+    for i, (volume, map_id) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        map_id = map_id[0]
+        volume = volume[0]
         output_file = os.path.join(output_path, f"{map_id}.npy")
 
         embeddings = []
@@ -57,7 +62,7 @@ def generate_embeddings(
                 x_tokens_list = model(volume[i:upper_range].to(device))
             embeddings.append(embed_fcn(x_tokens_list).cpu().numpy())
 
-        embeddings = np.concatenate(embeddings, axis=0)
+        embeddings = np.concatenate(embeddings, axis=1)
 
         np.save(output_file, embeddings)
 
@@ -76,7 +81,7 @@ def main():
     data_mean = -573.8
     data_std = 461.3
     channels = config.student.channels
-    max_workers = 4
+    max_workers = 16
 
     img_processor = ImageTransform(full_image_size, data_mean, data_std)
 
