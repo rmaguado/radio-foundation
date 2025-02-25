@@ -12,6 +12,7 @@ class CT_RATE:
         checkpoint_name: str,
         multiabnormality_labels_path: str,
         label: str,
+        cache_format: str = "npy",
     ):
         self.embeddings_path = os.path.join(
             "evaluation/cache/CT-RATE_valid_eval",
@@ -21,12 +22,23 @@ class CT_RATE:
         self.df = pd.read_csv(multiabnormality_labels_path)
         self.label = label
 
+        pattern = "_ct2rep.npy" if cache_format == "npy" else "_ct2rep.npz"
+        self.get_embeddings = self.load_npy if cache_format == "npy" else self.load_npz
+
         self.map_ids = [
-            file.split("_ct2rep.npy")[0] for file in os.listdir(self.embeddings_path)
+            file.split(pattern)[0] for file in os.listdir(self.embeddings_path)
         ]
 
-    def get_embeddings(self, map_id: str):
+    def load_npy(self, map_id: str):
         return np.load(os.path.join(self.embeddings_path, f"{map_id}_ct2rep.npy"))
+
+    def load_npz(self, map_id: str):
+        return np.expand_dims(
+            np.load(os.path.join(self.embeddings_path, f"{map_id}_ct2rep.npz"))[
+                "arr_0"
+            ],
+            0,
+        )
 
     def get_target(self, index):
         VolumeName = f"{self.map_ids[index]}.nii.gz"
