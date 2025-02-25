@@ -14,7 +14,7 @@ class CT_RATE:
         label: str,
     ):
         self.embeddings_path = os.path.join(
-            "evaluation/cache/CT-RATE_eval",
+            "evaluation/cache/CT-RATE_valid_eval",
             run_name,
             checkpoint_name,
         )
@@ -22,11 +22,11 @@ class CT_RATE:
         self.label = label
 
         self.map_ids = [
-            file.split(".npy")[0] for file in os.listdir(self.embeddings_path)
+            file.split("_ct2rep.npy")[0] for file in os.listdir(self.embeddings_path)
         ]
 
     def get_embeddings(self, map_id: str):
-        return np.load(os.path.join(self.embeddings_path, f"{map_id}.npy"))
+        return np.load(os.path.join(self.embeddings_path, f"{map_id}_ct2rep.npy"))
 
     def get_target(self, index):
         VolumeName = f"{self.map_ids[index]}.nii.gz"
