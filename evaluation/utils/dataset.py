@@ -1,6 +1,7 @@
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset
 import numpy as np
+import torch
 
 
 def split_dataset(dataset, split_ratio):
@@ -79,3 +80,20 @@ class BalancedSampler(Sampler):
 
     def __len__(self):
         return 2 * self.n_samples
+
+
+def collate_sequences(batch):
+    embeddings, labels = zip(*batch)
+
+    _, num_tokens, embed_dim = embeddings[0].shape
+
+    max_length = max([embedding.shape[0] for embedding in embeddings])
+
+    padded_embeddings = torch.zeros(len(embeddings), max_length, num_tokens, embed_dim)
+    mask = torch.zeros(len(embeddings), max_length)
+
+    for i, embedding in enumerate(embeddings):
+        padded_embeddings[i, : embedding.shape[0]] = embedding
+        mask[i, : embedding.shape[0]] = 1
+
+    return padded_embeddings, mask, torch.tensor(labels)
