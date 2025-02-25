@@ -58,13 +58,13 @@ class NiftiFullVolumeEval(NiftiCtVolumesFull):
         rowid, map_id = self.entries[index]
         self.cursor.execute(
             """
-            SELECT axial_dim, nifti_path FROM global WHERE rowid = ?
+            SELECT dataset, axial_dim, nifti_path FROM global WHERE rowid = ?
             """,
             (int(rowid),),
         )
-        axial_dim, nifti_path = self.cursor.fetchone()
+        dataset, axial_dim, nifti_path = self.cursor.fetchone()
 
-        abs_path_to_nifti = os.path.join(self.root_path, self.dataset_name, nifti_path)
+        abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
         nifti_file = nib.load(abs_path_to_nifti)
 
         volume_data = nifti_file.get_fdata().astype(np.float32)
@@ -77,7 +77,8 @@ class NiftiFullVolumeEval(NiftiCtVolumesFull):
         image_width = volume_data.shape[1]
         image_height = volume_data.shape[2]
 
-        volume_data = volume_data[:num_slices].view(
+        volume_data = volume_data[:num_slices]
+        volume_data = torch.tensor(volume_data).view(
             num_stacks, self.channels, image_width, image_height
         )
 
