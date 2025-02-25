@@ -67,8 +67,10 @@ class PerceiverResampler(nn.Module):
         return attn_output.transpose(0, 1)
 
 
-class FullScanPredictor(nn.Module):
-    def __init__(self, embed_dim, hidden_dim, num_labels, patch_resample_dim=64, dropout=0.5):
+class FullScanPatchPredictor(nn.Module):
+    def __init__(
+        self, embed_dim, hidden_dim, num_labels, patch_resample_dim=64, dropout=0.5
+    ):
         super().__init__()
 
         self.patch_resample_dim = patch_resample_dim
@@ -83,13 +85,34 @@ class FullScanPredictor(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        _, axial_dim, num_tokens, embed_dim = x.size()
+        _, num_tokens, axial_dim, embed_dim = x.size()
         x = x.view(axial_dim, num_tokens, embed_dim)
         x = self.token_resampler(x)
 
         axial_dim, resample_len, resample_dim = x.size()
 
         x = x.reshape(1, axial_dim * resample_len, resample_dim)
+        x = self.axial_resampler(x)
+        x = self.dropout(x)
+
+        x = x.squeeze(0)
+        return self.mlp(x)
+
+
+class FullScanClassPredictor(nn.Module):
+    def __init__(self, embed_dim, hidden_dim, num_labels, dropout=0.5):
+        super().__init__()
+        self.axial_resampler = PerceiverResampler(
+            embed_dim=embed_dim, latent_dim=hidden_dim, num_queries=1
+        )
+        self.mlp = nn.Linear(hidden_dim, num_labels)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        _, num_tokens, axial_dim, embed_dim = x.size()
+        assert num_tokens == 1
+
+        x = x.reshape(1, axial_dim, embed_dim)
         x = self.axial_resampler(x)
         x = self.dropout(x)
 
