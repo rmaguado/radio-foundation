@@ -108,7 +108,7 @@ def get_autocast_dtype(cfg):
         return torch.float
 
 
-def load_model(path_to_run, checkpoint_name, device):
+def load_model(path_to_run, checkpoint_name, device, intermediate_layers=4):
     path_to_checkpoint = os.path.join(
         path_to_run, "eval", checkpoint_name, "teacher_checkpoint.pth"
     )
@@ -124,6 +124,8 @@ def load_model(path_to_run, checkpoint_name, device):
     autocast_ctx = partial(
         torch.autocast, enabled=True, dtype=autocast_dtype, device_type="cuda"
     )
-    feature_model = ModelWithIntermediateLayers(model, 4, autocast_ctx)
+    feature_model = ModelWithIntermediateLayers(
+        model, intermediate_layers, autocast_ctx
+    )
 
     return feature_model, config
