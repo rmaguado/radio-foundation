@@ -4,6 +4,10 @@ from dotenv import load_dotenv
 import numpy as np
 import torch
 from tqdm import tqdm
+import time
+import logging
+import concurrent.futures
+import queue
 
 from evaluation.utils.finetune import (
     load_model,
@@ -25,7 +29,7 @@ def get_model(project_path, run_name, checkpoint_name):
 
     path_to_run = os.path.join(project_path, "runs", run_name)
     device = torch.device("cuda")
-    feature_model, config = load_model(path_to_run, checkpoint_name, device)
+    feature_model, config = load_model(path_to_run, checkpoint_name, device, 1)
 
     return feature_model, config
 
@@ -33,6 +37,15 @@ def get_model(project_path, run_name, checkpoint_name):
 def generate_embeddings(
     model, dataset, output_path, embed_patches, embed_cls, max_batch_size
 ):
+    def save_callback(future, output_file, t0):
+        """Logs when a save operation completes."""
+        try:
+            future.result()
+            t_save = time.time() - t0
+            logging.info(f"Save completed for {output_file} in {t_save:.2f}s")
+        except Exception as e:
+            logging.error(f"Error saving {output_file}: {e}")
+
     device = torch.device("cuda")
     if embed_patches and embed_cls:
         embed_fcn = extract_all_tokens
@@ -42,32 +55,69 @@ def generate_embeddings(
         embed_fcn = extract_class_tokens
     else:
         raise ValueError("Must save at least path or class token embeddings.")
-    
+
     model = torch.nn.DataParallel(model)
     model.to(device)
+
+    max_saves = 4
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_saves)
+    futures = queue.Queue(max_saves)
 
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=1, shuffle=False, num_workers=16
     )
 
+    t0 = time.time()
     for i, (volume, map_id) in tqdm(enumerate(dataloader), total=len(dataloader)):
         map_id = map_id[0]
         volume = volume[0]
+        t_data = time.time() - t0
+        logging.info(
+            f"Processing volume {i+1}/{len(dataloader)} ({map_id}) - Loaded data in {t_data:.2f}s"
+        )
         output_file = os.path.join(output_path, f"{map_id}.npy")
 
         embeddings = []
         for i in range(0, volume.shape[0], max_batch_size):
+            t0 = time.time()
             upper_range = min(i + max_batch_size, volume.shape[0])
             with torch.no_grad():
                 x_tokens_list = model(volume[i:upper_range].to(device))
             embeddings.append(embed_fcn(x_tokens_list).cpu().numpy())
+            t_batch = time.time() - t0
+            logging.info(f"Batch processed in {t_batch:.2f}s")
 
-        embeddings = np.concatenate(embeddings, axis=1)
+        embeddings = np.concatenate(embeddings, axis=0)
 
-        np.save(output_file, embeddings)
+        logging.info(f"Embeddings shape: {embeddings.shape}")
+
+        while futures.full():
+            done_future = futures.get()
+            done_future.result()
+
+        future = executor.submit(np.save, output_file, embeddings)
+        future.add_done_callback(
+            lambda f, filename=output_file: save_callback(f, filename, time.time())
+        )
+        futures.put(future)
+
+        t0 = time.time()
+
+    while not futures.empty():
+        done_future = futures.get()
+        done_future.result()
+
+    executor.shutdown()
 
 
 def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        filename="cache_embeddings.log",
+    )
+    logging.info("Starting cache_embeddings.py")
+
     parser = get_argpase()
     args = parser.parse_args()
     if not torch.cuda.is_available():
