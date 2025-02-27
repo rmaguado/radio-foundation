@@ -21,8 +21,8 @@ def get_argpase():
 
 
 def main(args):
-    dataset_name = "CT-RATE_valid"
-    db_name = "CT-RATE_valid_eval"
+    dataset_name = "CT-RATE_train"
+    db_name = "CT-RATE_train_eval"
     dataset_path = os.path.join(args.root_path, dataset_name)
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
