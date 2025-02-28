@@ -11,6 +11,7 @@
 !__init__.py
 !statistics.py
 !utils.py
+!tsne.py
 
 dataprep/**/__pycache__
 dataprep/**/.ipynb_checkpoints/
