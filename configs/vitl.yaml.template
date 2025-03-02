@@ -11,7 +11,7 @@ student:
   drop_path_rate: 0.4
   channels: 10
 teacher:
-  warmup_teacher_temp_epochs: 20
+  warmup_teacher_temp_epochs: 30
 optim:
   epochs: 100
   warmup_epochs: 10
