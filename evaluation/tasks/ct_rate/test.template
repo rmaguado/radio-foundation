@@ -1,0 +1,26 @@
+#!/bin/bash
+
+#SBATCH --job-name=${JOB_NAME}
+#SBATCH --output=logs/${JOB_NAME}_%j.out
+#SBATCH --nodes=1
+#SBATCH --nodelist=compute-cuda-02
+#SBATCH --cpus-per-task=16
+
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:A40:1
+
+#SBATCH --mem=16GB
+#SBATCH --partition=odap-gpu
+#SBATCH --signal=USR2@120
+#SBATCH --time=14400
+
+source $HOME/.conda_rc
+conda activate dino2t24
+cd $HOME/projects/radio-foundation
+export PYTHONPATH=$PWD
+
+srun --unbuffered --ntasks=1 --cpus-per-task=16 \
+    python3 ${PWD}/evaluation/tasks/test_multi_abnormality.py \
+            --run_name=${RUN_NAME} \
+            --checkpoint_name=${CHECKPOINT_NAME} \
+            --embed_dim=${EMBED_DIM}
