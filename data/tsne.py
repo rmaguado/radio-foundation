@@ -108,7 +108,7 @@ def load_latents_and_labels(directory, abnormalities_df, metadata_df):
         )
         if data is not None:
             latents.append(data)
-            labels.append(label.values)
+            labels.append(label)
             metas.append(meta)
 
     latents = np.vstack(latents)
@@ -281,7 +281,10 @@ def plot_tsne_metadata(embedding, metas, fname="new_image_latents"):
             plt.clf()
 
 
-def load_latents(latent_path, abnormalities_path, metadata_path):
+def load_latents(args):
+    latent_path = args.latent_path
+    abnormalities_path = args.abnormalities_path
+    metadata_path = args.metadata_path
 
     abnormalities_df = pd.read_csv(abnormalities_path)
     metadata_df = pd.read_csv(metadata_path)
@@ -319,9 +322,9 @@ def load_save(path="tsne/save.pkl"):
 
 
 def main(args):
-    os.makedirs("tsne")
-    os.makedirs("tsne/categories")
-    os.makedirs("tsne/metadata")
+    os.makedirs("tsne", exist_ok=True)
+    os.makedirs("tsne/categories", exist_ok=True)
+    os.makedirs("tsne/metadata", exist_ok=True)
 
     latents, labels, metadata = load_latents(args)
 
@@ -356,7 +359,7 @@ def get_argpase():
     )
     parser.add_argument(
         "--metadata_path",
-        type=int,
+        type=str,
         required=True,
         help="Path to .csv file containing scan metadata.",
     )
