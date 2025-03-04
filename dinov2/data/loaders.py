@@ -7,6 +7,7 @@ import logging
 from enum import Enum
 from typing import Any, Callable, Tuple, List, Optional, TypeVar
 from omegaconf import DictConfig
+from tabulate import tabulate
 
 import torch
 from torch.utils.data import Sampler
@@ -135,6 +136,31 @@ def _make_sampler(
         SamplerType.WEIGHTED_SHARDED_INFINITE,
     ]:
         assert weights is not None, "Weights must be provided for weighted sampling"
+
+    if weights is not None:
+        logger.info("Using weighted sampling.")
+        table = [
+            ["Dataset", "Size", "Weight"],
+            *[
+                [dataset_name, f"{size:,d}", weight]
+                for dataset_name, size, weight in zip(
+                    dataset_names, dataset_sizes, weights
+                )
+            ],
+        ]
+    else:
+        logger.info(
+            "Not using weighted sampling. Provide a weight for each dataset to enable."
+        )
+        table = [
+            ["Dataset", "Size"],
+            *[
+                [dataset_name, f"{size:,d}"]
+                for dataset_name, size in zip(dataset_names, dataset_sizes)
+            ],
+        ]
+
+    logger.info(tabulate(table, headers="firstrow", tablefmt="orgtbl"))
 
     if sampler_type == SamplerType.INFINITE:
         logger.info("sampler: infinite")
