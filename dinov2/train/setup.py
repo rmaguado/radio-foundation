@@ -4,7 +4,7 @@ from functools import partial
 
 from fvcore.common.checkpoint import PeriodicCheckpointer
 
-from dinov2.fsdp import FSDPCheckpointer
+from dinov2.fsdp import FSDPCheckpointer, DistributedCheckpointer
 from dinov2.utils.utils import CosineScheduler
 from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
@@ -133,12 +133,21 @@ def setup_training_components(cfg, model, resume):
     schedulers = build_schedulers(cfg)
     logger.info("Schedulers ready.")
 
-    fsdp_checkpointer = FSDPCheckpointer(
+    sharding_strategy = cfg.compute_precision.teacher.backbone.sharding_strategy
+    if sharding_strategy in [
+        "NO_SHARD",
+        "SHARD_GRAD_OP",
+    ]:
+        checkpointer_wrapper = FSDPCheckpointer
+    else:
+        checkpointer_wrapper = DistributedCheckpointer
+
+    checkpointer = checkpointer_wrapper(
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
     start_iter = (
-        fsdp_checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get(
+        checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get(
             "iteration", -1
         )
         + 1
@@ -157,7 +166,7 @@ def setup_training_components(cfg, model, resume):
         )
 
     checkpointer = PeriodicCheckpointer(
-        fsdp_checkpointer,
+        checkpointer_wrapper,
         period=cfg.train.saveckp_iterations,
         max_iter=max_iter,
         max_to_keep=3,
