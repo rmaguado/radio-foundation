@@ -176,6 +176,8 @@ class DistributedCheckpointer(Checkpointer):
         with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
             data["model"] = self.model.state_dict()
 
+        self.logger.debug("Obtained model state_dict.")
+
         for key, obj in self.checkpointables.items():
             data[key] = obj.state_dict()
         data.update(kwargs)
