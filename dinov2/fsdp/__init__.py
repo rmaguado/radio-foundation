@@ -172,10 +172,9 @@ class DistributedCheckpointer(Checkpointer):
             data[key] = obj.state_dict()
         data.update(kwargs)
 
-        if distributed.get_global_rank() == 0:
-            basename = f"{name}.pth"  # Only rank 0 saves the checkpoint
-        else:
-            return
+        if distributed.get_global_rank() != 0:
+            return  # Only rank 0 saves the checkpoint
+        basename = f"{name}.pth"
         save_file = os.path.join(self.save_dir, basename)
         assert os.path.basename(save_file) == basename, basename
         self.logger.info("Saving checkpoint to {}".format(save_file))
@@ -219,8 +218,6 @@ class DistributedCheckpointer(Checkpointer):
         Args:
             last_filename_basename (str): the basename of the last filename.
         """
-        if distributed.is_enabled():
-            torch.distributed.barrier()
         save_file = os.path.join(self.save_dir, f"last_checkpoint")
         with self.path_manager.open(save_file, "w") as f:
             f.write(last_filename_basename)  # pyre-ignore
