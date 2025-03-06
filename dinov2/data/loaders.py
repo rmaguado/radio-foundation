@@ -160,7 +160,7 @@ def _make_sampler(
             ],
         ]
 
-    logger.info(tabulate(table, headers="firstrow", tablefmt="orgtbl"))
+    logger.info("\n" + tabulate(table, headers="firstrow", tablefmt="orgtbl"))
 
     if sampler_type == SamplerType.INFINITE:
         logger.info("sampler: infinite")
