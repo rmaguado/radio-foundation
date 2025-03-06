@@ -138,9 +138,9 @@ def setup_training_components(cfg, model, resume):
         "NO_SHARD",
         "SHARD_GRAD_OP",
     ]:
-        checkpointer_wrapper = FSDPCheckpointer
-    else:
         checkpointer_wrapper = DistributedCheckpointer
+    else:
+        checkpointer_wrapper = FSDPCheckpointer
 
     checkpointer = checkpointer_wrapper(
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
