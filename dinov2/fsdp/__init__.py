@@ -167,16 +167,17 @@ class DistributedCheckpointer(Checkpointer):
         if not self.save_dir or not self.save_to_disk:
             return
 
+        if distributed.get_global_rank() != 0:
+            return
+
         data = {}
-        with FSDP.state_dict_type(self.model, StateDictType.LOCAL_STATE_DICT):
+        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
             data["model"] = self.model.state_dict()
 
         for key, obj in self.checkpointables.items():
             data[key] = obj.state_dict()
         data.update(kwargs)
 
-        if distributed.get_global_rank() != 0:
-            return  # Only rank 0 saves the checkpoint
         basename = f"{name}.pth"
         save_file = os.path.join(self.save_dir, basename)
         assert os.path.basename(save_file) == basename, basename
@@ -186,7 +187,7 @@ class DistributedCheckpointer(Checkpointer):
         self.tag_last_checkpoint(basename)
 
     def load(self, *args, **kwargs):
-        with FSDP.state_dict_type(self.model, StateDictType.LOCAL_STATE_DICT):
+        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
             return super().load(*args, **kwargs)
 
     def has_checkpoint(self) -> bool:
