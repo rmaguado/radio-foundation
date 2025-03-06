@@ -195,7 +195,7 @@ class DistributedCheckpointer(Checkpointer):
         torch.distributed.barrier()
 
     def load(self, *args, **kwargs):
-        cfg = FullStateDictConfig(offload_to_cpu=True)
+        cfg = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT, cfg):
             return super().load(*args, **kwargs)
 
