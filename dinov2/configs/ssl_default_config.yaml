@@ -59,6 +59,7 @@ ibot:
   head_nlayers: 3
   head_hidden_dim: 2048
 train:
+  debug: false
   grad_accum_steps: 1
   batch_size_per_gpu: 64
   output_dir: .
