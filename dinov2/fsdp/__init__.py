@@ -170,7 +170,7 @@ class DistributedCheckpointer(Checkpointer):
         if distributed.get_global_rank() != 0:
             torch.distributed.barrier()
             return
-        self.logger.info("Saving checkpoint...")
+        self.logger.debug("Saving checkpoint...")
 
         data = {}
         with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
