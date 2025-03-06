@@ -167,15 +167,17 @@ class DistributedCheckpointer(Checkpointer):
         if not self.save_dir or not self.save_to_disk:
             return
 
-        if distributed.get_global_rank() != 0:
-            torch.distributed.barrier()
-            return
         self.logger.debug("Saving checkpoint...")
 
         data = {}
-        data["model"] = self.model.state_dict()
+        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
+            data["model"] = self.model.state_dict()
 
         self.logger.debug("Obtained model state_dict.")
+
+        if distributed.get_global_rank() != 0:
+            torch.distributed.barrier()
+            return
 
         for key, obj in self.checkpointables.items():
             data[key] = obj.state_dict()
