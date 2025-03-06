@@ -111,8 +111,7 @@ class FSDPCheckpointer(Checkpointer):
         self.tag_last_checkpoint(basename)
 
     def load(self, *args, **kwargs):
-        cfg = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        with FSDP.state_dict_type(self.model, StateDictType.LOCAL_STATE_DICT, cfg):
+        with FSDP.state_dict_type(self.model, StateDictType.LOCAL_STATE_DICT):
             return super().load(*args, **kwargs)
 
     def has_checkpoint(self) -> bool:
@@ -173,7 +172,7 @@ class DistributedCheckpointer(Checkpointer):
 
         data = {}
         cfg = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT.cfg):
+        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT, cfg):
             data["model"] = self.model.state_dict()
 
         self.logger.debug("Obtained model state_dict.")
@@ -196,7 +195,8 @@ class DistributedCheckpointer(Checkpointer):
         torch.distributed.barrier()
 
     def load(self, *args, **kwargs):
-        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
+        cfg = FullStateDictConfig(offload_to_cpu=True)
+        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT, cfg):
             return super().load(*args, **kwargs)
 
     def has_checkpoint(self) -> bool:
