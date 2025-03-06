@@ -173,8 +173,7 @@ class DistributedCheckpointer(Checkpointer):
         self.logger.debug("Saving checkpoint...")
 
         data = {}
-        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
-            data["model"] = self.model.state_dict()
+        data["model"] = self.model.state_dict()
 
         self.logger.debug("Obtained model state_dict.")
 
@@ -192,8 +191,7 @@ class DistributedCheckpointer(Checkpointer):
         torch.distributed.barrier()
 
     def load(self, *args, **kwargs):
-        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
-            return super().load(*args, **kwargs)
+        return super().load(*args, **kwargs)
 
     def has_checkpoint(self) -> bool:
         """
