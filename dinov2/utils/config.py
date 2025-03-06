@@ -40,7 +40,7 @@ def default_setup(args):
     seed = getattr(args, "seed", 0)
     rank = distributed.get_global_rank()
 
-    if args.debug:
+    if getattr(args, "debug", False):
         logging_level = logging.DEBUG
     else:
         logging_level = logging.INFO
