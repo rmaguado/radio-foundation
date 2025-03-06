@@ -160,7 +160,7 @@ class ImageTransforms:
         img: torch.Tensor,
     ) -> torch.Tensor:
         angle = 180.0 * random.uniform(-1, 1)
-        return transforms.functional.rotate(img, angle)
+        return transforms.functional.rotate(img, angle, fill=self.lower_bound)
 
     def _flip(self, img: torch.Tensor) -> torch.Tensor:
         return transforms.functional.hflip(img)
