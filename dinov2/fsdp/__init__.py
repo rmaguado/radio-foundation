@@ -168,6 +168,7 @@ class DistributedCheckpointer(Checkpointer):
             return
 
         if distributed.get_global_rank() != 0:
+            torch.distributed.barrier()
             return
 
         data = {}
@@ -185,6 +186,7 @@ class DistributedCheckpointer(Checkpointer):
         with self.path_manager.open(save_file, "wb") as f:
             torch.save(data, f)
         self.tag_last_checkpoint(basename)
+        torch.distributed.barrier()
 
     def load(self, *args, **kwargs):
         with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
