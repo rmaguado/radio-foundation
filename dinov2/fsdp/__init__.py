@@ -151,6 +151,9 @@ class FSDPCheckpointer(Checkpointer):
         with self.path_manager.open(save_file, "w") as f:
             f.write(last_filename_basename)  # pyre-ignore
 
+    def _load_file(self, f):
+        return torch.load(f, map_location=torch.device("cpu"), weights_only=False)
+
 
 class DistributedCheckpointer(Checkpointer):
     def save(self, name: str, **kwargs: Any) -> None:
@@ -221,6 +224,9 @@ class DistributedCheckpointer(Checkpointer):
         save_file = os.path.join(self.save_dir, f"last_checkpoint")
         with self.path_manager.open(save_file, "w") as f:
             f.write(last_filename_basename)  # pyre-ignore
+
+    def _load_file(self, f):
+        return torch.load(f, map_location=torch.device("cpu"), weights_only=False)
 
 
 ShardedGradScaler = ShardedGradScaler
