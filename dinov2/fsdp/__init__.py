@@ -177,13 +177,15 @@ class DistributedCheckpointer(Checkpointer):
 
         self.logger.debug("Obtained model state_dict.")
 
-        if distributed.get_global_rank() != 0:
-            torch.distributed.barrier()
-            return
-
         for key, obj in self.checkpointables.items():
             data[key] = obj.state_dict()
         data.update(kwargs)
+
+        self.logger.debug("Obtained checkpointables.")
+
+        if distributed.get_global_rank() != 0:
+            torch.distributed.barrier()
+            return
 
         basename = f"{name}.pth"
         save_file = os.path.join(self.save_dir, basename)
