@@ -6,7 +6,7 @@
 #SBATCH --output=$OUT/$CONF/$CONF-%j.out
 #SBATCH --nodes=1
 #SBATCH --nodelist=compute-cuda-02
-#SBATCH --cpus-per-task=10
+#SBATCH --cpus-per-task=$WORKERS
 
 #SBATCH --ntasks-per-node=$GPUS
 #SBATCH --gres=gpu:$GPUTYPE:$GPUS
@@ -21,7 +21,7 @@ conda activate dino2
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
-srun --unbuffered --ntasks=$GPUS --cpus-per-task=10 \
+srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS \
     python3 ${PWD}/dinov2/train/train.py \
             --config-file="${PWD}/configs/$CONF.yaml" \
             --output-dir="${PWD}/runs/$CONF"

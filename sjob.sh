@@ -8,12 +8,13 @@ if [ ! -e $DHOME/sjob.template ]; then
   exit 1
 fi
 
-# CONF NODES GPUS [W]
+# CONF NODES GPUS WORKERS [W]
 
 export CONF="${1##*/}"
 export CONF="${CONF%.*}"
 export GPUS=$2
 export GPUTYPE=${3:-L40S}
+export WORKERS=$4
 
 if [ "$GPUTYPE" != "A40" -a "$GPUTYPE" != "L40S" ]; then
   echo "$GPUTYPE not available"
@@ -31,12 +32,12 @@ fi
 
 
 if [ ! -z $2 ]; then 
-  printf "\nJob  conf: $CONF  gpus-per_node: $GPUS $GPUTYPE GPUs\n\n"
+  printf "\nJob  conf: $CONF  gpus-per_node: $GPUS $GPUTYPE GPUs   Workers per GPU: $WORKERS\n\n"
   mkdir -p $OUT/$CONF
-  envsubst '$CONF $GPUS $GPUTYPE $OUT' < $PWD/sjob.template > $OUT/$CONF/$CONF.run
+  envsubst '$CONF $GPUS $GPUTYPE $OUT $WORKERS' < $PWD/sjob.template > $OUT/$CONF/$CONF.run
   sbatch $OUT/$CONF/$CONF.run
 
 else
-  printf "\nneed CONF GPUS GPUTYPE\n\n"
+  printf "\nneed CONF GPUS GPUTYPE WORKERS\n\n"
 
 fi
