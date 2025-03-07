@@ -14,6 +14,7 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 from torch.distributed.fsdp import MixedPrecision
 from torch.distributed.fsdp import StateDictType
+from torch.distributed.fsdp import FullStateDictConfig
 from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torch.distributed.fsdp._runtime_utils import _reshard
@@ -211,8 +212,7 @@ class FlexibleFSDPCheckpointer(Checkpointer):
             assert os.path.isfile(path), "Checkpoint {} not found!".format(path)
 
         checkpoint = self._load_file(path)
-        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
-            incompatible = self._load_model(checkpoint)
+        incompatible = self._load_model(checkpoint)
         if incompatible is not None:
             self._log_incompatible_keys(incompatible)
 
@@ -221,18 +221,27 @@ class FlexibleFSDPCheckpointer(Checkpointer):
                 self.logger.info("Loading {} from {} ...".format(key, path))
                 obj = self.checkpointables[key]
                 if key == "optimizer":
-                    with FSDP.state_dict_type(
-                        self.model, StateDictType.FULL_STATE_DICT
-                    ):
-                        optim_state_dict = checkpoint.pop(key)
-                        optim_state_dict = FSDP.optim_state_dict_to_load(
-                            self.model, obj, optim_state_dict
-                        )
-                        obj.load_state_dict(optim_state_dict)
+                    state_dict = checkpoint.pop("optimizer")
+                    self._load_optim(obj, state_dict)
                 else:
                     obj.load_state_dict(checkpoint.pop(key))
 
         return checkpoint
+
+    def _load_optim(self, optim, state_dict):
+        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
+            optim_state_dict = FSDP.optim_state_dict_to_load(
+                self.model, optim, state_dict
+            )
+            optim.load_state_dict(optim_state_dict)
+
+    def _load_file(self, f):
+        cfg = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
+        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT, cfg):
+            state_dict = torch.load(
+                f, map_location=torch.device("cpu"), weights_only=False
+            )
+        return state_dict
 
 
 ShardedGradScaler = ShardedGradScaler
