@@ -22,9 +22,8 @@ def load_sharded_save_unsharded(cfg, model):
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
-    iteration = (
-        checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=True).get("iteration", -1)
-        + 1
+    iteration = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=True).get(
+        "iteration", -1
     )
 
     logger.info(
