@@ -133,8 +133,14 @@ def setup_training_components(cfg, model, resume):
     schedulers = build_schedulers(cfg)
     logger.info("Schedulers ready.")
 
-    # sharding_strategy = cfg.compute_precision.teacher.backbone.sharding_strategy
-    checkpointer_wrapper = FlexibleFSDPCheckpointer
+    sharding_strategy = cfg.compute_precision.teacher.backbone.sharding_strategy
+    if sharding_strategy in [
+        "NO_SHARD",
+        "SHARD_GRAD_OP",
+    ]:
+        checkpointer_wrapper = FlexibleFSDPCheckpointer
+    else:
+        checkpointer_wrapper = FSDPCheckpointer
 
     checkpointer = checkpointer_wrapper(
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
