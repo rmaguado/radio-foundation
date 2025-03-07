@@ -294,6 +294,9 @@ class AntiFSDPConverter(Checkpointer):
         with FSDP.state_dict_type(self.model, StateDictType.LOCAL_STATE_DICT):
             return super().load(*args, **kwargs)
 
+    def _load_file(self, f):
+        return torch.load(f, map_location=torch.device("cpu"), weights_only=False)
+
     def has_checkpoint(self) -> bool:
         save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
         return self.path_manager.exists(save_file)
