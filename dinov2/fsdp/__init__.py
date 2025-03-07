@@ -311,9 +311,7 @@ class AntiFSDPConverter(Checkpointer):
         return os.path.join(self.save_dir, last_saved)
 
     def tag_last_checkpoint(self, last_filename_basename: str) -> None:
-        if distributed.is_enabled():
-            torch.distributed.barrier()
-        save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
+        save_file = os.path.join(self.save_dir, f"last_checkpoint")
         with self.path_manager.open(save_file, "w") as f:
             f.write(last_filename_basename)  # pyre-ignore
 
