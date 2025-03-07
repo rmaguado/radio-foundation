@@ -2,6 +2,9 @@
 #
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
+#
+# AntiFSDPCheckpointer implemented by TimDarcet:
+# https://gist.github.com/TimDarcet/8b986c6b2b2522603fe57a4327590652
 
 import os
 from typing import Any, Dict, List, Optional
