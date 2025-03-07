@@ -175,9 +175,7 @@ class FlexibleFSDPCheckpointer(Checkpointer):
         for key, obj in self.checkpointables.items():
             if key == "optimizer":
                 with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
-                    optim_state_dict = FSDP.optim_state_dict(
-                        self.model, obj.state_dict()
-                    )
+                    optim_state_dict = FSDP.optim_state_dict(self.model, obj)
                     data[key] = optim_state_dict
 
                     self.logger.debug("Gathered full state dict for optimizer")
