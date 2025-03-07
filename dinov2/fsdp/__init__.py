@@ -174,14 +174,11 @@ class DistributedCheckpointer(Checkpointer):
         cfg = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT, cfg):
             data["model"] = self.model.state_dict()
+            for key, obj in self.checkpointables.items():
+                data[key] = obj.state_dict()
+            data.update(kwargs)
 
-        self.logger.debug("Obtained model state_dict.")
-
-        for key, obj in self.checkpointables.items():
-            data[key] = obj.state_dict()
-        data.update(kwargs)
-
-        self.logger.debug("Obtained checkpointables.")
+        self.logger.debug("Obtained state_dicts.")
 
         if distributed.get_global_rank() != 0:
             torch.distributed.barrier()
