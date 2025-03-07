@@ -244,4 +244,75 @@ class FlexibleFSDPCheckpointer(Checkpointer):
         return state_dict
 
 
+class AntiFSDPConverter(Checkpointer):
+    """
+    Used to convert sharded checkpoints to non-sharded checkpoints.
+    """
+
+    def save(self, name: str, **kwargs: Any) -> None:
+        if not self.save_dir or not self.save_to_disk:
+            return
+
+        self.logger.debug("Saving checkpoint to {} ...".format(self.save_dir))
+
+        data = {}
+        with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
+            data["model"] = self.model.state_dict()
+
+        self.logger.debug("Gathered full state dict for model")
+
+        for key, obj in self.checkpointables.items():
+            if key == "optimizer":
+                with FSDP.state_dict_type(self.model, StateDictType.FULL_STATE_DICT):
+                    optim_state_dict = FSDP.optim_state_dict(self.model, obj)
+                    data[key] = optim_state_dict
+
+                    self.logger.debug("Gathered full state dict for optimizer")
+            else:
+                data[key] = obj.state_dict()
+        data.update(kwargs)
+
+        if distributed.get_global_rank() != 0:
+            self.logger.debug("Waiting for rank 0 to save checkpoint")
+            torch.distributed.barrier()
+            self.logger.debug("Rank 0 saved checkpoint. Resuming ...")
+            return
+
+        basename = f"{name}.pth"
+        save_file = os.path.join(self.save_dir, basename)
+        assert os.path.basename(save_file) == basename, basename
+        self.logger.info("Saving checkpoint to {}".format(save_file))
+        with self.path_manager.open(save_file, "wb") as f:
+            torch.save(data, f)
+        self.tag_last_checkpoint(basename)
+
+        self.logger.debug("Checkpoint saved")
+
+        torch.distributed.barrier()
+
+    def load(self, *args, **kwargs):
+        with FSDP.state_dict_type(self.model, StateDictType.LOCAL_STATE_DICT):
+            return super().load(*args, **kwargs)
+
+    def has_checkpoint(self) -> bool:
+        save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
+        return self.path_manager.exists(save_file)
+
+    def get_checkpoint_file(self) -> str:
+        save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
+        try:
+            with self.path_manager.open(save_file, "r") as f:
+                last_saved = f.read().strip()
+        except IOError:
+            return ""
+        return os.path.join(self.save_dir, last_saved)
+
+    def tag_last_checkpoint(self, last_filename_basename: str) -> None:
+        if distributed.is_enabled():
+            torch.distributed.barrier()
+        save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
+        with self.path_manager.open(save_file, "w") as f:
+            f.write(last_filename_basename)  # pyre-ignore
+
+
 ShardedGradScaler = ShardedGradScaler
