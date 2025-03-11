@@ -84,6 +84,9 @@ def train(
         if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
             apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps)
             model.update_teacher(mom)
+
+            checkpointer.step(iteration)
+
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
 
             iteration += 1
@@ -91,8 +94,6 @@ def train(
             if should_eval_model(cfg, iteration):
                 do_test(cfg, model, f"training_{iteration}")
                 torch.cuda.synchronize()
-
-            checkpointer.step(iteration)
 
         grad_accum_counter += 1
 
