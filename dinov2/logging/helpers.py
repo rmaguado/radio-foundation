@@ -118,14 +118,14 @@ class MetricLogger(object):
             data_time.update(time.time() - end)
             yield obj
             iter_time.update(time.time() - end)
-            if i % print_freq == 0 or i == n_iterations - 1:
-                self.dump_in_output_file(i, iter_time.avg(), data_time.avg())
-                eta_seconds = iter_time.avg() * (n_iterations - i)
-                eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
-                self.log_iteration(
-                    i, n_iterations, eta_string, iter_time.avg(), data_time.avg()
-                )
             if (grad_accum_counter + 1) % grad_accum_steps == 0:
+                if i % print_freq == 0 or i == n_iterations - 1:
+                    self.dump_in_output_file(i, iter_time.avg(), data_time.avg())
+                    eta_seconds = iter_time.avg() * (n_iterations - i)
+                    eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
+                    self.log_iteration(
+                        i, n_iterations, eta_string, iter_time.avg(), data_time.avg()
+                    )
                 i += 1
             grad_accum_counter += 1
             end = time.time()
