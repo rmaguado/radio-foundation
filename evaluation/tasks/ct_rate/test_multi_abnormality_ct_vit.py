@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import argparse
 
 from evaluation.utils.networks import FullScanPatchPredictor
-from evaluation.tasks.ct_rate.datasets import CT_RATE
+from evaluation.tasks.ct_rate.datasets import CT_RATE_Clip
 from evaluation.utils.dataset import BalancedSampler, split_dataset
 from evaluation.utils.train import train, evaluate
 from evaluation.utils.metrics import save_metrics
@@ -35,7 +35,7 @@ def get_args():
     parser.add_argument(
         "--embed_dim",
         type=int,
-        default=768,
+        default=512,
         help="Dimension of embeddings. ",
     )
     parser.add_argument(
@@ -83,7 +83,7 @@ def get_dataloaders(args, label):
         data_path, "CT-RATE/multi_abnormality_labels/train_predicted_labels.csv"
     )
 
-    dataset = CT_RATE(args.run_name, args.checkpoint_name, metadata_path, label)
+    dataset = CT_RATE_Clip(args.run_name, args.checkpoint_name, metadata_path, label)
 
     train_dataset, val_dataset = split_dataset(dataset, 0.8)
 

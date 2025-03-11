@@ -3,6 +3,52 @@ from evaluation.utils.metrics import compute_metrics
 from tqdm import tqdm
 import torch
 import numpy as np
+import time
+
+
+def evaluate(
+    classifier_model: torch.nn.Module,
+    val_loader: torch.utils.data.DataLoader,
+    device: torch.device,
+    max_eval_n: int = 1000,
+    verbose: bool = True,
+):
+    classifier_model.eval()
+    all_logits = []
+    all_labels = []
+
+    data_times = []
+
+    total_eval_iter = min(len(val_loader), max_eval_n)
+
+    val_iter = iter(val_loader)
+    if verbose:
+        eval_iter_loop = tqdm(range(total_eval_iter))
+    else:
+        eval_iter_loop = range(total_eval_iter)
+
+    with torch.no_grad():
+
+        for idx in eval_iter_loop:
+            t0_data = time.time()
+            embeddings, mask, labels = next(val_iter)
+            data_times.append(time.time() - t0_data)
+
+            embeddings = embeddings.to(device)
+            mask = mask.to(device)
+            logits = classifier_model(embeddings, mask=mask)
+
+            all_logits.append(logits.detach().cpu().flatten().numpy())
+            all_labels.append(labels.float().cpu().numpy())
+
+    torch.cuda.empty_cache()
+
+    all_logits = np.array(all_logits).flatten()
+    all_labels = np.array(all_labels).flatten()
+
+    print(f"Mean data load time (eval): {np.mean(data_times):.4f}")
+
+    return compute_metrics(all_logits, all_labels)
 
 
 def train(
@@ -10,72 +56,60 @@ def train(
     optimizer: torch.optim.Optimizer,
     criterion: torch.nn.Module,
     train_loader: torch.utils.data.DataLoader,
-    val_loader: torch.utils.data.DataLoader,
-    train_epochs: int,
+    train_iters: int,
     accum_steps: int,
     device: torch.device,
     scheduler: torch.optim.lr_scheduler._LRScheduler = None,
-) -> int:
-    def evaluate():
-        classifier_model.eval()
-        all_logits = []
-        all_labels = []
-
-        with torch.no_grad():
-            val_iter = iter(val_loader)
-            for idx, (embeddings, _, labels) in enumerate(tqdm(val_iter)):
-                embeddings = embeddings.to(device)
-                logits = classifier_model(embeddings)
-
-                all_logits.append(logits.flatten().cpu().numpy())
-                all_labels.append(labels.float().cpu().numpy())
-
-        all_logits = np.array(all_logits).flatten()
-        all_labels = np.array(all_labels).flatten()
-
-        return compute_metrics(all_logits, all_labels)
-
+    verbose: bool = True,
+) -> list:
+    torch.cuda.empty_cache()
     classifier_model.train()
-    losses = []
-    grad_norms = []
-    val_metrics = []
+    optimizer.zero_grad()
 
-    for train_epoch in range(train_epochs):
+    train_iter = iter(train_loader)
 
-        total_loss = 0.0
-        total_grad_norm = 0.0
+    if verbose:
+        train_iter_loop = tqdm(range(train_iters))
+    else:
+        train_iter_loop = range(train_iters)
 
-        optimizer.zero_grad()
+    all_logits = []
+    all_labels = []
 
-        train_iter = iter(train_loader)
+    t0_train = time.time()
+    data_times = []
+    for iteration in train_iter_loop:
+        try:
+            t0_data = time.time()
+            embeddings, mask, labels = next(train_iter)
+            data_times.append(time.time() - t0_data)
 
-        for idx, (embeddings, _, labels) in enumerate(tqdm(train_iter)):
-            logits = classifier_model(embeddings.to(device))
-            loss = criterion(logits.flatten(), labels.float().to(device))
-            total_loss += loss.item()
-            loss.backward()
+        except StopIteration:
+            del train_iter
+            train_iter = iter(train_loader)
+            embeddings, mask, labels = next(train_iter)
 
-            total_grad_norm += torch.nn.utils.clip_grad_norm_(
-                classifier_model.parameters(), 1.0
-            ).item()
+        logits = classifier_model(embeddings.to(device), mask=mask.to(device))
+        loss = criterion(logits.flatten(), labels.float().to(device))
+        loss.backward()
 
-            if ((idx + 1) % accum_steps == 0) or ((idx + 1) == len(train_loader)):
-                optimizer.step()
-                optimizer.zero_grad()
-                if scheduler is not None:
-                    scheduler.step()
+        all_logits.append(logits.detach().cpu().flatten().numpy())
+        all_labels.append(labels.float().cpu().numpy())
 
-        losses.append(total_loss / len(train_loader))
-        grad_norms.append(total_grad_norm / len(train_loader))
+        torch.nn.utils.clip_grad_norm_(classifier_model.parameters(), 1.0)
 
-        epoch_metrics = evaluate()
-        val_metrics.append(epoch_metrics)
+        if (iteration + 1) % accum_steps == 0:
+            optimizer.step()
+            optimizer.zero_grad()
+            if scheduler is not None:
+                scheduler.step()
+            torch.cuda.empty_cache()
 
-        pr_auc = epoch_metrics["pr_auc"]
-        roc_auc = epoch_metrics["roc_auc"]
+    tf_train = time.time() - t0_train
+    print(f"Time per iteration: {tf_train / train_iters:.4f}")
+    print(f"Mean data load time: {np.mean(data_times):.4f}")
 
-        print(
-            f"Epoch {train_epoch + 1}/{train_epochs} - PR AUC: {pr_auc:.4f} - ROC AUC: {roc_auc:.4f}"
-        )
+    all_logits = np.array(all_logits).flatten()
+    all_labels = np.array(all_labels).flatten()
 
-    return losses, grad_norms, val_metrics
+    return compute_metrics(all_logits, all_labels)
