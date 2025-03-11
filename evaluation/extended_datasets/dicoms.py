@@ -89,7 +89,7 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
             stack_data = self.create_stack_data(stack_rows)
         except Exception as e:
             logger.exception(f"Error processing stack (map_id: {map_id}) \n{e}")
-            stack_data = torch.zeros((10, 512, 512), dtype=torch.float32)
+            stack_data = torch.zeros((self.channels, 512, 512), dtype=torch.float32)
 
         return stack_data, map_id
 
