@@ -4,6 +4,7 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
+- [ ] evaluation dataloader without caching
 - [ ] Randomise sagital and coronal views for nifti dataloader if spacing is cube.
 - [ ] update userguide for data processing
 
