@@ -85,9 +85,9 @@ def train(
             apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps)
             model.update_teacher(mom)
 
-            checkpointer.step(iteration)
-
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
+
+            checkpointer.step(iteration)
 
             iteration += 1
 
