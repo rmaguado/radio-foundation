@@ -85,14 +85,21 @@ class MetricLogger(object):
             "eta": eta,
             "meters": meters,
             "time": iter_time,
-            "data": data_time
+            "data": data_time,
         }
         if torch.cuda.is_available():
             msg_values["memory"] = torch.cuda.max_memory_allocated() / MB
 
         logger.info(self.log_msg.format(**msg_values))
 
-    def log_every(self, print_freq, header=None, n_iterations=None, start_iteration=0):
+    def log_every(
+        self,
+        print_freq,
+        header=None,
+        n_iterations=None,
+        start_iteration=0,
+        grad_accum_steps=1,
+    ):
         iterable = self.dataloader
         i = start_iteration
         if not header:
@@ -106,6 +113,7 @@ class MetricLogger(object):
             n_iterations = len(iterable)
         self.log_msg = self.build_log_msg(header, n_iterations)
 
+        grad_accum_counter = 0
         for obj in iterable:
             data_time.update(time.time() - end)
             yield obj
@@ -117,7 +125,9 @@ class MetricLogger(object):
                 self.log_iteration(
                     i, n_iterations, eta_string, iter_time.avg(), data_time.avg()
                 )
-            i += 1
+            if (grad_accum_counter + 1) % grad_accum_steps == 0:
+                i += 1
+            grad_accum_counter += 1
             end = time.time()
             if i >= n_iterations:
                 break

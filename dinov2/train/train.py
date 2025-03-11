@@ -70,6 +70,7 @@ def train(
         "Training",
         max_iter,
         start_iter,
+        accum_steps,
     ):
         if iteration > max_iter:
             return
