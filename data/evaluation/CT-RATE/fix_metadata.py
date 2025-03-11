@@ -18,7 +18,8 @@ def process_row(row_args):
     VolumeName = row["VolumeName"]
     dir1 = VolumeName.rsplit("_", 1)[0]
     dir2 = VolumeName.rsplit("_", 2)[0]
-    filepath = os.path.join(args.root_path, "dataset/train", dir2, dir1, VolumeName)
+    foldername = "CT-RATE_valid" if args.dataset == "validation" else "CT-RATE_train"
+    filepath = os.path.join(args.root_path, foldername, dir2, dir1, VolumeName)
 
     try:
         img_nib = nib.load(filepath, mmap=True)
@@ -61,7 +62,7 @@ def process_row(row_args):
 def main(args):
 
     metadata = pd.read_csv(
-        os.path.join(args.root_path, "dataset/metadata/train_metadata.csv")
+        os.path.join(args.root_path, f"metadata/{args.dataset}_metadata.csv")
     )
 
     rows = metadata.to_dict(orient="records")
@@ -79,7 +80,7 @@ def main(args):
 
 def processed_missed_rows(args, missed_rows=[]):
     metadata = pd.read_csv(
-        os.path.join(args.root_path, "dataset/metadata/train_metadata.csv")
+        os.path.join(args.root_path, f"metadata/{args.dataset}_metadata.csv")
     )
 
     metadata = metadata[metadata["VolumeName"].isin(missed_rows)]
@@ -99,6 +100,12 @@ def get_args():
         type=str,
         default="/path/to/CT-RATE",
         help="The root directory of the data.",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="train",
+        help="train or validation",
     )
     return parser.parse_args()
 
