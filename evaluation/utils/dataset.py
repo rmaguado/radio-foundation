@@ -84,16 +84,46 @@ class BalancedSampler(Sampler):
 
 def collate_sequences(batch):
     embeddings, labels = zip(*batch)
+    batch_size = len(embeddings)
 
     _, num_tokens, embed_dim = embeddings[0].shape
 
-    max_length = max([embedding.shape[0] for embedding in embeddings])
+    max_axial_dim = max([embedding.shape[0] for embedding in embeddings])
 
-    padded_embeddings = torch.zeros(len(embeddings), max_length, num_tokens, embed_dim)
-    mask = torch.zeros(len(embeddings), max_length)
+    padded_embeddings = torch.zeros(batch_size, max_axial_dim, num_tokens, embed_dim)
+    mask = torch.zeros(batch_size, max_axial_dim)
 
     for i, embedding in enumerate(embeddings):
         padded_embeddings[i, : embedding.shape[0]] = embedding
         mask[i, : embedding.shape[0]] = 1
+
+    return padded_embeddings, mask, torch.tensor(labels)
+
+
+def collate_sequences_clip_len(batch):
+    """
+    clip the number of axial slices around the center
+    """
+    max_len = 24
+    embeddings, labels = zip(*batch)
+    batch_size = len(embeddings)
+
+    max_lengths = [embedding.shape[0] for embedding in embeddings]
+    max_len = min(max(max_lengths), max_len)
+
+    _, num_tokens, embed_dim = embeddings[0].shape
+
+    center = [embedding.shape[0] // 2 for embedding in embeddings]
+    start_idx = [max(0, center[i] - max_len // 2) for i in range(batch_size)]
+
+    padded_embeddings = torch.zeros(batch_size, max_len, num_tokens, embed_dim)
+    mask = torch.zeros(batch_size, max_len)
+
+    for i, embedding in enumerate(embeddings):
+        end_idx = min(start_idx[i] + max_len, embedding.shape[0])
+        padded_embeddings[i, : end_idx - start_idx[i]] = embedding[
+            start_idx[i] : end_idx
+        ]
+        mask[i, : end_idx - start_idx[i]] = 1
 
     return padded_embeddings, mask, torch.tensor(labels)
