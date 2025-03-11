@@ -4,11 +4,6 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- [x] benchmark on CT-RATE multiabnormality labels
-- [x] script for running benchmark tests
-- [x] alternative way to order slices for dicoms
-- [x] resume training with different number of gpus (NEEDS TESTING)
-- [ ] add an augmentation transform that resamples the axial dimension (add to student?)
 - [ ] Randomise sagital and coronal views for nifti dataloader if spacing is cube.
 - [ ] update userguide for data processing
 
