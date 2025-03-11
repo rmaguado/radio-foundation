@@ -4,7 +4,7 @@ from functools import partial
 
 from fvcore.common.checkpoint import PeriodicCheckpointer
 
-from dinov2.fsdp import FSDPCheckpointer, DistributedCheckpointer
+from dinov2.fsdp import FSDPCheckpointer, FlexibleFSDPCheckpointer
 from dinov2.utils.utils import CosineScheduler
 from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
@@ -138,7 +138,7 @@ def setup_training_components(cfg, model, resume):
         "NO_SHARD",
         "SHARD_GRAD_OP",
     ]:
-        checkpointer_wrapper = DistributedCheckpointer
+        checkpointer_wrapper = FlexibleFSDPCheckpointer
     else:
         checkpointer_wrapper = FSDPCheckpointer
 
