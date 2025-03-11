@@ -112,8 +112,7 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
 def get_full_size_iter(cfg):
     full_img_epochs = cfg.train.full_image.epochs
     epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
-    accum_steps = cfg.train.full_image.grad_accum_steps
-    return full_img_epochs * epoch_len * accum_steps
+    return full_img_epochs * epoch_len
 
 
 def get_cropped_iter(cfg):
@@ -121,8 +120,7 @@ def get_cropped_iter(cfg):
     full_img_epochs = cfg.train.full_image.epochs
     cropped_epochs = total_epochs - full_img_epochs
     epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
-    accum_steps = cfg.train.grad_accum_steps
-    return cropped_epochs * epoch_len * accum_steps
+    return cropped_epochs * epoch_len
 
 
 def setup_training_components(cfg, model, resume):
@@ -157,14 +155,6 @@ def setup_training_components(cfg, model, resume):
     cropped_iter = get_cropped_iter(cfg)
     max_iter = cropped_iter + full_size_iter
 
-    if start_iter <= cropped_iter:
-        train_step = start_iter // cfg.train.grad_accum_steps
-    else:
-        train_step = (
-            cropped_iter // cfg.train.grad_accum_steps
-            + (start_iter - cropped_iter) // cfg.train.full_image.grad_accum_steps
-        )
-
     checkpointer = PeriodicCheckpointer(
         checkpointer,
         period=cfg.train.saveckp_iterations,
@@ -177,7 +167,6 @@ def setup_training_components(cfg, model, resume):
         schedulers,
         checkpointer,
         start_iter,
-        train_step,
         max_iter,
         full_size_iter,
     )
