@@ -36,7 +36,7 @@ def save_metrics(val_metrics, output_path, label):
     metrics_path = os.path.join(output_path, "metrics", f"{label}.csv")
     os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
 
-    with open(metrics_path, "w") as f:
+    with open(metrics_path, "a") as f:
         if os.stat(metrics_path).st_size == 0:
             f.write("roc_auc,pr_auc,precision,recall\n")
         f.write(",".join([str(val_metrics[metric]) for metric in metrics]) + "\n")
