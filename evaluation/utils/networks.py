@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class LinearClassifier(nn.Module):
@@ -73,7 +72,10 @@ class FullScanPatchPredictor(nn.Module):
     ):
         super().__init__()
 
+        self.embed_dim = embed_dim
+        self.hidden_dim = hidden_dim
         self.patch_resample_dim = patch_resample_dim
+        self.num_labels = num_labels
 
         self.token_resampler = PerceiverResampler(
             embed_dim=embed_dim, latent_dim=hidden_dim, num_queries=patch_resample_dim
@@ -84,19 +86,35 @@ class FullScanPatchPredictor(nn.Module):
         self.mlp = nn.Linear(hidden_dim, num_labels)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
-        _, num_tokens, axial_dim, embed_dim = x.size()
-        x = x.view(axial_dim, num_tokens, embed_dim)
+    def forward(self, x, mask=None):
+        # x: (batch_size 8, axial_dim 20, num_tokens 1297, embed_dim 768)
+        # mask: (batch_size 8, axial_dim 20)
+
+        batch_size, axial_dim, num_tokens, embed_dim = x.size()
+
+        x = x.view(batch_size * axial_dim, num_tokens, embed_dim)
+
+        # x: (batch_size * axial_dim 160, num_tokens 1297, embed_dim 768)
+
         x = self.token_resampler(x)
 
-        axial_dim, resample_len, resample_dim = x.size()
+        # x: (batch_size * axial_dim 160, patch_resample_dim 64, hidden_dim 768)
 
-        x = x.reshape(1, axial_dim * resample_len, resample_dim)
-        x = self.axial_resampler(x)
+        x = x.reshape(batch_size, axial_dim * self.patch_resample_dim, self.hidden_dim)
+
+        # x: (batch_size 8, axial_dim * patch_resample_dim 1280, hidden_dim 768)
+
+        mask = mask.unsqueeze(1).repeat(1, self.patch_resample_dim, 1)
+        mask = mask.view(batch_size, axial_dim * self.patch_resample_dim)
+
+        # mask: (batch_size 8, axial_dim * patch_resample_dim 1280)
+
+        x = self.axial_resampler(x, mask=mask)
         x = self.dropout(x)
 
-        x = x.squeeze(0)
-        return self.mlp(x)
+        x = self.mlp(x)
+
+        return x.view(batch_size, self.num_labels)
 
 
 class FullScanClassPredictor(nn.Module):
@@ -108,13 +126,24 @@ class FullScanClassPredictor(nn.Module):
         self.mlp = nn.Linear(hidden_dim, num_labels)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
-        _, num_tokens, axial_dim, embed_dim = x.size()
-        assert num_tokens == 1
+    def forward(self, x, mask=None):
+        # x: (batch_size 8, axial_dim 20, num_tokens 1, embed_dim 768)
+        # mask: (batch_size 8, axial_dim 20)
+        batch_size, axial_dim, num_tokens, embed_dim = x.size()
 
-        x = x.reshape(1, axial_dim, embed_dim)
-        x = self.axial_resampler(x)
+        x = x.view(batch_size, axial_dim, embed_dim)
+        mask = mask.unsqueeze(2)
+
+        # x: (batch_size 8, axial_dim 20, embed_dim 768)
+        # mask: (batch_size 8, axial_dim 20, 1)
+
+        x = self.axial_resampler(x, mask=mask)
         x = self.dropout(x)
 
-        x = x.squeeze(0)
-        return self.mlp(x)
+        # x: (batch_size 8, 1, hidden_dim 768)
+
+        x = x.view(batch_size, -1)
+
+        x = self.mlp(x)
+
+        return x.view(batch_size, -1)
