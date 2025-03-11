@@ -105,7 +105,8 @@ class MetricLogger(object):
         if not header:
             header = ""
         start_time = time.time()
-        end = time.time()
+        data_end = time.time()
+        iter_end = time.time()
         iter_time = Metric()
         data_time = Metric()
 
@@ -115,10 +116,10 @@ class MetricLogger(object):
 
         grad_accum_counter = 0
         for obj in iterable:
-            data_time.update(time.time() - end)
+            data_time.update(time.time() - data_end)
             yield obj
-            iter_time.update(time.time() - end)
             if (grad_accum_counter + 1) % grad_accum_steps == 0:
+                iter_time.update(time.time() - iter_end)
                 if i % print_freq == 0 or i == n_iterations - 1:
                     self.dump_in_output_file(i, iter_time.avg(), data_time.avg())
                     eta_seconds = iter_time.avg() * (n_iterations - i)
@@ -127,8 +128,9 @@ class MetricLogger(object):
                         i, n_iterations, eta_string, iter_time.avg(), data_time.avg()
                     )
                 i += 1
+                iter_end = time.time()
             grad_accum_counter += 1
-            end = time.time()
+            data_end = time.time()
             if i >= n_iterations:
                 break
         total_time = time.time() - start_time
