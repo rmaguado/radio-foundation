@@ -83,6 +83,9 @@ class NpzFullVolumeEval(NpzCtVolumesFull):
 
         return self.process_ct(volume_data), map_id
 
+    def get_index_from_map_id(self, map_id: str) -> int:
+        return np.where(self.entries["map_id"] == map_id)[0][0]
+
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
             image, map_id = self.get_image_data(index)

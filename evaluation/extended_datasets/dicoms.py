@@ -119,6 +119,9 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
 
         return stack_data.type(torch.float32)
 
+    def get_index_from_map_id(self, map_id: str) -> int:
+        return np.where(self.entries["map_id"] == map_id)[0][0]
+
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
             image, map_id = self.get_image_data(index)
