@@ -12,6 +12,7 @@ import queue
 from evaluation.utils.finetune import (
     load_model,
     ImageTransform,
+    ImageTransformResampleSlices,
     extract_class_tokens,
     extract_patch_tokens,
     extract_all_tokens,
@@ -133,7 +134,12 @@ def main():
     channels = config.student.channels
     max_workers = 16
 
-    img_processor = ImageTransform(full_image_size, data_mean, data_std)
+    if args.resample_slices == -1:
+        img_processor = ImageTransform(full_image_size, data_mean, data_std)
+    else:
+        img_processor = ImageTransformResampleSlices(
+            full_image_size, data_mean, data_std, args.resample_slices, channels
+        )
 
     output_path = os.path.join(
         project_path,
@@ -208,6 +214,12 @@ def get_argpase():
         type=str,
         default="dicom",
         help="The type of database (dicom, nifti, or npz).",
+    )
+    parser.add_argument(
+        "--resample_slices",
+        type=int,
+        default=-1,
+        help="A target number of slices to resample. ",
     )
     return parser
 

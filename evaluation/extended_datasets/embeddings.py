@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from evaluation.utils.finetune import (
     load_model,
     ImageTransform,
+    ImageTransformResampleSlices,
     extract_class_tokens,
     extract_patch_tokens,
     extract_all_tokens,
@@ -56,9 +57,10 @@ class EmbeddingsGenerator:
         embed_cls,
         max_batch_size=64,
         max_workers=16,
+        resample_slices=None,
     ):
         self.model, config = get_model(project_path, run_name, checkpoint_name)
-        full_image_size = config.student.full_image_size
+        full_image_size = config.student.full_image_size  # 504
         data_mean = -573.8
         data_std = 461.3
         channels = config.student.channels
@@ -67,7 +69,12 @@ class EmbeddingsGenerator:
         self.max_workers = max_workers
         self.device = device
 
-        img_processor = ImageTransform(full_image_size, data_mean, data_std)
+        if resample_slices is None:
+            img_processor = ImageTransform(full_image_size, data_mean, data_std)
+        else:
+            img_processor = ImageTransformResampleSlices(
+                full_image_size, data_mean, data_std, resample_slices, channels
+            )
 
         db_params = {
             "root_path": root_path,
@@ -86,6 +93,8 @@ class EmbeddingsGenerator:
                 "Invalid database storage type (db_storage should be dicom, nifti, or npz)."
             )
 
+        self.map_ids = self.dataset.entries["map_id"]
+
         if embed_patches and embed_cls:
             self.embed_fcn = extract_all_tokens
         elif embed_patches:
@@ -95,7 +104,7 @@ class EmbeddingsGenerator:
 
     def get_embeddings(self, map_id: str) -> torch.Tensor:
         index = self.dataset.get_index_from_map_id(map_id)
-        volume = self.dataset.get_image_data(index)
+        volume, _ = self.dataset[index]
 
         embeddings = []
         for i in range(0, volume.shape[0], self.max_batch_size):

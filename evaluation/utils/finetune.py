@@ -22,6 +22,32 @@ class ImageTransform:
         return normalized
 
 
+class ImageTransformResampleSlices:
+    def __init__(self, img_size, mean, std, target_slices=240, channels=10):
+        self.img_size = img_size
+        self.resize = transforms.Resize((img_size, img_size))
+        self.normalize = transforms.Normalize(mean=mean, std=std)
+
+        assert isinstance(target_slices, int), "target_slices must be an integer"
+
+        self.target_slices = target_slices
+        self.channels = channels
+
+    def resample_z(self, image):
+        groups, channels, w, h = image.shape
+        image = image.view(1, 1, groups * channels, w, h)
+        image = torch.nn.functional.interpolate(
+            image, size=(self.target_slices, w, h), mode="trilinear"
+        )
+        return image.view(-1, self.channels, w, h)
+
+    def __call__(self, image):
+        image = self.resize(image)
+        image = self.resample_z(image)
+        image = self.normalize(image)
+        return image
+
+
 class ImageTargetTransform:
     def __init__(self, img_size, mean, std):
         self.img_size = img_size
