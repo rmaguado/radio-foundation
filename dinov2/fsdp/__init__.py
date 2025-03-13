@@ -9,7 +9,7 @@ from typing import Any
 import torch
 import dinov2.distributed as distributed
 from functools import partial
-from fvcore.common.checkpoint import Checkpointer
+from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy
 from torch.distributed.fsdp import MixedPrecision
@@ -314,6 +314,36 @@ class AntiFSDPConverter(Checkpointer):
         save_file = os.path.join(self.save_dir, f"last_checkpoint")
         with self.path_manager.open(save_file, "w") as f:
             f.write(last_filename_basename)  # pyre-ignore
+
+
+class FlexiblePeriodicCheckpointer(PeriodicCheckpointer):
+    def step(self, iteration: int, **kwargs: Any) -> None:
+        iteration = int(iteration)
+        additional_state = {"iteration": iteration}
+        additional_state.update(kwargs)
+
+        if (iteration + 1) % self.period == 0:
+            self.checkpointer.save(
+                "{}_{:07d}".format(self.file_prefix, iteration), **additional_state
+            )
+
+            if self.max_to_keep is not None:
+                self.recent_checkpoints.append(self.checkpointer.get_checkpoint_file())
+                if len(self.recent_checkpoints) > self.max_to_keep:
+                    file_to_delete = self.recent_checkpoints.pop(0)
+                    if self.path_manager.exists(
+                        file_to_delete
+                    ) and not file_to_delete.endswith(f"{self.file_prefix}_final.pth"):
+                        try:
+                            self.path_manager.rm(file_to_delete)
+                        except FileNotFoundError:
+                            self.logger.warning(
+                                f"File {file_to_delete} not found. It might have been already removed."
+                            )
+
+        if self.max_iter is not None:
+            if iteration >= self.max_iter - 1:
+                self.checkpointer.save(f"{self.file_prefix}_final", **additional_state)
 
 
 ShardedGradScaler = ShardedGradScaler

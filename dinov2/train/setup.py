@@ -2,9 +2,11 @@ import logging
 import torch
 from functools import partial
 
-from fvcore.common.checkpoint import PeriodicCheckpointer
-
-from dinov2.fsdp import FSDPCheckpointer, FlexibleFSDPCheckpointer
+from dinov2.fsdp import (
+    FSDPCheckpointer,
+    FlexibleFSDPCheckpointer,
+    FlexiblePeriodicCheckpointer,
+)
 from dinov2.utils.utils import CosineScheduler
 from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
@@ -155,7 +157,7 @@ def setup_training_components(cfg, model, resume):
     cropped_iter = get_cropped_iter(cfg)
     max_iter = cropped_iter + full_size_iter
 
-    checkpointer = PeriodicCheckpointer(
+    checkpointer = FlexiblePeriodicCheckpointer(
         checkpointer,
         period=cfg.train.saveckp_iterations,
         max_iter=max_iter,
