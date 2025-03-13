@@ -91,7 +91,7 @@ def extract_class_tokens(x_tokens_list, n_last_blocks=4):
         [class_token for _, class_token in x_tokens_list[-n_last_blocks:]],
         dim=-1,
     )
-    class_tokens = class_tokens.unsqueeze(0)
+    class_tokens = class_tokens.unsqueeze(1)
     return class_tokens
 
 
