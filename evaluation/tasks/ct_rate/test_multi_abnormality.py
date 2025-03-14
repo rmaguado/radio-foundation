@@ -5,12 +5,13 @@ import torch
 from dotenv import load_dotenv
 import argparse
 
-from evaluation.utils.networks import FullScanPatchPredictor
+from evaluation.utils.networks import FullScanClassPredictor, FullScanPatchPredictor
+from evaluation.extended_datasets import CachedEmbeddings, EmbeddingsGenerator
 from evaluation.tasks.ct_rate.datasets import CT_RATE
-from evaluation.utils.dataset import BalancedSampler, split_dataset
+
+from evaluation.utils.dataset import BalancedSampler, split_dataset, collate_sequences
 from evaluation.utils.train import train, evaluate
 from evaluation.utils.metrics import save_metrics
-
 
 ALL_LABELS = [
     "Medical material",
@@ -30,7 +31,7 @@ ALL_LABELS = [
     "Peribronchial thickening",
     "Consolidation",
     "Bronchiectasis",
-    "Interlobular septal thickening"
+    "Interlobular septal thickening",
 ]
 
 
@@ -93,46 +94,53 @@ def get_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=10,
+        default=5,
         help="Number of batches to iterate over the training set.",
+    )
+    parser.add_argument(
+        "--cls_only",
+        type=bool,
+        default=False,
+        help="Wether to use only the CLS token or CLS + Patch tokens.",
+    )
+    parser.add_argument(
+        "--experiment_name",
+        type=str,
+        default="default_test",
+        help="Name of experiment. Used to differentiate save files.",
     )
     return parser.parse_args()
 
 
 def get_dataloaders(args, label):
+    project_path = os.getenv("PROJECTPATH")
     data_path = os.getenv("DATAPATH")
+
+    embeddings_path = os.path.join(
+        project_path,
+        "evaluation/cache/CT-RATE_train_eval",
+        args.run_name,
+        args.checkpoint_name,
+    )
+    embeddings_provider = CachedEmbeddings(embeddings_path, cls_only=args.cls_only)
+
     metadata_path = os.path.join(
-        data_path, "CT-RATE/multi_abnormality_labels/train_predicted_labels.csv"
+        data_path, "niftis/CT-RATE/multi_abnormality_labels/train_predicted_labels.csv"
     )
 
-    dataset = CT_RATE(args.run_name, args.checkpoint_name, metadata_path, label)
+    dataset = CT_RATE(
+        embeddings_provider,
+        metadata_path,
+        label,
+    )
 
     train_dataset, val_dataset = split_dataset(dataset, 0.8)
-
-    def collate_fn(batch):
-        embeddings, labels = zip(*batch)
-        batch_size = len(embeddings)
-
-        _, num_tokens, embed_dim = embeddings[0].shape
-
-        max_axial_dim = max([embedding.shape[0] for embedding in embeddings])
-
-        padded_embeddings = torch.zeros(
-            batch_size, max_axial_dim, num_tokens, embed_dim
-        )
-        mask = torch.zeros(batch_size, max_axial_dim)
-
-        for i, embedding in enumerate(embeddings):
-            padded_embeddings[i, : embedding.shape[0]] = embedding
-            mask[i, : embedding.shape[0]] = 1
-
-        return padded_embeddings, mask, torch.tensor(labels)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        collate_fn=collate_fn,
+        collate_fn=collate_sequences,
         sampler=BalancedSampler(train_dataset),
         num_workers=4,
         persistent_workers=True,
@@ -141,7 +149,7 @@ def get_dataloaders(args, label):
         val_dataset,
         batch_size=1,
         shuffle=False,
-        collate_fn=collate_fn,
+        collate_fn=collate_sequences,
         sampler=BalancedSampler(val_dataset),
         num_workers=1,
         persistent_workers=True,
@@ -151,12 +159,17 @@ def get_dataloaders(args, label):
 
 
 def get_model(args, device):
-    classifier_model = FullScanPatchPredictor(
-        args.embed_dim,
-        args.hidden_dim,
-        num_labels=1,
-        patch_resample_dim=args.patch_resample_dim,
-    )
+    if args.cls_only:
+        classifier_model = FullScanClassPredictor(
+            args.embed_dim, args.hidden_dim, num_labels=1
+        )
+    else:
+        classifier_model = FullScanPatchPredictor(
+            args.embed_dim,
+            args.hidden_dim,
+            num_labels=1,
+            patch_resample_dim=args.patch_resample_dim,
+        )
     classifier_model.to(device)
 
     return classifier_model
@@ -173,15 +186,20 @@ def run_evaluation(args, label):
     train_loader, val_loader = get_dataloaders(args, label)
 
     classifier_model = get_model(args, device)
-    optimizer = torch.optim.AdamW(classifier_model.parameters(), lr=1e-4)
+    optimizer = torch.optim.AdamW(classifier_model.parameters(), lr=1e-3)
     criterion = torch.nn.BCEWithLogitsLoss()
 
     output_path = os.path.join(
-        project_path, args.output_dir, args.run_name, args.checkpoint_name
+        project_path,
+        args.output_dir,
+        args.run_name,
+        args.checkpoint_name,
+        args.experiment_name,
     )
     os.makedirs(output_path, exist_ok=True)
 
     for i in range(args.epochs):
+        n_eval_steps = 100 if i + 1 < args.epochs else 1000
         train_metrics = train(
             classifier_model,
             optimizer,
@@ -190,13 +208,19 @@ def run_evaluation(args, label):
             args.train_iters,
             args.accum_steps,
             device,
+            verbose=False,
         )
+        print(f"Timestep: {i + 1}/{args.epochs}")
         print(
             f"PR AUC: {train_metrics['pr_auc']:.4f} - ROC AUC: {train_metrics['roc_auc']:.4f}\n"
         )
 
         eval_metrics = evaluate(
-            classifier_model, val_loader, device=device, max_eval_n=64
+            classifier_model,
+            val_loader,
+            device=device,
+            max_eval_n=n_eval_steps,
+            verbose=False,
         )
         print(
             f"PR AUC: {eval_metrics['pr_auc']:.4f} - ROC AUC: {eval_metrics['roc_auc']:.4f}\n"
