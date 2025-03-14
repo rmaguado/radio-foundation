@@ -132,10 +132,10 @@ class FullScanClassPredictor(nn.Module):
         batch_size, axial_dim, num_tokens, embed_dim = x.size()
 
         x = x.view(batch_size, axial_dim, embed_dim)
-        mask = mask.unsqueeze(2)
+        # mask = mask.unsqueeze(2)
 
         # x: (batch_size 8, axial_dim 20, embed_dim 768)
-        # mask: (batch_size 8, axial_dim 20, 1)
+        # mask: (batch_size 8, axial_dim 20)
 
         x = self.axial_resampler(x, mask=mask)
         x = self.dropout(x)
