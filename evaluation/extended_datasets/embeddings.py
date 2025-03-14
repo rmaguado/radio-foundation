@@ -28,18 +28,20 @@ def get_model(project_path, run_name, checkpoint_name):
 
 
 class CachedEmbeddings:
-    def __init__(
-        self,
-        embeddings_path: str,
-    ):
+    def __init__(self, embeddings_path: str, cls_only: bool = False):
         self.embeddings_path = embeddings_path
+        self.cls_only = cls_only
 
         self.map_ids = [
             file.split(".npy")[0] for file in os.listdir(self.embeddings_path)
         ]
 
     def get_embeddings(self, map_id: str) -> torch.Tensor:
-        embeddings = np.load(os.path.join(self.embeddings_path, f"{map_id}.npy"))
+        embeddings = np.load(
+            os.path.join(self.embeddings_path, f"{map_id}.npy"), mmap_mode="r"
+        )
+        if self.cls_only:
+            return torch.from_numpy(embeddings[:, 0, :]).float()
         return torch.from_numpy(embeddings).float()
 
 
