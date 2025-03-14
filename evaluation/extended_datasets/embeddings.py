@@ -37,11 +37,12 @@ class CachedEmbeddings:
         ]
 
     def get_embeddings(self, map_id: str) -> torch.Tensor:
-        embeddings = np.load(
-            os.path.join(self.embeddings_path, f"{map_id}.npy"), mmap_mode="r"
-        )
         if self.cls_only:
-            return torch.from_numpy(embeddings[:, :1, :]).float()
+            embeddings = np.load(
+                os.path.join(self.embeddings_path, f"{map_id}.npy"), mmap_mode="r"
+            )
+            return torch.from_numpy(embeddings[:, :1, :].copy()).float()
+        embeddings = np.load(os.path.join(self.embeddings_path, f"{map_id}.npy"))
         return torch.from_numpy(embeddings).float()
 
 
