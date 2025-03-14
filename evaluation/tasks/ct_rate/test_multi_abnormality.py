@@ -12,6 +12,28 @@ from evaluation.utils.train import train, evaluate
 from evaluation.utils.metrics import save_metrics
 
 
+ALL_LABELS = [
+    "Medical material",
+    "Arterial wall calcification",
+    "Cardiomegaly",
+    "Pericardial effusion",
+    "Coronary artery wall calcification",
+    "Hiatal hernia",
+    "Lymphadenopathy",
+    "Emphysema",
+    "Atelectasis",
+    "Lung nodule",
+    "Lung opacity",
+    "Pulmonary fibrotic sequela",
+    "Pleural effusion",
+    "Mosaic attenuation pattern",
+    "Peribronchial thickening",
+    "Consolidation",
+    "Bronchiectasis",
+    "Interlobular septal thickening"
+]
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -184,12 +206,7 @@ def run_evaluation(args, label):
 
 
 def run_benchmarks(args):
-    labels = [
-        "Lung nodule",
-        "Lung opacity",
-        "Arterial wall calcification",
-        "Pulmonary fibrotic sequela",
-    ]
+    labels = ALL_LABELS
 
     for label in labels:
         run_evaluation(args, label)
