@@ -41,7 +41,7 @@ class CachedEmbeddings:
             os.path.join(self.embeddings_path, f"{map_id}.npy"), mmap_mode="r"
         )
         if self.cls_only:
-            return torch.from_numpy(embeddings[:, 0, :]).float()
+            return torch.from_numpy(embeddings[:, :1, :]).float()
         return torch.from_numpy(embeddings).float()
 
 
