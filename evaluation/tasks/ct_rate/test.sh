@@ -2,11 +2,10 @@
 
 mkdir -p logs
 
-export JOB_NAME="multi_abnormality_test"
-export RUN_NAME="vitb-14.10"
-export CHECKPOINT_NAME="training_319999"
-export EMBED_DIM=768
+export JOB_NAME="multi_abnormality_cls"
+export RUN_NAME="vitb_CT-RATE"
+export CHECKPOINT_NAME="training_549999"
 
-envsubst < job_template.slurm > job_filled.slurm
+envsubst '$JOB_NAME $RUN_NAME $CHECKPOINT_NAME' < $PWD/test.template > $PWD/$JOB_NAME.run
 
-sbatch job_filled.slurm
+sbatch $JOB_NAME.run
