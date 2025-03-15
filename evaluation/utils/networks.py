@@ -147,3 +147,54 @@ class FullScanClassPredictor(nn.Module):
         x = self.mlp(x)
 
         return x.view(batch_size, -1)
+
+
+class FullScanClassPatchPredictor(nn.Module):
+    def __init__(
+        self, embed_dim, hidden_dim, num_labels, patch_resample_dim=16, dropout=0.5
+    ):
+        super().__init__()
+
+        self.embed_dim = embed_dim
+        self.hidden_dim = hidden_dim
+        self.patch_resample_dim = patch_resample_dim
+        self.num_labels = num_labels
+
+        self.token_resampler = PerceiverResampler(
+            embed_dim=embed_dim, latent_dim=hidden_dim, num_queries=patch_resample_dim
+        )
+        self.axial_resampler = PerceiverResampler(
+            embed_dim=hidden_dim, latent_dim=hidden_dim, num_queries=1
+        )
+        self.class_resampler = PerceiverResampler(
+            embed_dim=embed_dim, latent_dim=hidden_dim, num_queries=1
+        )
+        self.mlp = nn.Linear(hidden_dim * 2, num_labels)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):
+        batch_size, axial_dim, num_tokens, embed_dim = x.size()
+
+        cls_tokens = x[:, :, :1, :]
+        patch_tokens = x[:, :, 1:, :]
+
+        patch_tokens = patch_tokens.view(
+            batch_size * axial_dim, num_tokens - 1, embed_dim
+        )
+        patch_tokens = self.token_resampler(patch_tokens)
+        patch_tokens = patch_tokens.reshape(
+            batch_size, axial_dim * self.patch_resample_dim, self.hidden_dim
+        )
+
+        patch_mask = mask.unsqueeze(1).repeat(1, self.patch_resample_dim, 1)
+        patch_mask = patch_mask.view(batch_size, axial_dim * self.patch_resample_dim)
+
+        patch_embed = self.axial_resampler(patch_tokens, mask=patch_mask)
+
+        cls_tokens = cls_tokens.view(batch_size, axial_dim, embed_dim)
+        cls_embed = self.class_resampler(cls_tokens, mask=mask)
+
+        cls_patch_embed = torch.cat([cls_embed, patch_embed], dim=1)
+        cls_patch_embed = self.dropout(cls_patch_embed)
+
+        return self.mlp(cls_patch_embed).view(batch_size, self.num_labels)

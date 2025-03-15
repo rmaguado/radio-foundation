@@ -6,7 +6,10 @@ from dotenv import load_dotenv
 import argparse
 import time
 
-from evaluation.utils.networks import FullScanClassPredictor, FullScanPatchPredictor
+from evaluation.utils.networks import (
+    FullScanClassPredictor,
+    FullScanClassPatchPredictor,
+)
 from evaluation.extended_datasets import CachedEmbeddings
 from evaluation.tasks.ct_rate.datasets import CT_RATE
 
@@ -162,7 +165,7 @@ def get_model(args, device):
             args.embed_dim, args.hidden_dim, num_labels=1
         )
     else:
-        classifier_model = FullScanPatchPredictor(
+        classifier_model = FullScanClassPatchPredictor(
             args.embed_dim,
             args.hidden_dim,
             num_labels=1,
