@@ -33,21 +33,21 @@ def compute_metrics(logits, labels):
     }
 
 
-def save_metrics(val_metrics, output_path, label):
+def save_metrics(metrics_dict, output_path, filename):
     metrics = ["roc_auc", "pr_auc", "f1"]
 
-    metrics_path = os.path.join(output_path, f"{label}.csv")
+    metrics_path = os.path.join(output_path, f"{filename}.csv")
     os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
 
     with open(metrics_path, "a") as f:
         if os.stat(metrics_path).st_size == 0:
             f.write(",".join(metrics) + "\n")
-        f.write(",".join([str(val_metrics[metric]) for metric in metrics]) + "\n")
+        f.write(",".join([str(metrics_dict[metric]) for metric in metrics]) + "\n")
 
 
-def print_metrics(val_metrics):
+def print_metrics(metrics_dict, field: str):
     metrics = ["roc_auc", "pr_auc", "f1"]
     metrics_str = " - ".join(
-        [f"{metric}: {val_metrics[metric]:.4f}" for metric in metrics]
+        [f"{metric}: {metrics_dict[metric]:.4f}" for metric in metrics]
     )
-    print(metrics_str)
+    print(field + metrics_str)
