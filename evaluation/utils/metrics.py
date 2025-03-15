@@ -36,7 +36,7 @@ def compute_metrics(logits, labels):
 def save_metrics(val_metrics, output_path, label):
     metrics = ["roc_auc", "pr_auc", "f1"]
 
-    metrics_path = os.path.join(output_path, "results", f"{label}.csv")
+    metrics_path = os.path.join(output_path, f"{label}.csv")
     os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
 
     with open(metrics_path, "a") as f:
