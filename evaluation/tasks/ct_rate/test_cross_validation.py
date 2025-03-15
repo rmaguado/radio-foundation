@@ -4,6 +4,7 @@ import os
 import torch
 from dotenv import load_dotenv
 import argparse
+import time
 
 from evaluation.utils.networks import FullScanClassPredictor, FullScanPatchPredictor
 from evaluation.extended_datasets import CachedEmbeddings
@@ -98,7 +99,7 @@ def get_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=5,
+        default=4,
         help="Number of times to validate between training.",
     )
     parser.add_argument(
@@ -173,7 +174,7 @@ def get_model(args, device):
 
 
 def train_and_evaluate_model(
-    args, train_dataset, val_dataset, device, label, output_path
+    args, train_dataset, val_dataset, device, label, output_path, fold_idx
 ):
 
     classifier_model = get_model(args, device)
@@ -186,24 +187,28 @@ def train_and_evaluate_model(
         shuffle=False,
         collate_fn=collate_sequences,
         sampler=BalancedSampler(train_dataset),
-        num_workers=4,
+        num_workers=8,
         persistent_workers=True,
     )
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
-        batch_size=1,
+        batch_size=args.batch_size,
         shuffle=False,
         collate_fn=collate_sequences,
         sampler=BalancedSampler(val_dataset),
-        num_workers=1,
+        num_workers=8,
         persistent_workers=True,
     )
 
     positive_n = sum(train_dataset.get_target(i) for i in range(len(train_dataset)))
     negative_n = len(train_dataset) - positive_n
 
-    train_iterations = int(min(positive_n, negative_n) / args.batch_size * 1.5)
+    train_iterations = int(min(positive_n, negative_n) / args.batch_size * 1.0)
     epoch_iterations = int(train_iterations / args.epochs)
+
+    print(f"P: {positive_n}, N: {negative_n}")
+
+    t0 = time.time()
 
     for i in range(args.epochs):
         print(f"Timestep: {i + 1}/{args.epochs}")
@@ -219,7 +224,7 @@ def train_and_evaluate_model(
             verbose=False,
         )
 
-        print_metrics(train_metrics)
+        print_metrics(train_metrics, "train | ")
 
         eval_metrics = evaluate(
             classifier_model,
@@ -228,9 +233,9 @@ def train_and_evaluate_model(
             max_eval_n=100,
             verbose=False,
         )
-        print_metrics(eval_metrics)
+        print_metrics(eval_metrics, "valid | ")
 
-        save_metrics(eval_metrics, output_path, label)
+        save_metrics(eval_metrics, output_path, fold_idx)
 
     eval_metrics = evaluate(
         classifier_model,
@@ -239,10 +244,12 @@ def train_and_evaluate_model(
         max_eval_n=None,
         verbose=False,
     )
+    tf = time.time() - t0
 
-    print("Final evaluation:")
-    print_metrics(eval_metrics)
-    save_metrics(eval_metrics, output_path, label)
+    print("Final validation:")
+    print_metrics(eval_metrics, "valid | ")
+    print(f"Finished training in {tf:.4f} seconds.")
+    save_metrics(eval_metrics, output_path, fold_idx)
 
 
 def run_evaluation(args, label):
@@ -264,14 +271,14 @@ def run_evaluation(args, label):
             args.run_name,
             args.checkpoint_name,
             args.experiment_name,
-            f"fold_{fold_idx}",
+            label,
         )
         os.makedirs(output_path, exist_ok=True)
 
-        print(f"Running fold {fold_idx}\n")
+        print(f"Running fold {fold_idx + 1}/5\n")
 
         train_and_evaluate_model(
-            args, train_dataset, val_dataset, device, label, output_path
+            args, train_dataset, val_dataset, device, label, output_path, fold_idx + 1
         )
 
     print(f"Running test evaluation for {label}\n")
@@ -287,7 +294,7 @@ def run_evaluation(args, label):
     os.makedirs(output_path, exist_ok=True)
 
     train_and_evaluate_model(
-        args, train_val_dataset, test_dataset, device, label, output_path
+        args, train_val_dataset, test_dataset, device, label, output_path, "test"
     )
 
 
