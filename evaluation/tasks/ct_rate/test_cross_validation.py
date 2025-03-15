@@ -248,12 +248,22 @@ def train_and_evaluate_model(
 
     print("Final validation:")
     print_metrics(eval_metrics, "valid | ")
-    print(f"Finished training in {tf:.4f} seconds.")
+    print(f"Finished training in {tf:.4f} seconds. \n")
     save_metrics(eval_metrics, output_path, fold_idx)
 
 
 def run_evaluation(args, label):
     project_path = os.getenv("PROJECTPATH")
+
+    output_path = os.path.join(
+        project_path,
+        args.output_dir,
+        args.run_name,
+        args.checkpoint_name,
+        args.experiment_name,
+        label,
+    )
+    os.makedirs(output_path, exist_ok=True)
 
     print(f'Running cross validation for "{label}"\n')
 
@@ -265,16 +275,6 @@ def run_evaluation(args, label):
 
     for fold_idx, (train_dataset, val_dataset) in enumerate(cv_folds):
 
-        output_path = os.path.join(
-            project_path,
-            args.output_dir,
-            args.run_name,
-            args.checkpoint_name,
-            args.experiment_name,
-            label,
-        )
-        os.makedirs(output_path, exist_ok=True)
-
         print(f"Running fold {fold_idx + 1}/5\n")
 
         train_and_evaluate_model(
@@ -282,16 +282,6 @@ def run_evaluation(args, label):
         )
 
     print(f"Running test evaluation for {label}\n")
-
-    output_path = os.path.join(
-        project_path,
-        args.output_dir,
-        args.run_name,
-        args.checkpoint_name,
-        args.experiment_name,
-        "test",
-    )
-    os.makedirs(output_path, exist_ok=True)
 
     train_and_evaluate_model(
         args, train_val_dataset, test_dataset, device, label, output_path, "test"
