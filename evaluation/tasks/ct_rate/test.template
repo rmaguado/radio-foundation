@@ -20,8 +20,8 @@ cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
 srun --unbuffered --ntasks=1 --cpus-per-task=16 \
-    python3 ${PWD}/evaluation/tasks/ct_rate/test_multi_abnormality.py \
+    python3 ${PWD}/evaluation/tasks/ct_rate/test_cross_validation.py \
             --run_name=${RUN_NAME} \
             --checkpoint_name=${CHECKPOINT_NAME} \
             --experiment_name=${JOB_NAME} \
-            --cls_only="true"
+            --cls_only="false"
