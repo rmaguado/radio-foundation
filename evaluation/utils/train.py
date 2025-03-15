@@ -42,10 +42,10 @@ def evaluate(
             logits = classifier_model(embeddings, mask=mask)
 
             all_logits.append(logits.detach().cpu().flatten().numpy())
-            all_labels.append(labels.float().cpu().numpy())
+            all_labels.append(labels.float().cpu().flatten().numpy())
 
-    all_logits = np.array(all_logits).flatten()
-    all_labels = np.array(all_labels).flatten()
+    all_logits = np.concatenate(all_logits)
+    all_labels = np.concatenate(all_labels)
 
     if verbose:
         print(f"Mean data load time (eval): {np.mean(data_times):.4f}")
@@ -95,7 +95,7 @@ def train(
         loss.backward()
 
         all_logits.append(logits.detach().cpu().flatten().numpy())
-        all_labels.append(labels.float().cpu().numpy())
+        all_labels.append(labels.float().cpu().flatten().numpy())
 
         torch.nn.utils.clip_grad_norm_(classifier_model.parameters(), 1.0)
 
@@ -111,7 +111,7 @@ def train(
         print(f"Time per iteration: {tf_train / train_iters:.4f}")
         print(f"Mean data load time: {np.mean(data_times):.4f}")
 
-    all_logits = np.array(all_logits).flatten()
-    all_labels = np.array(all_labels).flatten()
+    all_logits = np.concatenate(all_logits)
+    all_labels = np.concatenate(all_labels)
 
     return compute_metrics(all_logits, all_labels)
