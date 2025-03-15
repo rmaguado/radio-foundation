@@ -110,7 +110,7 @@ def get_args():
     return parser.parse_args()
 
 
-def get_dataloaders(args, label):
+def get_datasets(args, label):
     project_path = os.getenv("PROJECTPATH")
     data_path = os.getenv("DATAPATH")
 
@@ -199,8 +199,8 @@ def train_and_evaluate_model(
         persistent_workers=True,
     )
 
-    positive_n = sum(train_dataset.labels)
-    negative_n = len(train_dataset.labels) - positive_n
+    positive_n = sum(train_dataset.get_target(i) for i in range(len(train_dataset)))
+    negative_n = len(train_dataset) - positive_n
 
     train_iterations = int(min(positive_n, negative_n) / args.batch_size * 1.5)
     epoch_iterations = int(train_iterations / args.epochs)
@@ -252,9 +252,9 @@ def run_evaluation(args, label):
 
     device = torch.device("cuda")
 
-    train_dataset, test_dataset = get_dataloaders(args, label)
+    train_val_dataset, test_dataset = get_datasets(args, label)
 
-    cv_folds = cross_validation_split(train_dataset, 5)
+    cv_folds = cross_validation_split(train_val_dataset, 5)
 
     for fold_idx, (train_dataset, val_dataset) in enumerate(cv_folds):
 
@@ -287,7 +287,7 @@ def run_evaluation(args, label):
     os.makedirs(output_path, exist_ok=True)
 
     train_and_evaluate_model(
-        args, test_dataset, test_dataset, device, label, output_path
+        args, train_val_dataset, test_dataset, device, label, output_path
     )
 
 
