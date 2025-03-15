@@ -212,7 +212,7 @@ def run_evaluation(args, label):
         )
         print(f"Timestep: {i + 1}/{args.epochs}")
         print(
-            f"PR AUC: {train_metrics['pr_auc']:.4f} - ROC AUC: {train_metrics['roc_auc']:.4f}\n"
+            f"PR AUC: {train_metrics['pr_auc']:.4f} - ROC AUC: {train_metrics['roc_auc']:.4f}"
         )
 
         eval_metrics = evaluate(

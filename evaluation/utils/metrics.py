@@ -4,6 +4,7 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
     average_precision_score,
+    f1_score,
 )
 
 import os
@@ -20,6 +21,7 @@ def compute_metrics(logits, labels):
     recall = recall_score(labels, binary_predictions)
     roc_auc = roc_auc_score(labels, probabilities)
     pr_auc = average_precision_score(labels, probabilities)
+    f1 = f1_score(labels, binary_predictions)
 
     return {
         "accuracy": accuracy,
@@ -27,16 +29,25 @@ def compute_metrics(logits, labels):
         "recall": recall,
         "roc_auc": roc_auc,
         "pr_auc": pr_auc,
+        "f1": f1,
     }
 
 
 def save_metrics(val_metrics, output_path, label):
-    metrics = ["roc_auc", "pr_auc", "precision", "recall"]
+    metrics = ["roc_auc", "pr_auc", "f1"]
 
-    metrics_path = os.path.join(output_path, "metrics", f"{label}.csv")
+    metrics_path = os.path.join(output_path, "results", f"{label}.csv")
     os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
 
     with open(metrics_path, "a") as f:
         if os.stat(metrics_path).st_size == 0:
-            f.write("roc_auc,pr_auc,precision,recall\n")
+            f.write(",".join(metrics) + "\n")
         f.write(",".join([str(val_metrics[metric]) for metric in metrics]) + "\n")
+
+
+def print_metrics(val_metrics):
+    metrics = ["roc_auc", "pr_auc", "f1"]
+    metrics_str = " - ".join(
+        [f"{metric}: {val_metrics[metric]:.4f}" for metric in metrics]
+    )
+    print(metrics_str)

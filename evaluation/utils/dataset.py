@@ -14,6 +14,37 @@ def split_dataset(dataset, split_ratio):
     return train_dataset, val_dataset
 
 
+def cross_validation_split(dataset, n_splits):
+    n = len(dataset)
+    positive_indices = [i for i in range(n) if dataset.get_target(i)]
+    negative_indices = [i for i in range(n) if not i in positive_indices]
+
+    np.random.shuffle(positive_indices)
+    np.random.shuffle(negative_indices)
+
+    positive_folds = np.array_split(positive_indices, n_splits)
+    negative_folds = np.array_split(negative_indices, n_splits)
+
+    folds = []
+    for i in range(n_splits):
+        train_positive_indices = np.concatenate(
+            positive_folds[:i] + positive_folds[i + 1 :]
+        )
+        train_negative_indices = np.concatenate(
+            negative_folds[:i] + negative_folds[i + 1 :]
+        )
+
+        train_indices = np.concatenate([train_positive_indices, train_negative_indices])
+        val_indices = np.concatenate([positive_folds[i], negative_folds[i]])
+
+        train_dataset = DatasetSplit(dataset, train_indices)
+        val_dataset = DatasetSplit(dataset, val_indices)
+
+        folds.append((train_dataset, val_dataset))
+
+    return folds
+
+
 class CombinedDataset(Dataset):
     def __init__(self, *datasets):
         self.datasets = datasets

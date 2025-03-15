@@ -10,7 +10,7 @@ def evaluate(
     classifier_model: torch.nn.Module,
     val_loader: torch.utils.data.DataLoader,
     device: torch.device,
-    max_eval_n: int = 1000,
+    max_eval_n: int = None,
     verbose: bool = True,
 ):
     classifier_model.eval()
@@ -19,7 +19,10 @@ def evaluate(
 
     data_times = []
 
-    total_eval_iter = min(len(val_loader), max_eval_n)
+    if max_eval_n is None:
+        total_eval_iter = len(val_loader)
+    else:
+        total_eval_iter = min(len(val_loader), max_eval_n)
 
     val_iter = iter(val_loader)
     if verbose:
@@ -41,12 +44,11 @@ def evaluate(
             all_logits.append(logits.detach().cpu().flatten().numpy())
             all_labels.append(labels.float().cpu().numpy())
 
-    torch.cuda.empty_cache()
-
     all_logits = np.array(all_logits).flatten()
     all_labels = np.array(all_labels).flatten()
 
-    print(f"Mean data load time (eval): {np.mean(data_times):.4f}")
+    if verbose:
+        print(f"Mean data load time (eval): {np.mean(data_times):.4f}")
 
     return compute_metrics(all_logits, all_labels)
 
@@ -62,7 +64,6 @@ def train(
     scheduler: torch.optim.lr_scheduler._LRScheduler = None,
     verbose: bool = True,
 ) -> list:
-    torch.cuda.empty_cache()
     classifier_model.train()
     optimizer.zero_grad()
 
@@ -103,11 +104,12 @@ def train(
             optimizer.zero_grad()
             if scheduler is not None:
                 scheduler.step()
-            torch.cuda.empty_cache()
 
     tf_train = time.time() - t0_train
-    print(f"Time per iteration: {tf_train / train_iters:.4f}")
-    print(f"Mean data load time: {np.mean(data_times):.4f}")
+
+    if verbose:
+        print(f"Time per iteration: {tf_train / train_iters:.4f}")
+        print(f"Mean data load time: {np.mean(data_times):.4f}")
 
     all_logits = np.array(all_logits).flatten()
     all_labels = np.array(all_labels).flatten()
