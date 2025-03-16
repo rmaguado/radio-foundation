@@ -100,7 +100,9 @@ class FullScanPatchPredictor(nn.Module):
 
         # x: (batch_size * axial_dim 160, patch_resample_dim 64, hidden_dim 768)
 
-        x = x.reshape(batch_size, axial_dim * self.patch_resample_dim, self.hidden_dim)
+        x = x.reshape(batch_size, axial_dim, self.patch_resample_dim, self.hidden_dim)
+
+        x = x.view(batch_size, axial_dim * self.patch_resample_dim, self.hidden_dim)
 
         # x: (batch_size 8, axial_dim * patch_resample_dim 1280, hidden_dim 768)
 
@@ -183,6 +185,9 @@ class FullScanClassPatchPredictor(nn.Module):
         )
         patch_tokens = self.token_resampler(patch_tokens)
         patch_tokens = patch_tokens.reshape(
+            batch_size, axial_dim, self.patch_resample_dim, self.hidden_dim
+        )
+        patch_tokens = patch_tokens.view(
             batch_size, axial_dim * self.patch_resample_dim, self.hidden_dim
         )
 
