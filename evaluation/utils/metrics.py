@@ -34,7 +34,7 @@ def compute_metrics(logits, labels):
 
 
 def save_metrics(metrics_dict, output_path, filename):
-    metrics = ["roc_auc", "pr_auc", "f1"]
+    metrics = ["roc_auc", "pr_auc", "f1", "precision", "recall"]
 
     metrics_path = os.path.join(output_path, f"{filename}.csv")
     os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
@@ -46,7 +46,7 @@ def save_metrics(metrics_dict, output_path, filename):
 
 
 def print_metrics(metrics_dict, field: str):
-    metrics = ["roc_auc", "pr_auc", "f1"]
+    metrics = ["roc_auc", "pr_auc", "f1", "precision", "recall"]
     metrics_str = " - ".join(
         [f"{metric}: {metrics_dict[metric]:.4f}" for metric in metrics]
     )
