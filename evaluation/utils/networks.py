@@ -194,7 +194,7 @@ class FullScanClassPatchPredictor(nn.Module):
         cls_tokens = cls_tokens.view(batch_size, axial_dim, embed_dim)
         cls_embed = self.class_resampler(cls_tokens, mask=mask)
 
-        cls_patch_embed = torch.cat([cls_embed, patch_embed], dim=1)
+        cls_patch_embed = torch.cat([cls_embed, patch_embed], dim=2)
         cls_patch_embed = self.dropout(cls_patch_embed)
 
         return self.mlp(cls_patch_embed).view(batch_size, self.num_labels)
