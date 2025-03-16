@@ -196,41 +196,42 @@ def run_evaluation(args, label):
         args.checkpoint_name,
         args.experiment_name,
     )
-    os.makedirs(output_path, exist_ok=True)
+    # os.makedirs(output_path, exist_ok=True)
 
-    for i in range(args.epochs):
-        n_eval_steps = 100 if i + 1 < args.epochs else 1000
+    epoch_iterations = len(train_loader) // 4
+
+    for i in range(8):
+        print(f"Timestep: {i + 1}/{args.epochs}")
+
         train_metrics = train(
             classifier_model,
             optimizer,
             criterion,
             train_loader,
-            args.train_iters,
+            epoch_iterations,
             args.accum_steps,
             device,
             verbose=False,
         )
-        print(f"Timestep: {i + 1}/{args.epochs}")
-        print(
-            f"PR AUC: {train_metrics['pr_auc']:.4f} - ROC AUC: {train_metrics['roc_auc']:.4f}"
-        )
+
+        print_metrics(train_metrics, "train | ")
 
         eval_metrics = evaluate(
             classifier_model,
             val_loader,
             device=device,
-            max_eval_n=n_eval_steps,
-            verbose=False,
-        )
-        print(
-            f"PR AUC: {eval_metrics['pr_auc']:.4f} - ROC AUC: {eval_metrics['roc_auc']:.4f}\n"
+            max_eval_n=None,
+            verbose=True,
         )
 
-        save_metrics(eval_metrics, output_path, label)
+        print_metrics(eval_metrics, "valid | ")
+
+        # save_metrics(eval_metrics, output_path, label)
 
 
 def run_benchmarks(args):
-    labels = ALL_LABELS
+    # labels = ALL_LABELS
+    labels = ["Lung nodule"]
 
     for label in labels:
         run_evaluation(args, label)
