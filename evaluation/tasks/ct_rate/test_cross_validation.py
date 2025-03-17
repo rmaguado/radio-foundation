@@ -19,7 +19,7 @@ from evaluation.utils.dataset import (
     collate_sequences,
 )
 from evaluation.utils.train import train, evaluate
-from evaluation.utils.metrics import save_metrics, print_metrics
+from evaluation.utils.metrics import save_metrics, save_predictions, print_metrics
 
 ALL_LABELS = [
     "Medical material",
@@ -177,7 +177,7 @@ def get_model(args, device):
 
 
 def train_and_evaluate_model(
-    args, train_dataset, val_dataset, device, label, output_path, fold_idx
+    args, train_dataset, val_dataset, device, output_path, filename
 ):
 
     classifier_model = get_model(args, device)
@@ -216,7 +216,7 @@ def train_and_evaluate_model(
     for i in range(args.epochs):
         print(f"Timestep: {i + 1}/{args.epochs}")
 
-        train_metrics = train(
+        train_metrics, _ = train(
             classifier_model,
             optimizer,
             criterion,
@@ -229,7 +229,7 @@ def train_and_evaluate_model(
 
         print_metrics(train_metrics, "train | ")
 
-        eval_metrics = evaluate(
+        eval_metrics, _ = evaluate(
             classifier_model,
             val_loader,
             device=device,
@@ -238,21 +238,22 @@ def train_and_evaluate_model(
         )
         print_metrics(eval_metrics, "valid | ")
 
-        save_metrics(eval_metrics, output_path, fold_idx)
+        save_metrics(eval_metrics, output_path, filename)
 
-    eval_metrics = evaluate(
+    eval_metrics, (eval_logits, eval_labels) = evaluate(
         classifier_model,
         val_loader,
         device=device,
         max_eval_n=None,
         verbose=False,
     )
+    save_predictions(eval_logits, eval_labels, output_path, f"logits_{filename}")
     tf = time.time() - t0
 
     print("Final validation:")
     print_metrics(eval_metrics, "valid | ")
     print(f"Finished training in {tf:.4f} seconds. \n")
-    save_metrics(eval_metrics, output_path, fold_idx)
+    save_metrics(eval_metrics, output_path, filename)
 
 
 def run_evaluation(args, label):
@@ -281,13 +282,13 @@ def run_evaluation(args, label):
         print(f"Running fold {fold_idx + 1}/5\n")
 
         train_and_evaluate_model(
-            args, train_dataset, val_dataset, device, label, output_path, fold_idx + 1
+            args, train_dataset, val_dataset, device, output_path, fold_idx + 1
         )
 
     print(f"Running test evaluation for {label}\n")
 
     train_and_evaluate_model(
-        args, train_val_dataset, test_dataset, device, label, output_path, "test"
+        args, train_val_dataset, test_dataset, device, output_path, "test"
     )
 
 

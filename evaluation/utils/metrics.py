@@ -24,9 +24,6 @@ def compute_metrics(logits, labels):
     f1 = f1_score(labels, binary_predictions)
 
     return {
-        "accuracy": accuracy,
-        "precision": precision,
-        "recall": recall,
         "roc_auc": roc_auc,
         "pr_auc": pr_auc,
         "f1": f1,
@@ -34,7 +31,7 @@ def compute_metrics(logits, labels):
 
 
 def save_metrics(metrics_dict, output_path, filename):
-    metrics = ["roc_auc", "pr_auc", "f1", "precision", "recall"]
+    metrics = ["roc_auc", "pr_auc", "f1"]
 
     metrics_path = os.path.join(output_path, f"{filename}.csv")
     os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
@@ -46,8 +43,19 @@ def save_metrics(metrics_dict, output_path, filename):
 
 
 def print_metrics(metrics_dict, field: str):
-    metrics = ["roc_auc", "pr_auc", "f1", "precision", "recall"]
+    metrics = ["roc_auc", "pr_auc", "f1"]
     metrics_str = " - ".join(
         [f"{metric}: {metrics_dict[metric]:.4f}" for metric in metrics]
     )
     print(field + metrics_str)
+
+
+def save_predictions(logits, labels, output_path, filename):
+    predictions_path = os.path.join(output_path, f"{filename}.csv")
+    os.makedirs(os.path.dirname(predictions_path), exist_ok=True)
+
+    with open(predictions_path, "a") as f:
+        if os.stat(predictions_path).st_size == 0:
+            f.write("logits,labels\n")
+        for logit, label in zip(logits, labels):
+            f.write(f"{logit},{label}\n")
