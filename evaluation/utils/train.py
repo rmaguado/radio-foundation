@@ -50,7 +50,7 @@ def evaluate(
     if verbose:
         print(f"Mean data load time (eval): {np.mean(data_times):.4f}")
 
-    return compute_metrics(all_logits, all_labels)
+    return compute_metrics(all_logits, all_labels), (all_logits, all_labels)
 
 
 def train(
@@ -114,4 +114,4 @@ def train(
     all_logits = np.concatenate(all_logits)
     all_labels = np.concatenate(all_labels)
 
-    return compute_metrics(all_logits, all_labels)
+    return compute_metrics(all_logits, all_labels), (all_logits, all_labels)
