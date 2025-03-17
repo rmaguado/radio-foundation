@@ -1,7 +1,4 @@
 from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
     roc_auc_score,
     average_precision_score,
     f1_score,
@@ -16,9 +13,6 @@ def compute_metrics(logits, labels):
     probabilities = 1 / (1 + np.exp(-logits))
     binary_predictions = probabilities >= threshold
 
-    accuracy = accuracy_score(labels, binary_predictions)
-    precision = precision_score(labels, binary_predictions)
-    recall = recall_score(labels, binary_predictions)
     roc_auc = roc_auc_score(labels, probabilities)
     pr_auc = average_precision_score(labels, probabilities)
     f1 = f1_score(labels, binary_predictions)
