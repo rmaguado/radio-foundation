@@ -206,7 +206,6 @@ def train_and_evaluate_model(
         batch_size=args.batch_size,
         shuffle=False,
         collate_fn=collate_sequences,
-        sampler=BalancedSampler(val_dataset),
         num_workers=8,
         persistent_workers=True,
     )

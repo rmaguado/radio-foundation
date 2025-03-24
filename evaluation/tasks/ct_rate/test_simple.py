@@ -150,7 +150,6 @@ def get_dataloaders(args, label):
         batch_size=args.batch_size,
         shuffle=False,
         collate_fn=collate_sequences,
-        sampler=BalancedSampler(val_dataset),
         num_workers=4,
         persistent_workers=True,
     )
