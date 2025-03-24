@@ -11,7 +11,7 @@ from evaluation.tasks.ct_rate.datasets import CT_RATE
 
 from evaluation.utils.dataset import BalancedSampler, split_dataset, collate_sequences
 from evaluation.utils.train import train, evaluate
-from evaluation.utils.metrics import save_metrics
+from evaluation.utils.metrics import save_metrics, print_metrics
 
 ALL_LABELS = [
     "Medical material",
@@ -94,7 +94,7 @@ def get_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=5,
+        default=10,
         help="Number of batches to iterate over the training set.",
     )
     parser.add_argument(
@@ -147,11 +147,11 @@ def get_dataloaders(args, label):
     )
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
-        batch_size=1,
+        batch_size=args.batch_size,
         shuffle=False,
         collate_fn=collate_sequences,
         sampler=BalancedSampler(val_dataset),
-        num_workers=1,
+        num_workers=4,
         persistent_workers=True,
     )
 
@@ -186,7 +186,9 @@ def run_evaluation(args, label):
     train_loader, val_loader = get_dataloaders(args, label)
 
     classifier_model = get_model(args, device)
-    optimizer = torch.optim.AdamW(classifier_model.parameters(), lr=1e-3)
+    optimizer = torch.optim.SGD(
+        classifier_model.parameters(), lr=1e-3, momentum=1e-3, weight_decay=1e-5
+    )
     criterion = torch.nn.BCEWithLogitsLoss()
 
     output_path = os.path.join(
@@ -196,14 +198,15 @@ def run_evaluation(args, label):
         args.checkpoint_name,
         args.experiment_name,
     )
-    # os.makedirs(output_path, exist_ok=True)
+    os.makedirs(output_path, exist_ok=True)
 
-    epoch_iterations = len(train_loader) // 4
+    epochs = args.epochs
+    epoch_iterations = len(train_loader)
 
-    for i in range(8):
-        print(f"Timestep: {i + 1}/{args.epochs}")
+    for i in range(epochs):
+        print(f"Timestep: {i + 1}/32")
 
-        train_metrics = train(
+        train_metrics, _ = train(
             classifier_model,
             optimizer,
             criterion,
@@ -216,17 +219,17 @@ def run_evaluation(args, label):
 
         print_metrics(train_metrics, "train | ")
 
-        eval_metrics = evaluate(
+        eval_metrics, _ = evaluate(
             classifier_model,
             val_loader,
             device=device,
             max_eval_n=None,
-            verbose=True,
+            verbose=False,
         )
 
         print_metrics(eval_metrics, "valid | ")
 
-        # save_metrics(eval_metrics, output_path, label)
+        save_metrics(eval_metrics, output_path, label)
 
 
 def run_benchmarks(args):
