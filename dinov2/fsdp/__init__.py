@@ -337,9 +337,7 @@ class FlexiblePeriodicCheckpointer(PeriodicCheckpointer):
                         try:
                             self.path_manager.rm(file_to_delete)
                         except FileNotFoundError:
-                            self.logger.warning(
-                                f"File {file_to_delete} not found. It might have been already removed."
-                            )
+                            pass
 
         if self.max_iter is not None:
             if iteration >= self.max_iter - 1:
