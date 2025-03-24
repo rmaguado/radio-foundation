@@ -25,6 +25,14 @@ class DicomProcessorDeepRDT(DicomProcessorBase):
     def __init__(self, config: dict, database):
         super().__init__(config, database)
 
+    def get_dcm_paths(self, scan_path) -> List[str]:
+        dcm_paths = [
+            os.path.join(scan_path, f)
+            for f in os.listdir(scan_path)
+            if f.endswith(".dcm") and f.startswith("CT")
+        ]
+        return dcm_paths
+
     def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
         """
         Get paths to dicom files and their corresponding mapids.
@@ -38,7 +46,7 @@ class DicomProcessorDeepRDT(DicomProcessorBase):
         ]
 
         for mapid in mapids:
-            scan_path = os.path.join(self.absolute_dataset_path, mapid, "pCT")
+            scan_path = os.path.join(self.absolute_dataset_path, mapid)
 
             if os.path.isdir(scan_path):
                 paths_ids.append((scan_path, mapid))

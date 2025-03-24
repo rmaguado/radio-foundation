@@ -13,7 +13,14 @@ import argparse
 import logging
 
 from data.utils import set_logging
-from data.dataprep import DicomProcessor, DicomDatabase, NiftiProcessor, NiftiDatabase, NpzProcessor, NpzDatabase
+from data.dataprep import (
+    DicomProcessor,
+    DicomDatabase,
+    NiftiProcessor,
+    NiftiDatabase,
+    NpzProcessor,
+    NpzDatabase,
+)
 
 
 logger = logging.getLogger("dataprep")
@@ -138,6 +145,14 @@ class DicomProcessorBase(DicomProcessor):
 
         return paths_ids
 
+    def get_dcm_paths(self, scan_path: str) -> List[str]:
+        dcm_paths = [
+            os.path.join(scan_path, f)
+            for f in os.listdir(scan_path)
+            if f.endswith(".dcm")
+        ]
+        return dcm_paths
+
     def prepare_dataset(self) -> None:
         """
         Prepares the dataset by creating necessary tables in the database and inserting data.
@@ -148,11 +163,7 @@ class DicomProcessorBase(DicomProcessor):
         paths_ids = self.get_paths_and_mapids()
 
         for scan_path, mapid in tqdm(paths_ids):
-            dcm_paths = [
-                os.path.join(scan_path, f)
-                for f in os.listdir(scan_path)
-                if f.endswith(".dcm")
-            ]
+            dcm_paths = self.get_dcm_paths(scan_path)
             if not dcm_paths:
                 logger.warning(f"No dicom files found in {scan_path}. Skipping.")
                 continue
@@ -372,11 +383,7 @@ class NpzProcessorBase(NpzProcessor):
         paths_ids = []
 
         for data_folder, dirs, files in os.walk(self.absolute_dataset_path):
-            paths = [
-                os.path.join(data_folder, f)
-                for f in files
-                if f.endswith(".npz")
-            ]
+            paths = [os.path.join(data_folder, f) for f in files if f.endswith(".npz")]
 
             if not paths:
                 continue
@@ -405,14 +412,11 @@ class NpzProcessorBase(NpzProcessor):
                 self.process_volume(path, map_id)
                 volume_counts += 1
             except Exception as e:
-                logger.exception(
-                    f"Error processing {path} (map_id: {map_id}): {e}"
-                )
+                logger.exception(f"Error processing {path} (map_id: {map_id}): {e}")
 
         logger.info(
             f"Finished processing {self.dataset_name}. Added {volume_counts} volumes."
         )
-
 
 
 def get_argpase():
