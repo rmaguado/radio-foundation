@@ -186,7 +186,7 @@ def run_evaluation(args, label):
 
     classifier_model = get_model(args, device)
     optimizer = torch.optim.SGD(
-        classifier_model.parameters(), lr=1e-3, momentum=0.9, weight_decay=0.0
+        classifier_model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4
     )
     criterion = torch.nn.BCEWithLogitsLoss()
 
@@ -203,9 +203,10 @@ def run_evaluation(args, label):
     epoch_iterations = len(train_loader)
     max_iter = epoch_iterations * epochs
 
-    scheduler = scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, max_iter, eta_min=1e-4
-    )
+    # scheduler = scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    #     optimizer, max_iter, eta_min=1e-4
+    # )
+    scheduler = None
 
     for i in range(epochs):
         print(f"Timestep: {i + 1}/{epochs}")

@@ -149,7 +149,7 @@ def train_and_evaluate_model(
 
     classifier_model = get_model(args, device)
     optimizer = torch.optim.SGD(
-        classifier_model.parameters(), lr=1e-3, momentum=1e-3, weight_decay=1e-5
+        classifier_model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4
     )
     criterion = torch.nn.BCEWithLogitsLoss()
 
