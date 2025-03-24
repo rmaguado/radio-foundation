@@ -102,7 +102,7 @@ def get_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=4,
+        default=10,
         help="Number of times to validate between training.",
     )
     parser.add_argument(
@@ -177,11 +177,19 @@ def get_model(args, device):
 
 
 def train_and_evaluate_model(
-    args, train_dataset, val_dataset, device, output_path, filename
+    args,
+    train_dataset,
+    val_dataset,
+    device,
+    output_path,
 ):
+    logits_path = os.path.join(output_path, "predictions")
+    os.makedirs(logits_path, exist_ok=True)
 
     classifier_model = get_model(args, device)
-    optimizer = torch.optim.AdamW(classifier_model.parameters(), lr=1e-3)
+    optimizer = torch.optim.SGD(
+        classifier_model.parameters(), lr=1e-3, momentum=1e-3, weight_decay=1e-5
+    )
     criterion = torch.nn.BCEWithLogitsLoss()
 
     train_loader = torch.utils.data.DataLoader(
@@ -206,15 +214,14 @@ def train_and_evaluate_model(
     positive_n = sum(train_dataset.get_target(i) for i in range(len(train_dataset)))
     negative_n = len(train_dataset) - positive_n
 
-    train_iterations = int(min(positive_n, negative_n) / args.batch_size * 1.0)
-    epoch_iterations = int(train_iterations / args.epochs)
+    epoch_iterations = len(train_loader)
 
     print(f"P: {positive_n}, N: {negative_n}")
 
     t0 = time.time()
 
     for i in range(args.epochs):
-        print(f"Timestep: {i + 1}/{args.epochs}")
+        print(f"Epoch: {i + 1}/{args.epochs}")
 
         train_metrics, _ = train(
             classifier_model,
@@ -229,31 +236,24 @@ def train_and_evaluate_model(
 
         print_metrics(train_metrics, "train | ")
 
-        eval_metrics, _ = evaluate(
+        eval_metrics, (eval_logits, eval_labels) = evaluate(
             classifier_model,
             val_loader,
             device=device,
-            max_eval_n=100,
+            max_eval_n=None,
             verbose=False,
         )
+
         print_metrics(eval_metrics, "valid | ")
 
-        save_metrics(eval_metrics, output_path, filename)
+        save_metrics(eval_metrics, output_path, "summary")
+        save_predictions(eval_logits, eval_labels, logits_path, f"epoch_{i:02d}")
 
-    eval_metrics, (eval_logits, eval_labels) = evaluate(
-        classifier_model,
-        val_loader,
-        device=device,
-        max_eval_n=None,
-        verbose=False,
-    )
-    save_predictions(eval_logits, eval_labels, output_path, f"logits_{filename}")
     tf = time.time() - t0
 
     print("Final validation:")
     print_metrics(eval_metrics, "valid | ")
     print(f"Finished training in {tf:.4f} seconds. \n")
-    save_metrics(eval_metrics, output_path, filename)
 
 
 def run_evaluation(args, label):
@@ -282,13 +282,17 @@ def run_evaluation(args, label):
         print(f"Running fold {fold_idx + 1}/5\n")
 
         train_and_evaluate_model(
-            args, train_dataset, val_dataset, device, output_path, fold_idx + 1
+            args,
+            train_dataset,
+            val_dataset,
+            device,
+            os.path.join(output_path, f"fold_{fold_idx}"),
         )
 
     print(f"Running test evaluation for {label}\n")
 
     train_and_evaluate_model(
-        args, train_val_dataset, test_dataset, device, output_path, "test"
+        args, train_val_dataset, test_dataset, device, os.path.join(output_path, "test")
     )
 
 
