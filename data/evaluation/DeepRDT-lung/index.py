@@ -71,7 +71,7 @@ def main(args):
         "db_path": db_path,
     }
     database = DicomEvalBase(config)
-    processor = DicomProcessorBase(config, database)
+    processor = DicomProcessorDeepRDT(config, database)
     processor.prepare_dataset()
 
 
