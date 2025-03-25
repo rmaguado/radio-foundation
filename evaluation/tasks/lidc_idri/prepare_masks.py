@@ -6,7 +6,7 @@ from pylidc.utils import consensus
 import argparse
 from dotenv import load_dotenv
 import logging
-import transforms
+from torchvision import transforms
 import torch
 from einops import rearrange
 import pandas as pd
@@ -20,7 +20,7 @@ def get_argpase():
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument(
         "--image_size",
-        type=str,
+        type=int,
         default=504,
         help="The target size to resize the image.",
     )
@@ -34,7 +34,7 @@ def get_argpase():
 
 
 def main(args):
-    nodule_locations = {"map_id": [], "x": [], "y": []}
+    nodule_locations = {"map_id": [], "c": [], "h": [], "v": []}
 
     load_dotenv()
     project_path = os.getenv("PROJECTPATH")
@@ -80,12 +80,16 @@ def main(args):
 
             segmentation_mask = resize(torch.from_numpy(segmentation_mask))
             segmentation_mask = rearrange(
-                segmentation_mask, "s (w wp) (h hp) -> s w h wp hp"
+                segmentation_mask,
+                "s (w wp) (h hp) -> s w h wp hp",
+                wp=args.patch_size,
+                hp=args.patch_size,
             )
             segmentation_mask = segmentation_mask.sum(dim=3).sum(dim=3).numpy()
 
-            for h, v in zip(*np.where(segmentation_mask)):
-                nodule_locations["map_id"].append(patient_id)
+            for c, h, v in zip(*np.where(segmentation_mask)):
+                nodule_locations["map_id"].append(map_id)
+                nodule_locations["c"].append(c)
                 nodule_locations["h"].append(h)
                 nodule_locations["v"].append(v)
 
