@@ -18,7 +18,7 @@ class LidcIdriProcessor(DicomProcessorBase):
     def __init__(self, config, database):
         super().__init__(config, database)
 
-    def get_paths_and_ids(self) -> List[Tuple[str, str]]:
+    def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
         """
         Get paths to dicom files and their corresponding scans IDs used by LIDC-IDRI.
         """
