@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 import tqdm
 import math
 from scipy.stats import zscore
-import torch.nn.functional as F
 import pickle
 import time
 import argparse
@@ -118,13 +118,17 @@ def load_latents_and_labels(directory, abnormalities_df, metadata_df):
 
 def tsne_projection(data, n_components=2, perplexity=30, n_iter=300):
     t0 = time.time()
+
+    pca = PCA(n_components=50)
+    data_pca = pca.fit_transform(data)
+
     tsne = TSNE(
         n_components=n_components,
         perplexity=perplexity,
         max_iter=n_iter,
         random_state=41,
     )
-    embedding = tsne.fit_transform(data)
+    embedding = tsne.fit_transform(data_pca)
     tf = time.time() - t0
     print(f"Computed tsne in {tf} seconds.")
     return embedding
