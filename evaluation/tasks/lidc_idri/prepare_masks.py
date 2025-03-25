@@ -85,7 +85,7 @@ def main(args):
                 wp=args.patch_size,
                 hp=args.patch_size,
             )
-            segmentation_mask = segmentation_mask.sum(dim=3).sum(dim=3).numpy()
+            segmentation_mask = (segmentation_mask.sum(dim=3).sum(dim=3) > 0).numpy()
 
             for c, h, v in zip(*np.where(segmentation_mask)):
                 nodule_locations["map_id"].append(map_id)
