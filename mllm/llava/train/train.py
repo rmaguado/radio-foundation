@@ -73,6 +73,7 @@ class DataArguments:
     data_mean: float = field(default=0.0)
     data_std: float = field(default=1.0)
     is_multimodal: bool = False
+    image_tokens: int = 128
 
 
 @dataclass
@@ -234,93 +235,6 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: st
         trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
 
 
-def smart_tokenizer_and_embedding_resize(
-    special_tokens_dict: Dict,
-    tokenizer: transformers.PreTrainedTokenizer,
-    model: transformers.PreTrainedModel,
-):
-    """Resize tokenizer and embedding.
-
-    Note: This is the unoptimized version that may make your embedding size not be divisible by 64.
-    """
-    num_new_tokens = tokenizer.add_special_tokens(special_tokens_dict)
-    model.resize_token_embeddings(len(tokenizer))
-
-    if num_new_tokens > 0:
-        input_embeddings = model.get_input_embeddings().weight.data
-        output_embeddings = model.get_output_embeddings().weight.data
-
-        input_embeddings_avg = input_embeddings[:-num_new_tokens].mean(
-            dim=0, keepdim=True
-        )
-        output_embeddings_avg = output_embeddings[:-num_new_tokens].mean(
-            dim=0, keepdim=True
-        )
-
-        input_embeddings[-num_new_tokens:] = input_embeddings_avg
-        output_embeddings[-num_new_tokens:] = output_embeddings_avg
-
-
-def _tokenize_fn(
-    strings: Sequence[str], tokenizer: transformers.PreTrainedTokenizer
-) -> Dict:
-    """Tokenize a list of strings."""
-    tokenized_list = [
-        tokenizer(
-            text,
-            return_tensors="pt",
-            padding="longest",
-            max_length=tokenizer.model_max_length,
-            truncation=True,
-        )
-        for text in strings
-    ]
-    input_ids = labels = [tokenized.input_ids[0] for tokenized in tokenized_list]
-    input_ids_lens = labels_lens = [
-        tokenized.input_ids.ne(tokenizer.pad_token_id).sum().item()
-        for tokenized in tokenized_list
-    ]
-    return dict(
-        input_ids=input_ids,
-        labels=labels,
-        input_ids_lens=input_ids_lens,
-        labels_lens=labels_lens,
-    )
-
-
-def _mask_targets(target, tokenized_lens, speakers):
-    # cur_idx = 0
-    cur_idx = tokenized_lens[0]
-    tokenized_lens = tokenized_lens[1:]
-    target[:cur_idx] = IGNORE_INDEX
-    for tokenized_len, speaker in zip(tokenized_lens, speakers):
-        if speaker == "human":
-            target[cur_idx + 2 : cur_idx + tokenized_len] = IGNORE_INDEX
-        cur_idx += tokenized_len
-
-
-def _add_speaker_and_signal(header, source, get_conversation=True):
-    """Add speaker and start/end signal on each round."""
-    BEGIN_SIGNAL = "### "
-    END_SIGNAL = "\n"
-    conversation = header
-    for sentence in source:
-        from_str = sentence["from"]
-        if from_str.lower() == "human":
-            from_str = conversation_lib.default_conversation.roles[0]
-        elif from_str.lower() == "gpt":
-            from_str = conversation_lib.default_conversation.roles[1]
-        else:
-            from_str = "unknown"
-        sentence["value"] = (
-            BEGIN_SIGNAL + from_str + ": " + sentence["value"] + END_SIGNAL
-        )
-        if get_conversation:
-            conversation += sentence["value"]
-    conversation += BEGIN_SIGNAL
-    return conversation
-
-
 def preprocess_multimodal(sources: Sequence[str], data_args: DataArguments) -> Dict:
     is_multimodal = data_args.is_multimodal
     if not is_multimodal:
@@ -330,11 +244,10 @@ def preprocess_multimodal(sources: Sequence[str], data_args: DataArguments) -> D
         for sentence in source:
             if DEFAULT_IMAGE_TOKEN in sentence["value"]:
                 sentence["value"] = (
-                    sentence["value"].replace(DEFAULT_IMAGE_TOKEN, "").strip()
+                    f"{DEFAULT_IMAGE_TOKEN}\n"
+                    + sentence["value"].replace(DEFAULT_IMAGE_TOKEN, "").strip()
                 )
-                sentence["value"] = DEFAULT_IMAGE_TOKEN + "\n" + sentence["value"]
-                sentence["value"] = sentence["value"].strip()
-                if "mmtag" in conversation_lib.default_conversation.multimodal:
+                if conversation_lib.default_conversation.multimodal:
                     sentence["value"] = sentence["value"].replace(
                         DEFAULT_IMAGE_TOKEN,
                         "<Image>" + DEFAULT_IMAGE_TOKEN + "</Image>",
@@ -354,6 +267,10 @@ def preprocess_multimodal(sources: Sequence[str], data_args: DataArguments) -> D
 def preprocess_llama_3(
     sources, tokenizer: transformers.PreTrainedTokenizer, has_image: bool = False
 ) -> Dict:
+    """
+    sources is a list of list of dict, each dict has two keys: "from" and "value".
+    """
+
     conv = conversation_lib.default_conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
@@ -382,7 +299,6 @@ def preprocess_llama_3(
             dim=0,
         )
     else:
-        # this is the case tbh
         input_ids = torch.tensor(
             tokenizer(
                 conversations,
@@ -395,7 +311,7 @@ def preprocess_llama_3(
         )
 
     targets = input_ids.clone()
-    assert conv.sep_style == conversation_lib.SeparatorStyle.MPT
+    assert conv.sep_style == conversation_lib.SeparatorStyle.TWO
 
     # Mask targets
     sep = conv.sep + conv.roles[1]
@@ -450,7 +366,13 @@ def preprocess_plain(
     sources: Sequence[str],
     tokenizer: transformers.PreTrainedTokenizer,
 ) -> Dict:
-    # add end signal and concatenate together
+    """
+    Given a list of sources, each is a conversation list. This transform:
+    1. Add signal '### ' at the beginning each sentence, with end signal '\n';
+    2. Concatenate conversations together;
+    3. Tokenize the concatenated conversation;
+    4. Make a deepcopy as the target. Mask human words with IGNORE_INDEX.
+    """
     conversations = []
     for source in sources:
         assert len(source) == 2
@@ -480,13 +402,6 @@ def preprocess(
     tokenizer: transformers.PreTrainedTokenizer,
     has_image: bool = False,
 ) -> Dict:
-    """
-    Given a list of sources, each is a conversation list. This transform:
-    1. Add signal '### ' at the beginning each sentence, with end signal '\n';
-    2. Concatenate conversations together;
-    3. Tokenize the concatenated conversation;
-    4. Make a deepcopy as the target. Mask human words with IGNORE_INDEX.
-    """
     if (
         conversation_lib.default_conversation.sep_style
         == conversation_lib.SeparatorStyle.PLAIN
@@ -497,38 +412,6 @@ def preprocess(
         == conversation_lib.SeparatorStyle.LLAMA_3
     ):
         return preprocess_llama_3(sources, tokenizer, has_image=has_image)
-    # add end signal and concatenate together
-    conversations = []
-    for source in sources:
-        header = f"{conversation_lib.default_conversation.system}\n\n"
-        conversation = _add_speaker_and_signal(header, source)
-        conversations.append(conversation)
-
-    # tokenize conversations
-    def get_tokenize_len(prompts):
-        return [len(tokenizer_image_token(prompt, tokenizer)) for prompt in prompts]
-
-    if has_image:
-        input_ids = [
-            tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
-            for prompt in conversations
-        ]
-    else:
-        conversations_tokenized = _tokenize_fn(conversations, tokenizer)
-        input_ids = conversations_tokenized["input_ids"]
-
-    targets = copy.deepcopy(input_ids)
-    for target, source in zip(targets, sources):
-        if has_image:
-            tokenized_lens = get_tokenize_len([header] + [s["value"] for s in source])
-        else:
-            tokenized_lens = _tokenize_fn(
-                [header] + [s["value"] for s in source], tokenizer
-            )["input_ids_lens"]
-        speakers = [sentence["from"] for sentence in source]
-        _mask_targets(target, tokenized_lens, speakers)
-
-    return dict(input_ids=input_ids, labels=targets)
 
 
 class SupervisedDataset(Dataset):
@@ -538,7 +421,6 @@ class SupervisedDataset(Dataset):
         self,
         tokenizer: transformers.PreTrainedTokenizer,
         data_args: DataArguments,
-        image_tokens: int = 128,
     ):
         super().__init__()
 
@@ -552,7 +434,7 @@ class SupervisedDataset(Dataset):
             std=data_args.data_std,
         )
         self.data_args = data_args
-        self.image_tokens = image_tokens
+        self.image_tokens = self.data_args.image_tokens
 
     def __len__(self):
         return len(self.dataset)
@@ -566,20 +448,17 @@ class SupervisedDataset(Dataset):
 
         data_dict = {}
 
-        idx = self.list_data_dict[i]["image"]
+        image, text = self.dataset[i]
+        sources = [{"from": "human", "value": text}]
+        sources = preprocess_multimodal(copy.deepcopy(sources), self.data_args)
 
-        image, text = self.dataset[idx]
+        data_dict = preprocess(sources, self.tokenizer, has_image=True)
 
-        # add sources and targets
-
-        sources = preprocess_multimodal(
-            copy.deepcopy([e["conversations"] for e in sources]), self.data_args
+        return dict(
+            input_ids=data_dict["input_ids"][0],
+            labels=data_dict["labels"][0],
+            image=image,
         )
-
-        # add things to data_dict
-        # NOT COMPLETE YET
-
-        return data_dict
 
 
 @dataclass
@@ -606,7 +485,7 @@ class DataCollatorForSupervisedDataset(object):
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
 
-        if "image" in instances[0]:
+        if "image" in instances[0]:  # check if multimodal
             images = [instance["image"] for instance in instances]
             if all(x is not None and x.shape == images[0].shape for x in images):
                 batch["images"] = torch.stack(images)
@@ -621,7 +500,7 @@ def make_supervised_data_module(
 ) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
     train_dataset = SupervisedDataset(
-        tokenizer=tokenizer, data_path=data_args.data_path, data_args=data_args
+        tokenizer=tokenizer, data_path=data_args.data_path
     )
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     return dict(
