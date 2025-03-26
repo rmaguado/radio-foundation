@@ -290,25 +290,6 @@ class LLaVATrainer(Trainer):
             self.optimizer = optimizer_cls(
                 optimizer_grouped_parameters, **optimizer_kwargs
             )
-            if optimizer_cls.__name__ == "Adam8bit":
-                import bitsandbytes
-
-                manager = bitsandbytes.optim.GlobalOptimManager.get_instance()
-
-                skipped = 0
-                for module in opt_model.modules():
-                    if isinstance(module, nn.Embedding):
-                        skipped += sum(
-                            {
-                                p.data_ptr(): p.numel() for p in module.parameters()
-                            }.values()
-                        )
-                        logger.info(f"skipped {module}: {skipped/2**20}M params")
-                        manager.register_module_override(
-                            module, "weight", {"optim_bits": 32}
-                        )
-                        logger.debug(f"bitsandbytes: will optimize {module} in fp32")
-                logger.info(f"skipped: {skipped/2**20}M params")
 
         return self.optimizer
 
