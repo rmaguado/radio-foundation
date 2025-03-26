@@ -11,3 +11,5 @@ omegaconf
 pandas
 scikit-learn
 matplotlib
+omegaconf
+fvcore
