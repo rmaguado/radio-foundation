@@ -3,9 +3,9 @@
 ## NAME GPUS GPUTYPE WORKERS
 
 #SBATCH --job-name=$NAME
-#SBATCH --output=$OUT/$NAME-%j.out
+#SBATCH --output=$OUT/$NAME/%j.out
 #SBATCH --nodes=1
-#SBATCH --nodelist=compute-cuda-02
+#SBATCH --nodelist=compute-cuda-03
 #SBATCH --cpus-per-task=$WORKERS
 
 #SBATCH --ntasks-per-node=$GPUS
