@@ -74,12 +74,15 @@ class RadiologyReportDataset(NiftiCtVolumesFull):
 
         entries_dtype = [
             ("rowid", np.uint32),
+            ("length", np.uint32),
         ]
         entries = []
-        row_ids = self.cursor.execute(f"SELECT rowid FROM global").fetchall()
+        row_ids, lengths = self.cursor.execute(
+            f"SELECT rowid, length FROM global"
+        ).fetchall()
 
-        for rowid in row_ids:
-            entries.append((rowid,))
+        for rowid, length in zip(row_ids, lengths):
+            entries.append((rowid, length))
 
         entries_array = np.array(entries, dtype=entries_dtype)
 
@@ -87,8 +90,11 @@ class RadiologyReportDataset(NiftiCtVolumesFull):
         np.save(entries_dir, entries_array)
         return np.load(entries_dir, mmap_mode="r")
 
+    def get_lengths(self):
+        return self.entries["length"]
+
     def get_image_data(self, index: int) -> torch.Tensor:
-        rowid = self.entries[index]
+        rowid, _ = self.entries[index]
         self.cursor.execute(
             """
             SELECT dataset, axial_dim, nifti_path, report, slice_thickness FROM global WHERE rowid = ?

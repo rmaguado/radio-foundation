@@ -39,8 +39,9 @@ class NiftiEvalBase(NiftiDatabase):
                 spacing_x REAL,
                 spacing_y REAL,
                 axial_dim INTEGER,
-                nifti_path TEXT
-                text TEXT
+                nifti_path TEXT,
+                text TEXT,
+                length INTEGER
             )
             """
         )
@@ -50,8 +51,8 @@ class NiftiEvalBase(NiftiDatabase):
     ) -> None:
         self.cursor.execute(
             """
-            INSERT INTO "global" (dataset, map_id, num_slices, slice_thickness, spacing_x, spacing_y, axial_dim, nifti_pat, text)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO "global" (dataset, map_id, num_slices, slice_thickness, spacing_x, spacing_y, axial_dim, nifti_pat, text, length)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 dataset_name,
@@ -63,6 +64,7 @@ class NiftiEvalBase(NiftiDatabase):
                 metadata["axial_dim"],
                 nifti_path,
                 text,
+                len(text),
             ),
         )
 

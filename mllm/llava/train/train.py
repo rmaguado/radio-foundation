@@ -441,8 +441,7 @@ class SupervisedDataset(Dataset):
 
     @property
     def modality_lengths(self):
-        length_list = []
-        return length_list
+        return self.dataset.lengths
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
 
