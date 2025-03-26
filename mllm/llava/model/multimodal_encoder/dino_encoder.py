@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import OmegaConf
+from omegaconf import OmegaConf
 from functools import partial
 
 from dinov2.models import build_model_from_cfg
