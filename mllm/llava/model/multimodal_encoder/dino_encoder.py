@@ -13,7 +13,7 @@ class DINOVisionTower(nn.Module):
 
         self.is_loaded = False
 
-        self.config = OmegaConf.load(args.mm_vision_config_path)
+        self.model_config = OmegaConf.load(args.mm_vision_config_path)
         self.vision_tower_name = vision_tower
         self.select_layer = args.mm_vision_select_layer
         self.select_feature = getattr(args, "mm_vision_select_feature", "patch")
@@ -28,7 +28,7 @@ class DINOVisionTower(nn.Module):
         elif getattr(args, "unfreeze_mm_vision_tower", False):
             self.load_model()
         else:
-            self.cfg_only = self.config
+            self.cfg_only = self.model_config
 
     def load_model(self):
         if self.is_loaded:
@@ -39,11 +39,13 @@ class DINOVisionTower(nn.Module):
             )
             return
 
-        self.vision_tower = build_model_from_cfg(self.config, only_teacher=True)
+        self.vision_tower, _ = build_model_from_cfg(
+            self.model_config, only_teacher=True
+        )
         load_pretrained_weights(self.vision_tower, self.path_to_checkpoint, "teacher")
 
         teacher_dtype_str = (
-            self.config.compute_precision.teacher.backbone.mixed_precision.param_dtype
+            self.model_config.compute_precision.teacher.backbone.mixed_precision.param_dtype
         )
         if teacher_dtype_str == "fp16":
             autocast_dtype = torch.half
@@ -84,20 +86,24 @@ class DINOVisionTower(nn.Module):
     @property
     def config(self):
         if self.is_loaded:
-            return self.vision_tower.config
+            return self.model_config
         else:
             return self.cfg_only
 
     @property
     def hidden_size(self):
-        return self.config.student.full_image_size
+        return self.model_config.student.full_image_size
 
     @property
     def num_patches_per_side(self):
-        return self.config.student.full_image_size // self.config.student.patch_size
+        return (
+            self.model_config.student.full_image_size
+            // self.model_config.student.patch_size
+        )
 
     @property
     def num_patches(self):
         return (
-            self.config.student.full_image_size // self.config.student.patch_size
+            self.model_config.student.full_image_size
+            // self.model_config.student.patch_size
         ) ** 2
