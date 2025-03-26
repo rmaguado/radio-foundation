@@ -1,0 +1,24 @@
+#!/bin/bash
+
+## NAME GPUS GPUTYPE WORKERS
+
+#SBATCH --job-name=$NAME
+#SBATCH --output=$OUT/$NAME-%j.out
+#SBATCH --nodes=1
+#SBATCH --nodelist=compute-cuda-02
+#SBATCH --cpus-per-task=$WORKERS
+
+#SBATCH --ntasks-per-node=$GPUS
+#SBATCH --gres=gpu:$GPUTYPE:$GPUS
+
+#SBATCH --mem=96GB
+#SBATCH --partition=odap-gpu
+#SBATCH --signal=USR2@120
+#SBATCH --time=14400
+
+source $HOME/.conda_rc
+conda activate mllm
+cd $HOME/projects/radio-foundation
+export PYTHONPATH=$PWD
+
+srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS ./mllm/scripts/pretrain.sh
