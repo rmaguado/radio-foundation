@@ -176,13 +176,13 @@ class NiftiProcessor:
         try:
             metadata = self.get_metadata(nifti_file)
         except Exception as e:
-            logger.error(f"Metadata extraction failed for {nifti_path}: {e}")
+            logger.exception(f"Metadata extraction failed for {nifti_path}: {e}")
             return
 
         try:
             self.validator(nifti_file, metadata)
         except Exception as e:
-            logger.error(f"Validation failed for {nifti_path}: {e}")
+            logger.exception(f"Validation failed for {nifti_path}: {e}")
             return
 
         if self.validate_only:

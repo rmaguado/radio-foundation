@@ -262,7 +262,7 @@ class NiftiProcessorBase(NiftiProcessor):
             metadata = self.get_metadata(nifti_file)
             metadata["map_id"] = map_id
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Metadata extraction failed for {nifti_path} (mad_id: {map_id}): {e}"
             )
             return

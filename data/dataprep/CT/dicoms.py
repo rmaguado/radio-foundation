@@ -350,7 +350,7 @@ class DicomProcessor:
                     for dicom_path, dicom in dicoms:
                         self.validator(dicom, data_folder)
                 except AssertionError as e:
-                    logger.error(f"Error validating {data_folder}: {e}")
+                    logger.exception(f"Error validating {data_folder}: {e}")
                     continue
                 except Exception as e:
                     logger.exception(f"Error validating {data_folder}: {e}")
