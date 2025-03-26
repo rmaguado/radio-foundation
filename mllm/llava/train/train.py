@@ -17,45 +17,29 @@
 import os
 import copy
 from dataclasses import dataclass, field
-import json
 import logging
 import pathlib
 from typing import Dict, Optional, Sequence
-
+from torch.utils.data import Dataset
 import torch
 
 import transformers
-import tokenizers
 
-from llava.constants import (
+from mllm.llava.constants import (
     IGNORE_INDEX,
     DEFAULT_IMAGE_TOKEN,
     DEFAULT_IM_START_TOKEN,
     DEFAULT_IM_END_TOKEN,
 )
-from torch.utils.data import Dataset
-from llava.train.llava_trainer import LLaVATrainer
+from mllm.llava.train.llava_trainer import LLaVATrainer
 
-from llava import conversation as conversation_lib
-from llava.model import *
-from llava.mm_utils import tokenizer_image_token
-
-from PIL import Image
+from mllm.llava import conversation as conversation_lib
+from mllm.llava.model import *
+from mllm.llava.mm_utils import tokenizer_image_token
+from mllm.llava.train.dataset import RadiologyReportDataset
 
 
 local_rank = None
-
-
-def rank0_print(*args):
-    if local_rank == 0:
-        print(*args)
-
-
-from packaging import version
-
-IS_TOKENIZER_GREATER_THAN_0_14 = version.parse(tokenizers.__version__) >= version.parse(
-    "0.14"
-)
 
 
 @dataclass
@@ -65,9 +49,7 @@ class ModelArguments:
     freeze_backbone: bool = field(default=False)
     tune_mm_mlp_adapter: bool = field(default=False)
     vision_tower: Optional[str] = field(default=None)
-    mm_vision_select_layer: Optional[int] = field(
-        default=-1
-    )  # default to the last layer
+    mm_vision_select_layer: Optional[int] = field(default=-1)
     pretrain_mm_mlp_adapter: Optional[str] = field(default=None)
     mm_projector_type: Optional[str] = field(default="linear")
     mm_use_im_start_end: bool = field(default=False)
@@ -80,12 +62,17 @@ class ModelArguments:
 
 @dataclass
 class DataArguments:
-    data_path: str = field(
+    root_path: str = field(
         default=None, metadata={"help": "Path to the training data."}
     )
-    lazy_preprocess: bool = False
+    db_name: str = field(
+        default="CT-RATE_train_reports",
+        metadata={"help": "Name of .db file indexing images and reports."},
+    )
+    channels: int = field(default=1)
+    data_mean: float = field(default=0.0)
+    data_std: float = field(default=1.0)
     is_multimodal: bool = False
-    image_folder: Optional[str] = field(default=None)
     image_aspect_ratio: str = "square"
 
 
@@ -396,7 +383,7 @@ def preprocess_llama_3(
             dim=0,
         )
     else:
-        print("this is the case tbh")
+        # this is the case tbh
         input_ids = torch.tensor(
             tokenizer(
                 conversations,
@@ -450,9 +437,8 @@ def preprocess_llama_3(
         if cur_len < tokenizer.model_max_length:
             if cur_len != total_len:
                 target[:] = IGNORE_INDEX
-                print(
-                    f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}."
-                    f" (ignored)"
+                logging.warning(
+                    f"tokenization mismatch: {cur_len} vs. {total_len}. (ignored)"
                 )
 
     return dict(
@@ -546,46 +532,35 @@ def preprocess(
     return dict(input_ids=input_ids, labels=targets)
 
 
-class LazySupervisedDataset(Dataset):
+class SupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
     def __init__(
         self,
-        data_path: str,
         tokenizer: transformers.PreTrainedTokenizer,
         data_args: DataArguments,
+        image_tokens: int = 128,
     ):
-        super(LazySupervisedDataset, self).__init__()
-        list_data_dict = json.load(open(data_path, "r"))
+        super().__init__()
 
-        rank0_print("Formatting inputs...Skip in lazy mode")
         self.tokenizer = tokenizer
-        self.list_data_dict = list_data_dict
+
+        self.dataset = RadiologyReportDataset(
+            root_path=data_args.data_path,
+            dataset_name=data_args.dataset_name,
+            channels=data_args.data_path,
+            mean=data_args.data_mean,
+            std=data_args.data_std,
+        )
         self.data_args = data_args
+        self.image_tokens = image_tokens
 
     def __len__(self):
-        return len(self.list_data_dict)
-
-    @property
-    def lengths(self):
-        length_list = []
-        for sample in self.list_data_dict:
-            img_tokens = 128 if "image" in sample else 0
-            length_list.append(
-                sum(len(conv["value"].split()) for conv in sample["conversations"])
-                + img_tokens
-            )
-        return length_list
+        return len(self.dataset)
 
     @property
     def modality_lengths(self):
         length_list = []
-        for sample in self.list_data_dict:
-            cur_len = sum(
-                len(conv["value"].split()) for conv in sample["conversations"]
-            )
-            cur_len = cur_len if "image" in sample else -cur_len
-            length_list.append(cur_len)
         return length_list
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
@@ -594,39 +569,10 @@ class LazySupervisedDataset(Dataset):
             sources = [sources]
         assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
         if "image" in sources[0]:
-            image_file = self.list_data_dict[i]["image"]
-            image_folder = self.data_args.image_folder
-            processor = self.data_args.image_processor
-            image = Image.open(os.path.join(image_folder, image_file)).convert("RGB")
-            if self.data_args.image_aspect_ratio == "pad":
+            idx = self.list_data_dict[i]["image"]
 
-                def expand2square(pil_img, background_color):
-                    width, height = pil_img.size
-                    if width == height:
-                        return pil_img
-                    elif width > height:
-                        result = Image.new(
-                            pil_img.mode, (width, width), background_color
-                        )
-                        result.paste(pil_img, (0, (width - height) // 2))
-                        return result
-                    else:
-                        result = Image.new(
-                            pil_img.mode, (height, height), background_color
-                        )
-                        result.paste(pil_img, ((height - width) // 2, 0))
-                        return result
+            image, text = self.dataset[idx]
 
-                image = expand2square(
-                    image, tuple(int(x * 255) for x in processor.image_mean)
-                )
-                image = processor.preprocess(image, return_tensors="pt")[
-                    "pixel_values"
-                ][0]
-            else:
-                image = processor.preprocess(image, return_tensors="pt")[
-                    "pixel_values"
-                ][0]
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]), self.data_args
             )
@@ -688,7 +634,7 @@ def make_supervised_data_module(
     tokenizer: transformers.PreTrainedTokenizer, data_args
 ) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
-    train_dataset = LazySupervisedDataset(
+    train_dataset = SupervisedDataset(
         tokenizer=tokenizer, data_path=data_args.data_path, data_args=data_args
     )
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
@@ -792,7 +738,7 @@ def train(attn_implementation=None):
                 model.to(torch.bfloat16)
             if training_args.fp16:
                 model.to(torch.float16)
-        rank0_print("Adding LoRA adapters...")
+        logging.info("Adding LoRA adapters.")
         model = get_peft_model(model, lora_config)
 
     if "mpt" in model_args.model_name_or_path:
