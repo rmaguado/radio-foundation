@@ -6,8 +6,6 @@ tqdm==4.67.1
 python_gdcm>=3.0.10
 pylibjpeg>=2.0 
 pylibjpeg-libjpeg>=2.1
-fvcore
-omegaconf
 pandas
 scikit-learn
 matplotlib
