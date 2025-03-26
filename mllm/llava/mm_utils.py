@@ -3,7 +3,7 @@ import torch
 import math
 import ast
 
-from llava.constants import IMAGE_TOKEN_INDEX
+from mllm.llava.constants import IMAGE_TOKEN_INDEX
 
 
 def select_best_resolution(original_size, possible_resolutions):

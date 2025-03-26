@@ -1,4 +1,3 @@
-import os
 from .clip_encoder import CLIPVisionTower, CLIPVisionTowerS2
 from .dino_encoder import DINOVisionTower
 
