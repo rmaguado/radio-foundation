@@ -119,7 +119,7 @@ conv_llava_plain = Conversation(
 conv_llama_3 = Conversation(
     system="A chat between a curious user and an artificial intelligence assistant. "
     "The assistant gives helpful, detailed, and polite answers to the user's questions.",
-    roles=("USER", "ASSISTANT"),
+    roles=("user", "assistant"),
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.TWO,
@@ -129,7 +129,7 @@ conv_llama_3 = Conversation(
 
 conv_llama_3_mm = Conversation(
     system="A chat between a curious user and an artificial intelligence assistant. The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language. The visual content will be provided with the following format: <Image>visual content</Image>.",
-    roles=("USER", "ASSISTANT"),
+    roles=("user", "assistant"),
     multimodal=True,
     messages=(),
     offset=0,
