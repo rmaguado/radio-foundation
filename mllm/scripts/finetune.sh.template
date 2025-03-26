@@ -1,11 +1,14 @@
 #!/bin/bash
 
-deepspeed llava/train/train_mem.py \
-    --deepspeed ./scripts/zero3.json \
-    --model_name_or_path ./checkpoints/Llama3.1-8B-Instruct \
+deepspeed mllm/llava/train/train_mem.py \
+    --deepspeed ./mllm/scripts/zero3.json \
+    --model_name_or_path ./mllm/checkpoints/Llama3.1-8B-Instruct \
     --version v1 \
-    --data_path ./data/llava_v1_5_mix665k.json \
-    --image_folder ./playground/data \
+    --root_path /abs/path/to/data/ \
+    --db_name CT-RATE_train_report \
+    --channels 10 \
+    --data_mean -573.8 \
+    --data_std 461.3 \
     --vision_tower dino-vit-base-patch14-10 \
     --vision_tower_type dino \
     --pretrain_mm_mlp_adapter ./checkpoints/llava-pretrain/mm_projector.bin \
