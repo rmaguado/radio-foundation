@@ -21,7 +21,7 @@ from data.dataprep import (
 logger = logging.getLogger("dataprep")
 
 
-class NiftiEvalBase(NiftiDatabase):
+class NiftiReportBase(NiftiDatabase):
     def __init__(self, config):
         super().__init__(config)
 
@@ -51,7 +51,7 @@ class NiftiEvalBase(NiftiDatabase):
     ) -> None:
         self.cursor.execute(
             """
-            INSERT INTO "global" (dataset, map_id, num_slices, slice_thickness, spacing_x, spacing_y, axial_dim, nifti_pat, text, length)
+            INSERT INTO "global" (dataset, map_id, num_slices, slice_thickness, spacing_x, spacing_y, axial_dim, nifti_path, text, length)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -76,14 +76,14 @@ class NiftiProcessorBase(NiftiProcessor):
 
         self.database = database
 
-        log_path = f"data/log/{self.dataset_name}_eval.log"
+        log_path = f"data/log/{self.dataset_name}_mllm.log"
         set_logging(log_path)
 
     def get_text_data(self, map_id: str) -> str:
         """
         Get the text data for a given map_id.
         """
-        return ""
+        raise NotImplementedError
 
     def process_volume(self, nifti_path: str, map_id: str) -> None:
         """
@@ -99,7 +99,7 @@ class NiftiProcessorBase(NiftiProcessor):
             metadata = self.get_metadata(nifti_file)
             metadata["map_id"] = map_id
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Metadata extraction failed for {nifti_path} (mad_id: {map_id}): {e}"
             )
             return
@@ -107,7 +107,7 @@ class NiftiProcessorBase(NiftiProcessor):
         try:
             text = self.get_text_data(map_id)
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Text extraction failed for {nifti_path} (mad_id: {map_id}): {e}"
             )
             return
@@ -179,7 +179,7 @@ def get_argpase():
 
 def main(args):
     dataset_name = "DemoDatasetName"
-    db_name = "DemoDatasetName-Eval"
+    db_name = "DemoDatasetName-mllm"
     dataset_path = os.path.join(args.root_path, dataset_name)
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
@@ -193,7 +193,7 @@ def main(args):
         "dataset_path": dataset_path,
         "db_path": db_path,
     }
-    database = NiftiEvalBase(config)
+    database = NiftiReportBase(config)
     processor = NiftiProcessorBase(config, database)
     processor.prepare_dataset()
 

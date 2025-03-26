@@ -7,7 +7,7 @@ import argparse
 import logging
 import pandas as pd
 
-from data.mllm.base import NiftiEvalBase, NiftiProcessorBase
+from data.mllm.base import NiftiReportBase, NiftiProcessorBase
 
 
 logger = logging.getLogger("dataprep")
@@ -28,9 +28,14 @@ class CT_RATE_Processor(NiftiProcessorBase):
         self.reports_df = pd.read_csv(config["reports_path"])
 
     def get_text_data(self, map_id: int) -> str:
-        return self.reports_df.loc[
-            self.reports_df["map_id"] == map_id, "report"
-        ].values[0]
+        report = (
+            self.reports_df.loc[
+                self.reports_df["VolumeName"] == f"{map_id}.nii.gz", "Findings_EN"
+            ]
+            .values[0]
+            .strip()
+        )
+        return report
 
 
 def main(args):
@@ -40,6 +45,10 @@ def main(args):
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
 
+    reports_path = os.path.join(
+        args.root_path, "dataset/radiology_text_reports/train_reports.csv"
+    )
+
     db_dir = os.path.join("data/index", db_name)
     os.makedirs(db_dir, exist_ok=True)
     db_path = os.path.join(db_dir, "index.db")
@@ -48,9 +57,10 @@ def main(args):
         "dataset_name": dataset_name,
         "dataset_path": dataset_path,
         "db_path": db_path,
+        "reports_path": reports_path,
     }
-    database = NiftiEvalBase(config)
-    processor = NiftiProcessorBase(config, database)
+    database = NiftiReportBase(config)
+    processor = CT_RATE_Processor(config, database)
     processor.prepare_dataset()
 
 
