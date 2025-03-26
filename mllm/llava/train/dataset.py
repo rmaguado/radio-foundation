@@ -1,4 +1,5 @@
 import torch
+from torchvision import transforms
 import numpy as np
 import nibabel as nib
 import os
@@ -8,19 +9,59 @@ from einops import rearrange
 from dinov2.data.datasets.niftis import NiftiCtVolumesFull
 
 
+class ImageProcessor:
+    def __init__(self, img_size, mean, std, min_zspacing=1.0, channels=10):
+        self.img_size = img_size
+        self.normalize = transforms.Normalize(mean=mean, std=std)
+
+        self.min_zspacing = min_zspacing
+        self.channels = channels
+
+    def resize(self, image, slice_thickness):
+        slices, w, h = image.shape
+
+        target_height = self.img_size * h // w
+
+        if slice_thickness < self.min_zspacing:
+            target_slices = slices * self.min_zspacing / slice_thickness
+        else:
+            target_slices = slices
+
+        groups = target_slices // self.channels
+        target_slices = groups * self.channels
+
+        image = image.unsqueeze(0).unsqueeze(0)
+        image = torch.nn.functional.interpolate(
+            image, size=(target_slices, self.img_size, target_height), mode="trilinear"
+        )
+        return rearrange(image, "1 1 (g c) w h -> g c w h", g=groups, c=self.channels)
+
+    def __call__(self, image):
+        image = self.resize(image)
+        image = self.normalize(image)
+        return image
+
+
 class RadiologyReportDataset(NiftiCtVolumesFull):
     def __init__(
         self,
         root_path: str,
         dataset_name: str,
-        channels: int = 1,
-        transform=None,
+        channels: int = 10,
+        img_size: int = 504,
+        mean: float = 0.0,
+        std: float = 1.0,
+        min_zspacing=1.0,
     ):
         super().__init__(
             dataset_name=dataset_name,
             root_path=root_path,
             channels=channels,
-            transform=transform,
+            transform=None,
+        )
+
+        self.image_processor = ImageProcessor(
+            img_size, mean, std, min_zspacing, channels
         )
 
     def create_entries(self) -> np.ndarray:
@@ -50,27 +91,19 @@ class RadiologyReportDataset(NiftiCtVolumesFull):
         rowid = self.entries[index]
         self.cursor.execute(
             """
-            SELECT dataset, axial_dim, nifti_path, report FROM global WHERE rowid = ?
+            SELECT dataset, axial_dim, nifti_path, report, slice_thickness FROM global WHERE rowid = ?
             """,
             (int(rowid),),
         )
-        dataset, axial_dim, nifti_path, report = self.cursor.fetchone()
+        dataset, axial_dim, nifti_path, report, slice_thickness = self.cursor.fetchone()
 
         abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
         nifti_file = nib.load(abs_path_to_nifti)
 
         volume_data = nifti_file.get_fdata().astype(np.float32)
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
-
-        num_slices = volume_data.shape[0]
-        num_stacks = num_slices // self.channels
-        num_slices = num_stacks * self.channels
-
-        volume_data = volume_data[:num_slices]
         volume_data = torch.from_numpy(volume_data)
-        volume_data = rearrange(
-            volume_data, "(s c) w h -> s c w h", s=num_stacks, c=self.channels
-        )
+        volume_data = self.image_processor(volume_data, slice_thickness)
 
         return self.process_ct(volume_data), report
 
@@ -80,6 +113,4 @@ class RadiologyReportDataset(NiftiCtVolumesFull):
         except Exception as e:
             raise RuntimeError(f"can not read image/report for sample {index}") from e
 
-        transformed_image = self.transform(image)
-
-        return transformed_image, report
+        return image, report
