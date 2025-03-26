@@ -45,7 +45,7 @@ local_rank = None
 @dataclass
 class ModelArguments:
     model_name_or_path: Optional[str] = field(default="facebook/opt-125m")
-    version: Optional[str] = field(default="v0")
+    conv_template: Optional[str] = field(default="plain")
     freeze_backbone: bool = field(default=False)
     tune_mm_mlp_adapter: bool = field(default=False)
     vision_tower: Optional[str] = field(default=None)
@@ -73,7 +73,6 @@ class DataArguments:
     data_mean: float = field(default=0.0)
     data_std: float = field(default=1.0)
     is_multimodal: bool = False
-    image_aspect_ratio: str = "square"
 
 
 @dataclass
@@ -108,7 +107,7 @@ class TrainingArguments(transformers.TrainingArguments):
     lora_dropout: float = 0.05
     lora_weight_path: str = ""
     lora_bias: str = "none"
-    mm_projector_lr: Optional[float] = None
+    mm_projector_lr: float = 1e-4
     group_by_modality_length: bool = field(default=False)
 
 
@@ -335,7 +334,7 @@ def preprocess_multimodal(sources: Sequence[str], data_args: DataArguments) -> D
                 )
                 sentence["value"] = DEFAULT_IMAGE_TOKEN + "\n" + sentence["value"]
                 sentence["value"] = sentence["value"].strip()
-                if "mmtag" in conversation_lib.default_conversation.version:
+                if "mmtag" in conversation_lib.default_conversation.multimodal:
                     sentence["value"] = sentence["value"].replace(
                         DEFAULT_IMAGE_TOKEN,
                         "<Image>" + DEFAULT_IMAGE_TOKEN + "</Image>",
@@ -564,35 +563,22 @@ class SupervisedDataset(Dataset):
         return length_list
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-        sources = self.list_data_dict[i]
-        if isinstance(i, int):
-            sources = [sources]
-        assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
-        if "image" in sources[0]:
-            idx = self.list_data_dict[i]["image"]
 
-            image, text = self.dataset[idx]
+        data_dict = {}
 
-            sources = preprocess_multimodal(
-                copy.deepcopy([e["conversations"] for e in sources]), self.data_args
-            )
-        else:
-            sources = copy.deepcopy([e["conversations"] for e in sources])
-        data_dict = preprocess(
-            sources, self.tokenizer, has_image=("image" in self.list_data_dict[i])
+        idx = self.list_data_dict[i]["image"]
+
+        image, text = self.dataset[idx]
+
+        # add sources and targets
+
+        sources = preprocess_multimodal(
+            copy.deepcopy([e["conversations"] for e in sources]), self.data_args
         )
-        if isinstance(i, int):
-            data_dict = dict(
-                input_ids=data_dict["input_ids"][0], labels=data_dict["labels"][0]
-            )
 
-        # image exist in the data
-        if "image" in self.list_data_dict[i]:
-            data_dict["image"] = image
-        elif self.data_args.is_multimodal:
-            # image does not exist in the data, but the model is multimodal
-            crop_size = self.data_args.image_processor.crop_size
-            data_dict["image"] = torch.zeros(3, crop_size["height"], crop_size["width"])
+        # add things to data_dict
+        # NOT COMPLETE YET
+
         return data_dict
 
 
@@ -651,33 +637,6 @@ def train(attn_implementation=None):
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     local_rank = training_args.local_rank
-    compute_dtype = (
-        torch.float16
-        if training_args.fp16
-        else (torch.bfloat16 if training_args.bf16 else torch.float32)
-    )
-
-    bnb_model_from_pretrained_args = {}
-    if training_args.bits in [4, 8]:
-        from transformers import BitsAndBytesConfig
-
-        bnb_model_from_pretrained_args.update(
-            dict(
-                device_map={"": training_args.device},
-                load_in_4bit=training_args.bits == 4,
-                load_in_8bit=training_args.bits == 8,
-                quantization_config=BitsAndBytesConfig(
-                    load_in_4bit=training_args.bits == 4,
-                    load_in_8bit=training_args.bits == 8,
-                    llm_int8_skip_modules=["mm_projector"],
-                    llm_int8_threshold=6.0,
-                    llm_int8_has_fp16_weight=False,
-                    bnb_4bit_compute_dtype=compute_dtype,
-                    bnb_4bit_use_double_quant=training_args.double_quant,
-                    bnb_4bit_quant_type=training_args.quant_type,  # {'fp4', 'nf4'}
-                ),
-            )
-        )
 
     if model_args.vision_tower is not None:
         model = LlavaLlamaForCausalLM.from_pretrained(
@@ -685,7 +644,6 @@ def train(attn_implementation=None):
             cache_dir=training_args.cache_dir,
             attn_implementation=attn_implementation,
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-            **bnb_model_from_pretrained_args,
         )
     else:
         model = transformers.LlamaForCausalLM.from_pretrained(
@@ -693,24 +651,11 @@ def train(attn_implementation=None):
             cache_dir=training_args.cache_dir,
             attn_implementation=attn_implementation,
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-            **bnb_model_from_pretrained_args,
         )
     model.config.use_cache = False
 
     if model_args.freeze_backbone:
         model.model.requires_grad_(False)
-
-    if training_args.bits in [4, 8]:
-        from peft import prepare_model_for_kbit_training
-
-        model.config.torch_dtype = (
-            torch.float32
-            if training_args.fp16
-            else (torch.bfloat16 if training_args.bf16 else torch.float32)
-        )
-        model = prepare_model_for_kbit_training(
-            model, use_gradient_checkpointing=training_args.gradient_checkpointing
-        )
 
     if training_args.gradient_checkpointing:
         if hasattr(model, "enable_input_require_grads"):
@@ -738,44 +683,24 @@ def train(attn_implementation=None):
                 model.to(torch.bfloat16)
             if training_args.fp16:
                 model.to(torch.float16)
-        logging.info("Adding LoRA adapters.")
+        ## TODO: Add log here "Adding LoRA adapters."
         model = get_peft_model(model, lora_config)
 
-    if "mpt" in model_args.model_name_or_path:
-        tokenizer = transformers.AutoTokenizer.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            model_max_length=training_args.model_max_length,
-            padding_side="right",
-        )
-    else:
-        tokenizer = transformers.AutoTokenizer.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            model_max_length=training_args.model_max_length,
-            padding_side="right",
-            use_fast=False,
-        )
+    tokenizer = transformers.AutoTokenizer.from_pretrained(
+        model_args.model_name_or_path,
+        cache_dir=training_args.cache_dir,
+        model_max_length=training_args.model_max_length,
+        padding_side="right",
+        use_fast=False,
+    )
 
-    if model_args.version == "v0":
-        if tokenizer.pad_token is None:
-            smart_tokenizer_and_embedding_resize(
-                special_tokens_dict=dict(pad_token="[PAD]"),
-                tokenizer=tokenizer,
-                model=model,
-            )
-    elif model_args.version == "v0.5":
-        tokenizer.pad_token = tokenizer.unk_token
+    tokenizer.pad_token = tokenizer.unk_token
+    if model_args.conv_template in conversation_lib.conv_templates:
+        conversation_lib.default_conversation = conversation_lib.conv_templates[
+            model_args.conv_template
+        ]
     else:
-        tokenizer.pad_token = tokenizer.unk_token
-        if model_args.version in conversation_lib.conv_templates:
-            conversation_lib.default_conversation = conversation_lib.conv_templates[
-                model_args.version
-            ]
-        else:
-            conversation_lib.default_conversation = conversation_lib.conv_templates[
-                "vicuna_v1"
-            ]
+        raise ValueError(f"Unknown conversation template: {model_args.conv_template}")
 
     if model_args.vision_tower is not None:
         model.get_model().initialize_vision_modules(
@@ -788,11 +713,8 @@ def train(attn_implementation=None):
             device=training_args.device,
         )
 
-        data_args.image_processor = vision_tower.image_processor
         data_args.is_multimodal = True
 
-        model.config.image_aspect_ratio = data_args.image_aspect_ratio
-        model.config.tokenizer_padding_side = tokenizer.padding_side
         model.config.tokenizer_model_max_length = tokenizer.model_max_length
 
         model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter = (
@@ -808,11 +730,6 @@ def train(attn_implementation=None):
             for p in model.get_model().mm_projector.parameters():
                 p.requires_grad = False
 
-        if training_args.bits in [4, 8]:
-            model.get_model().mm_projector.to(
-                dtype=compute_dtype, device=training_args.device
-            )
-
         model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = (
             model_args.mm_use_im_start_end
         )
@@ -820,20 +737,6 @@ def train(attn_implementation=None):
         training_args.use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
         model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
-
-    if training_args.bits in [4, 8]:
-        from peft.tuners.lora import LoraLayer
-
-        for name, module in model.named_modules():
-            if isinstance(module, LoraLayer):
-                if training_args.bf16:
-                    module = module.to(torch.bfloat16)
-            if "norm" in name:
-                module = module.to(torch.float32)
-            if "lm_head" in name or "embed_tokens" in name:
-                if hasattr(module, "weight"):
-                    if training_args.bf16 and module.weight.dtype == torch.float32:
-                        module = module.to(torch.bfloat16)
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     trainer = LLaVATrainer(
