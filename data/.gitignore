@@ -16,10 +16,6 @@
 !utils.py
 !tsne.py
 
-dataprep/**/__pycache__
-dataprep/**/.ipynb_checkpoints/
-dataprep/**/.DS_Store
-
-evaluation/**/__pycache__
-evaluation/**/.ipynb_checkpoints/
-evaluation/**/.DS_Store
+**/__pycache__
+**/.ipynb_checkpoints/
+**/.DS_Store
