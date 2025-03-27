@@ -9,7 +9,8 @@ def build_vision_projector(config, delay_load=False, **kwargs):
     if projector_type == "attn_pool":
         mm_projector = AttentionalPoolProjector(
             embed_dim=config.mm_hidden_size,
-            context_dim=config.mm_context_size,
+            hidden_dim=config.hidden_size,
+            axial_resample_tokens=config.image_tokens,
         )
         return mm_projector
 

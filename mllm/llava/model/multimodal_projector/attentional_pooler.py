@@ -48,22 +48,31 @@ class PerceiverResampler(nn.Module):
 
 class AttentionalPoolProjector(nn.Module):
     def __init__(
-        self, embed_dim, hidden_dim, num_labels, patch_resample_dim=64, dropout=0.5
+        self,
+        embed_dim,
+        hidden_dim,
+        patch_resample_tokens=64,
+        axial_resample_tokens=128,
+        dropout=0.5,
     ):
         super().__init__()
 
         self.embed_dim = embed_dim
         self.hidden_dim = hidden_dim
-        self.patch_resample_dim = patch_resample_dim
-        self.num_labels = num_labels
+        self.patch_resample_tokens = patch_resample_tokens
+        self.axial_resample_tokens = axial_resample_tokens
 
         self.token_resampler = PerceiverResampler(
-            embed_dim=embed_dim, latent_dim=hidden_dim, num_queries=patch_resample_dim
+            embed_dim=embed_dim,
+            latent_dim=hidden_dim,
+            num_queries=patch_resample_tokens,
         )
         self.axial_resampler = PerceiverResampler(
-            embed_dim=hidden_dim, latent_dim=hidden_dim, num_queries=1
+            embed_dim=hidden_dim,
+            latent_dim=hidden_dim,
+            num_queries=axial_resample_tokens,
         )
-        self.mlp = nn.Linear(hidden_dim, num_labels)
+        self.mlp = nn.Linear(hidden_dim, hidden_dim)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, mask=None):
@@ -75,13 +84,10 @@ class AttentionalPoolProjector(nn.Module):
 
         x = rearrange(x, "(b a) t d -> b (a t) d", a=axial_dim)
 
-        mask = mask.unsqueeze(1).repeat(1, self.patch_resample_dim, 1)
+        mask = mask.unsqueeze(1).repeat(1, self.patch_resample_tokens, 1)
 
         mask = rearrange(mask, "b a t -> b (a t)")
 
         x = self.axial_resampler(x, mask=mask)
-        x = self.dropout(x)
 
-        x = self.mlp(x)
-
-        return x.view(batch_size, self.num_labels)
+        return self.mlp(x)
