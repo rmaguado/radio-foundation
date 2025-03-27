@@ -54,6 +54,7 @@ class LlavaMetaModel:
         mm_patch_merge_type = model_args.mm_patch_merge_type
 
         self.config.mm_vision_tower = vision_tower
+        self.config.image_tokens = model_args.image_tokens
 
         if self.get_vision_tower() is None:
             vision_tower = build_vision_tower(model_args)
