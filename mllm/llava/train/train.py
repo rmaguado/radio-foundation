@@ -427,9 +427,9 @@ class SupervisedDataset(Dataset):
         self.tokenizer = tokenizer
 
         self.dataset = RadiologyReportDataset(
-            root_path=data_args.data_path,
-            dataset_name=data_args.dataset_name,
-            channels=data_args.data_path,
+            root_path=data_args.root_path,
+            dataset_name=data_args.db_name,
+            channels=data_args.channels,
             mean=data_args.data_mean,
             std=data_args.data_std,
         )
@@ -498,9 +498,7 @@ def make_supervised_data_module(
     tokenizer: transformers.PreTrainedTokenizer, data_args
 ) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
-    train_dataset = SupervisedDataset(
-        tokenizer=tokenizer, data_path=data_args.data_path
-    )
+    train_dataset = SupervisedDataset(tokenizer=tokenizer, data_args=data_args)
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     return dict(
         train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator
@@ -514,6 +512,8 @@ def train(attn_implementation=None):
         (ModelArguments, DataArguments, TrainingArguments)
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    model_args.image_tokens = data_args.image_tokens
     local_rank = training_args.local_rank
 
     if model_args.vision_tower is not None:
