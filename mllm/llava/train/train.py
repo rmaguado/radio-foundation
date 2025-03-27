@@ -37,6 +37,7 @@ from mllm.llava import conversation as conversation_lib
 from mllm.llava.model import *
 from mllm.llava.mm_utils import tokenizer_image_token
 from mllm.llava.train.dataset import RadiologyReportDataset
+from mllm.llava.logging import setup_logging
 
 
 local_rank = None
@@ -110,6 +111,8 @@ class TrainingArguments(transformers.TrainingArguments):
     lora_bias: str = "none"
     mm_projector_lr: float = 1e-4
     group_by_modality_length: bool = field(default=False)
+    report_to: str = field(default=None)
+    log_dir: str = field(default=None)
 
 
 def maybe_zero_3(param, ignore_status=False, name=None):
@@ -241,25 +244,22 @@ def preprocess_multimodal(sources: Sequence[str], data_args: DataArguments) -> D
         return sources
 
     for source in sources:
-        for sentence in source:
-            if DEFAULT_IMAGE_TOKEN in sentence["value"]:
-                sentence["value"] = (
-                    f"{DEFAULT_IMAGE_TOKEN}\n"
-                    + sentence["value"].replace(DEFAULT_IMAGE_TOKEN, "").strip()
-                )
-                if conversation_lib.default_conversation.multimodal:
-                    sentence["value"] = sentence["value"].replace(
-                        DEFAULT_IMAGE_TOKEN,
-                        "<Image>" + DEFAULT_IMAGE_TOKEN + "</Image>",
-                    )
-            replace_token = DEFAULT_IMAGE_TOKEN
-            if data_args.mm_use_im_start_end:
-                replace_token = (
-                    DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
-                )
-            sentence["value"] = sentence["value"].replace(
-                DEFAULT_IMAGE_TOKEN, replace_token
+        if DEFAULT_IMAGE_TOKEN in source["value"]:
+            source["value"] = (
+                f"{DEFAULT_IMAGE_TOKEN}\n"
+                + source["value"].replace(DEFAULT_IMAGE_TOKEN, "").strip()
             )
+            if conversation_lib.default_conversation.multimodal:
+                source["value"] = source["value"].replace(
+                    DEFAULT_IMAGE_TOKEN,
+                    "<Image>" + DEFAULT_IMAGE_TOKEN + "</Image>",
+                )
+        replace_token = DEFAULT_IMAGE_TOKEN
+        if data_args.mm_use_im_start_end:
+            replace_token = (
+                DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
+            )
+        source["value"] = source["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
 
     return sources
 
@@ -512,6 +512,10 @@ def train(attn_implementation=None):
         (ModelArguments, DataArguments, TrainingArguments)
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    if training_args.log_dir is None:
+        training_args.log_dir = training_args.output_dir
+    setup_logging(output=training_args.log_dir, name="mllm")
 
     model_args.image_tokens = data_args.image_tokens
     local_rank = training_args.local_rank

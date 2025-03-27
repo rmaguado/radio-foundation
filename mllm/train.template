@@ -5,7 +5,7 @@
 #SBATCH --job-name=$NAME
 #SBATCH --output=$OUT/$NAME/%j.out
 #SBATCH --nodes=1
-#SBATCH --nodelist=compute-cuda-03
+#SBATCH --nodelist=compute-cuda-02
 #SBATCH --cpus-per-task=$WORKERS
 
 #SBATCH --ntasks-per-node=$GPUS
@@ -21,4 +21,4 @@ conda activate mllm
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
-srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS ./mllm/scripts/pretrain.sh
+srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS ./mllm/scripts/pretrain.sh $NAME
