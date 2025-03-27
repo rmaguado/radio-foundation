@@ -77,11 +77,11 @@ class RadiologyReportDataset(NiftiCtVolumesFull):
             ("length", np.uint32),
         ]
         entries = []
-        row_ids, lengths = self.cursor.execute(
+        row_id_lengths = self.cursor.execute(
             f"SELECT rowid, length FROM global"
         ).fetchall()
 
-        for rowid, length in zip(row_ids, lengths):
+        for rowid, length in row_id_lengths:
             entries.append((rowid, length))
 
         entries_array = np.array(entries, dtype=entries_dtype)
