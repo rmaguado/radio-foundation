@@ -1,11 +1,11 @@
 from .dino_encoder import DINOVisionTower
 
 
-def build_vision_tower(vision_tower_cfg, **kwargs):
+def build_vision_tower(vision_tower_cfg, delay_load=True):
     vision_tower = getattr(
         vision_tower_cfg,
         "mm_vision_tower",
         getattr(vision_tower_cfg, "vision_tower", None),
     )
 
-    return DINOVisionTower(vision_tower, args=vision_tower_cfg, **kwargs)
+    return DINOVisionTower(vision_tower, args=vision_tower_cfg, delay_load=True)
