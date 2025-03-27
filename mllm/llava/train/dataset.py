@@ -93,6 +93,9 @@ class RadiologyReportDataset(NiftiCtVolumesFull):
     def get_lengths(self):
         return self.entries["length"]
 
+    def process_report(self, report_text):
+        return report_text
+
     def get_image_data(self, index: int) -> torch.Tensor:
         rowid, _ = self.entries[index]
         self.cursor.execute(
