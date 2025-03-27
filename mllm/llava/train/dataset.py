@@ -36,8 +36,8 @@ class ImageProcessor:
         )
         return rearrange(image, "1 1 (g c) w h -> g c w h", g=groups, c=self.channels)
 
-    def __call__(self, image):
-        image = self.resize(image)
+    def __call__(self, image, slice_thickness):
+        image = self.resize(image, slice_thickness)
         image = self.normalize(image)
         return image
 
@@ -97,7 +97,7 @@ class RadiologyReportDataset(NiftiCtVolumesFull):
         rowid, _ = self.entries[index]
         self.cursor.execute(
             """
-            SELECT dataset, axial_dim, nifti_path, report, slice_thickness FROM global WHERE rowid = ?
+            SELECT dataset, axial_dim, nifti_path, text, slice_thickness FROM global WHERE rowid = ?
             """,
             (int(rowid),),
         )
