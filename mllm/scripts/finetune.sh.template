@@ -3,7 +3,7 @@
 deepspeed mllm/llava/train/train_xformers.py \
     --deepspeed mllm/scripts/zero3.json \
     --model_name_or_path mllm/checkpoints/Llama3.1-8B-Instruct \
-    --conv_template plain \
+    --conv_template llama_3_mm \
     --root_path /abs/path/to/data/ \
     --db_name CT-RATE_train_reports \
     --channels 10 \
