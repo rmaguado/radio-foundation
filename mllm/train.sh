@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export DHOME="$HOME/projects/radio-foundation"
-export OUT="$DHOME/mllm/runs"
+export OUT="$DHOME/runs"
 
 if [ ! -e $DHOME/sjob.template ]; then
   echo "sjob.template not found"
