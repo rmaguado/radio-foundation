@@ -21,29 +21,34 @@ class Conversation:
     messages: List[List[str]]
     offset: int
     sep_style: SeparatorStyle
-    multimodal: bool = False
 
     def parse_plain(self, messages):
-        prompt = self.system
-        if self.multimodal:
-            prompt += f"<Image>{DEFAULT_IMAGE_TOKEN}</Image>"
+        chunks = []
         for i, (role, message) in enumerate(messages):
             if message:
-                prompt += "###" + message + "\n"
-        return prompt
+                chunks.append((message + "\n", role == "gpt"))
+        return chunks
 
     def parse_llama_3(self, messagse):
-        prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>{self.system}<|eot_id|>"
-        if self.multimodal:
-            prompt += f"<Image>{DEFAULT_IMAGE_TOKEN}</Image>"
+        chunks = []
+        chunks.append(
+            (
+                f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>{self.system}<|eot_id|>",
+                False,
+            )
+        )
         for i, (role, message) in enumerate(messages):
-            prompt += f"<|start_header_id|>{role}<|end_header_id|>"
-            if message:
-                prompt += f"{message}<|eot_id|>"
-        return prompt
+            chunks.append(
+                (f"<|start_header_id|>{self.roles[role]}<|end_header_id|>", False)
+            )
+            chunks.append((f"{message}<|eot_id|>", self.roles == "gpt"))
+        return chunks
 
     def get_prompt(self):
         messages = self.messages
+        assert (
+            messages[0][0] == "human"
+        ), f"First message must be from human. received: {messages}"
 
         if self.sep_style == SeparatorStyle.PLAIN:
             return self.parse_plain(messages)
@@ -63,7 +68,6 @@ class Conversation:
             messages=self.messages.copy(),
             offset=self.offset,
             sep_style=self.sep_style,
-            multimodal=self.multimodal,
         )
 
     def dict(self):
@@ -86,7 +90,6 @@ conv_llava_plain = Conversation(
 conv_llama_3 = Conversation(
     system="A chat between a curious user and an artificial intelligence assistant. The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language. The visual content will be provided with the following format: <Image>visual content</Image>.",
     roles=("user", "assistant"),
-    multimodal=True,
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.LLAMA_3,

@@ -46,7 +46,6 @@ local_rank = None
 @dataclass
 class ModelArguments:
     model_name_or_path: Optional[str] = field(default="facebook/opt-125m")
-    conv_template: Optional[str] = field(default="plain")
     freeze_backbone: bool = field(default=False)
     tune_mm_mlp_adapter: bool = field(default=False)
     vision_tower: Optional[str] = field(default=None)
@@ -75,6 +74,7 @@ class DataArguments:
     data_std: float = field(default=1.0)
     is_multimodal: bool = False
     image_tokens: int = 128
+    conv_template: Optional[str] = field(default="plain")
 
 
 @dataclass
@@ -238,180 +238,31 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: st
         trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
 
 
-def preprocess_multimodal(sources: Sequence[str], data_args: DataArguments) -> Dict:
-    is_multimodal = data_args.is_multimodal
-    if not is_multimodal:
-        return sources
-
-    for source in sources:
-        if DEFAULT_IMAGE_TOKEN in source["value"]:
-            source["value"] = (
-                f"{DEFAULT_IMAGE_TOKEN}\n"
-                + source["value"].replace(DEFAULT_IMAGE_TOKEN, "").strip()
-            )
-            if conversation_lib.default_conversation.multimodal:
-                source["value"] = source["value"].replace(
-                    DEFAULT_IMAGE_TOKEN,
-                    "<Image>" + DEFAULT_IMAGE_TOKEN + "</Image>",
-                )
-        replace_token = DEFAULT_IMAGE_TOKEN
-        if data_args.mm_use_im_start_end:
-            replace_token = (
-                DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
-            )
-        source["value"] = source["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
-
-    return sources
-
-
-def preprocess_llama_3(
-    sources, tokenizer: transformers.PreTrainedTokenizer, has_image: bool = False
-) -> Dict:
-    """
-    sources is a list of list of dict, each dict has two keys: "from" and "value".
-    """
-
-    conv = conversation_lib.default_conversation.copy()
-    roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
-
-    # Apply prompt templates
-    conversations = []
-    for i, source in enumerate(sources):
-        if roles[source[0]["from"]] != conv.roles[0]:
-            # Skip the first one if it is not from human
-            source = source[1:]
-
-        conv.messages = []
-        for j, sentence in enumerate(source):
-            role = roles[sentence["from"]]
-            assert role == conv.roles[j % 2], f"{i}"
-            conv.append_message(role, sentence["value"])
-        conversations.append(conv.get_prompt())
-
-    # Tokenize conversations
-
-    if has_image:
-        input_ids = torch.stack(
-            [
-                tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
-                for prompt in conversations
-            ],
-            dim=0,
-        )
-    else:
-        input_ids = torch.tensor(
-            tokenizer(
-                conversations,
-                return_tensors="pt",
-                padding="longest",
-                max_length=tokenizer.model_max_length,
-                truncation=True,
-            ).input_ids,
-            dtype=torch.long,
-        )
-
-    targets = input_ids.clone()
-    assert conv.sep_style == conversation_lib.SeparatorStyle.TWO
-
-    # Mask targets
-    sep = conv.sep + conv.roles[1]
-    for conversation, target in zip(conversations, targets):
-        total_len = int(target.ne(tokenizer.pad_token_id).sum())
-
-        rounds = conversation.split(conv.sep)
-        re_rounds = [conv.sep.join(rounds[:3])]
-        for conv_idx in range(3, len(rounds), 2):
-            re_rounds.append(conv.sep.join(rounds[conv_idx : conv_idx + 2]))
-        cur_len = 0
-        target[:cur_len] = IGNORE_INDEX
-        for i, rou in enumerate(re_rounds):
-            if rou == "":
-                break
-
-            parts = rou.split(sep)
-            if len(parts) != 2:
-                break
-            parts[0] += sep
-
-            if has_image:
-                round_len = len(tokenizer_image_token(rou, tokenizer)) + 1
-                instruction_len = len(tokenizer_image_token(parts[0], tokenizer))
-            else:
-                round_len = len(tokenizer(rou).input_ids) + 1
-                instruction_len = len(tokenizer(parts[0]).input_ids)
-
-            if i > 0:
-                round_len -= 1
-                instruction_len -= 1
-
-            target[cur_len : cur_len + instruction_len] = IGNORE_INDEX
-
-            cur_len += round_len
-        target[cur_len:] = IGNORE_INDEX
-
-        if cur_len < tokenizer.model_max_length:
-            if cur_len != total_len:
-                target[:] = IGNORE_INDEX
-                logging.warning(
-                    f"tokenization mismatch: {cur_len} vs. {total_len}. (ignored)"
-                )
-
-    return dict(
-        input_ids=input_ids,
-        labels=targets,
-    )
-
-
-def preprocess_plain(
-    sources: Sequence[str],
-    tokenizer: transformers.PreTrainedTokenizer,
-) -> Dict:
-    """
-    Given a list of sources, each is a conversation list. This transform:
-    1. Add signal '### ' at the beginning each sentence, with end signal '\n';
-    2. Concatenate conversations together;
-    3. Tokenize the concatenated conversation;
-    4. Make a deepcopy as the target. Mask human words with IGNORE_INDEX.
-    """
-    conversations = []
-    for source in sources:
-        assert len(source) == 2
-        assert DEFAULT_IMAGE_TOKEN in source[0]["value"]
-        source[0]["value"] = DEFAULT_IMAGE_TOKEN
-        conversation = (
-            source[0]["value"]
-            + source[1]["value"]
-            + conversation_lib.default_conversation.sep
-        )
-        conversations.append(conversation)
-    # tokenize conversations
-    input_ids = [
-        tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
-        for prompt in conversations
-    ]
-    targets = copy.deepcopy(input_ids)
-    for target, source in zip(targets, sources):
-        tokenized_len = len(tokenizer_image_token(source[0]["value"], tokenizer))
-        target[:tokenized_len] = IGNORE_INDEX
-
-    return dict(input_ids=input_ids, labels=targets)
-
-
 def preprocess(
     sources: Sequence[str],
     tokenizer: transformers.PreTrainedTokenizer,
+    conversation: conversation_lib.Conversation,
     has_image: bool = False,
 ) -> Dict:
-    if (
-        conversation_lib.default_conversation.sep_style
-        == conversation_lib.SeparatorStyle.PLAIN
-    ):
-        return preprocess_plain(sources, tokenizer)
-    if (
-        conversation_lib.default_conversation.sep_style
-        == conversation_lib.SeparatorStyle.LLAMA_3
-    ):
-        return preprocess_llama_3(sources, tokenizer, has_image=has_image)
+    conversation.messages = []
+    for source in sources:
+        conversation.append_message(source["from"], source["value"])
+    prompt_chunks = conversation.get_prompt()
+
+    input_ids = []
+    targets = []
+    for prompt, ignore in prompt_chunks:
+        ids = tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
+        input_ids.append(ids)
+        if ignore:
+            targets.append(torch.tensor([tokenizer.pad_token_id] * len(ids)))
+        else:
+            targets.append(ids.clone())
+
+    input_ids = torch.cat(input_ids, dim=0)
+    targets = torch.cat(targets, dim=0)
+
+    return dict(input_ids=input_ids, labels=targets)
 
 
 class SupervisedDataset(Dataset):
@@ -436,6 +287,15 @@ class SupervisedDataset(Dataset):
         self.data_args = data_args
         self.image_tokens = self.data_args.image_tokens
 
+        if data_args.conv_template in conversation_lib.conv_templates:
+            self.conversation_template = conversation_lib.conv_templates[
+                data_args.conv_template
+            ]
+        else:
+            raise ValueError(
+                f"Unknown conversation template: {data_args.conv_template}"
+            )
+
     def __len__(self):
         return len(self.dataset)
 
@@ -448,14 +308,21 @@ class SupervisedDataset(Dataset):
         data_dict = {}
 
         image, text = self.dataset[i]
-        sources = [{"from": "human", "value": text}]
-        sources = preprocess_multimodal(copy.deepcopy(sources), self.data_args)
+        sources = [
+            {"from": "human", "value": f"<Image>{DEFAULT_IMAGE_TOKEN}</Image>"},
+            {"from": "gpt", "value": text},
+        ]
 
-        data_dict = preprocess(sources, self.tokenizer, has_image=True)
+        data_dict = preprocess(
+            copy.deepcopy(sources),
+            self.tokenizer,
+            self.conversation_template,
+            has_image=True,
+        )
 
         return dict(
-            input_ids=data_dict["input_ids"][0],
-            labels=data_dict["labels"][0],
+            input_ids=data_dict["input_ids"],
+            labels=data_dict["labels"],
             image=image,
         )
 
@@ -576,14 +443,6 @@ def train(attn_implementation=None):
         use_fast=False,
     )
 
-    tokenizer.pad_token = tokenizer.unk_token
-    if model_args.conv_template in conversation_lib.conv_templates:
-        conversation_lib.default_conversation = conversation_lib.conv_templates[
-            model_args.conv_template
-        ]
-    else:
-        raise ValueError(f"Unknown conversation template: {model_args.conv_template}")
-
     if model_args.vision_tower is not None:
         model.get_model().initialize_vision_modules(
             model_args=model_args, fsdp=training_args.fsdp
@@ -619,6 +478,9 @@ def train(attn_implementation=None):
         training_args.use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
         model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
+
+    tokenizer.pad_token = "<|finetune_right_pad_id|>"
+    tokenizer.pad_token_id = 128004
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     trainer = LLaVATrainer(
