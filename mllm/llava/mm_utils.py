@@ -89,3 +89,35 @@ def tokenizer_image_token(
             return torch.tensor(input_ids, dtype=torch.long)
         raise ValueError(f"Unsupported tensor type: {return_tensors}")
     return input_ids
+
+
+def detokenizer_image_token(
+    token_ids,
+    tokenizer,
+):
+    """
+    Converts a sequence of token IDs back to a string, replacing image tokens with a placeholder.
+
+    Args:
+        token_ids (list[int]): List of token IDs.
+        tokenizer: Tokenizer with a decode method.
+
+    Returns:
+        str: The reconstructed text with image placeholders.
+    """
+    text_chunks = []
+    current_chunk = []
+
+    for token in token_ids:
+        if token == image_token_index:
+            if current_chunk:
+                text_chunks.append(tokenizer.decode(current_chunk))
+                current_chunk = []
+            text_chunks.append("<image>")
+        else:
+            current_chunk.append(token)
+
+    if current_chunk:
+        text_chunks.append(tokenizer.decode(current_chunk))
+
+    return " ".join(text_chunks).strip()
