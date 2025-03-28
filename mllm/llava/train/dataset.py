@@ -23,7 +23,7 @@ class ImageProcessor:
         target_height = self.img_size * h // w
 
         if slice_thickness < self.min_zspacing:
-            target_slices = slices * self.min_zspacing / slice_thickness
+            target_slices = int(slices * self.min_zspacing / slice_thickness)
         else:
             target_slices = slices
 
