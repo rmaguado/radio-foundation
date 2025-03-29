@@ -243,7 +243,6 @@ def preprocess(
     sources: Sequence[str],
     tokenizer: transformers.PreTrainedTokenizer,
     conversation: conversation_lib.Conversation,
-    has_image: bool = False,
 ) -> Dict:
     conversation.messages = []
     for source in sources:
@@ -318,7 +317,6 @@ class SupervisedDataset(Dataset):
             copy.deepcopy(sources),
             self.tokenizer,
             self.conversation_template,
-            has_image=True,
         )
 
         return dict(

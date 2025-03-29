@@ -1,6 +1,5 @@
 import os
 import torch
-import torch.nn as nn
 
 from torch.utils.data import Sampler
 
@@ -10,7 +9,6 @@ from transformers.trainer import (
     get_parameter_names,
     has_length,
     ALL_LAYERNORM_LAYERS,
-    logger,
 )
 from typing import List, Optional
 
