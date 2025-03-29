@@ -112,9 +112,10 @@ class RadiologyReportDataset(NiftiCtVolumesFull):
         volume_data = nifti_file.get_fdata().astype(np.float32)
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
         volume_data = torch.from_numpy(volume_data)
+        volume_data = self.process_ct(volume_data)
         volume_data = self.image_processor(volume_data, slice_thickness)
 
-        return self.process_ct(volume_data), report
+        return volume_data, report
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
