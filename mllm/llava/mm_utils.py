@@ -91,16 +91,14 @@ def tokenizer_image_token(
     return input_ids
 
 
-def detokenizer_image_token(
-    token_ids,
-    tokenizer,
-):
+def detokenizer_image_token(token_ids, tokenizer, image_token_index=IMAGE_TOKEN_INDEX):
     """
     Converts a sequence of token IDs back to a string, replacing image tokens with a placeholder.
 
     Args:
         token_ids (list[int]): List of token IDs.
         tokenizer: Tokenizer with a decode method.
+        image_token_index (int): The token ID representing an image.
 
     Returns:
         str: The reconstructed text with image placeholders.
@@ -120,4 +118,4 @@ def detokenizer_image_token(
     if current_chunk:
         text_chunks.append(tokenizer.decode(current_chunk))
 
-    return " ".join(text_chunks).strip()
+    return "".join(text_chunks).strip()
