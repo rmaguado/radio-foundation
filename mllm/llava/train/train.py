@@ -251,11 +251,11 @@ def preprocess(
 
     input_ids = []
     targets = []
-    for prompt, ignore in prompt_chunks:
+    for prompt, is_target in prompt_chunks:
         ids = tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
         input_ids.append(ids)
-        if ignore:
-            targets.append(torch.tensor([tokenizer.pad_token_id] * len(ids)))
+        if not is_target:
+            targets.append(torch.tensor([IGNORE_INDEX] * len(ids)))
         else:
             targets.append(ids.clone())
 
