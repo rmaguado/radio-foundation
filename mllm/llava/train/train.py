@@ -41,6 +41,7 @@ from mllm.llava.logging import setup_logging
 
 
 local_rank = None
+logger = logging.getLogger("mllm")
 
 
 @dataclass
@@ -122,7 +123,7 @@ def maybe_zero_3(param, ignore_status=False, name=None):
     if hasattr(param, "ds_id"):
         if param.ds_status == ZeroParamStatus.NOT_AVAILABLE:
             if not ignore_status:
-                logging.warning(
+                logger.warning(
                     f"{name}: param.ds_status != ZeroParamStatus.NOT_AVAILABLE: {param.ds_status}"
                 )
         with zero.GatheredParameters([param]):
@@ -432,7 +433,7 @@ def train(attn_implementation=None):
                 model.to(torch.bfloat16)
             if training_args.fp16:
                 model.to(torch.float16)
-        ## TODO: Add log here "Adding LoRA adapters."
+        logger.info("Adding LoRA adapters.")
         model = get_peft_model(model, lora_config)
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
