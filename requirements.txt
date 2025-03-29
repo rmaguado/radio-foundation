@@ -10,3 +10,7 @@ pandas
 scikit-learn
 matplotlib
 tabulate
+omegaconf
+fvcore
+einops
+pickleshare
