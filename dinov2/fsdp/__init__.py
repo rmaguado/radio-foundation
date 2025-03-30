@@ -18,7 +18,7 @@ from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torch.distributed.fsdp._runtime_utils import _reshard
 
-import distributed
+import dinov2.distributed as distributed
 
 
 def get_fsdp_wrapper(model_cfg, modules_to_wrap=set()):

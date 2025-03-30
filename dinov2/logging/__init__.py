@@ -9,7 +9,7 @@ import os
 import sys
 from typing import Optional
 
-import distributed
+import dinov2.distributed as distributed
 
 
 # So that calling _configure_logger multiple times won't add many handlers

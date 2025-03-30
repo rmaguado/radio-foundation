@@ -37,7 +37,6 @@ from mllm.llava.model import *
 from mllm.llava.mm_utils import tokenizer_image_token
 from mllm.llava.train.dataset import RadiologyReportDataset
 from mllm.llava.logging import setup_logging
-import distributed
 
 
 local_rank = None
@@ -374,12 +373,7 @@ def make_supervised_data_module(
     )
 
 
-def setup():
-    distributed.enable(overwrite=True)
-
-
 def train(attn_implementation=None):
-    setup()
     global local_rank
 
     parser = transformers.HfArgumentParser(
