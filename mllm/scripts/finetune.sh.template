@@ -1,9 +1,11 @@
 #!/bin/bash
 
+export NAME=$1
+
 deepspeed mllm/llava/train/train_xformers.py \
     --deepspeed mllm/scripts/zero3.json \
-    --model_name_or_path mllm/checkpoints/Llama3.1-8B-Instruct \
-    --conv_template llama_3_mm \
+    --model_name_or_path meta-llama/Llama-3.1-8B-Instruct \
+    --conv_template llama_3 \
     --root_path /abs/path/to/data/ \
     --db_name CT-RATE_train_reports \
     --channels 10 \
@@ -19,7 +21,8 @@ deepspeed mllm/llava/train/train_xformers.py \
     --mm_use_im_patch_token False \
     --group_by_modality_length True \
     --bf16 True \
-    --output_dir mllm/checkpoints/llava-v1.5-13b \
+    --log_dir runs/$NAME \
+    --output_dir runs/$NAME/checkpoints \
     --num_train_epochs 1 \
     --per_device_train_batch_size 16 \
     --gradient_accumulation_steps 1 \
@@ -36,5 +39,3 @@ deepspeed mllm/llava/train/train_xformers.py \
     --model_max_length 2048 \
     --gradient_checkpointing True \
     --dataloader_num_workers 4 \
-    --lazy_preprocess True \
-    --report_to wandb
