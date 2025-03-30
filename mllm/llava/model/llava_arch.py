@@ -390,7 +390,7 @@ class LlavaMetaForCausalLM(ABC):
 
         if "llama_3" in model_args.model_name_or_path:
             tokenizer.pad_token = "<|finetune_right_pad_id|>"
-            # tokenizer.pad_token_id = 128004 ### might need to uncomment this later ###
+            tokenizer.pad_token_id = 128004
         else:
             tokenizer.pad_token = tokenizer.unk_token
 
