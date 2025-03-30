@@ -126,24 +126,8 @@ class LlavaMetaForCausalLM(ABC):
         images,
         image_sizes=None,
     ):
-        vision_tower = self.get_vision_tower()
-        if vision_tower is None or images is None or input_ids.shape[1] == 1:
-            return (
-                input_ids,
-                position_ids,
-                attention_mask,
-                past_key_values,
-                None,
-                labels,
-            )
 
         image_features = self.encode_images(images)
-
-        # TODO: image start / end is not implemented here to support pretraining.
-        if getattr(self.config, "tune_mm_mlp_adapter", False) and getattr(
-            self.config, "mm_use_im_start_end", False
-        ):
-            raise NotImplementedError
 
         # Let's just add dummy tensors if they do not exist,
         # it is a headache to deal with None all the time.
