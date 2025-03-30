@@ -4,7 +4,7 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- [ ] evaluation dataloader without caching
+- [ ] try possible fix for llava linux kernel: downgrade protobuf to version 3.20.3
 - [ ] Randomise sagital and coronal views for nifti dataloader if spacing is cube.
 - [ ] update userguide for data processing
 
