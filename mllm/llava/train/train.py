@@ -22,7 +22,6 @@ import pathlib
 from typing import Dict, Optional, Sequence
 from torch.utils.data import Dataset
 import torch
-
 import transformers
 
 from mllm.llava.constants import (
@@ -38,6 +37,7 @@ from mllm.llava.model import *
 from mllm.llava.mm_utils import tokenizer_image_token
 from mllm.llava.train.dataset import RadiologyReportDataset
 from mllm.llava.logging import setup_logging
+import distributed
 
 
 local_rank = None
@@ -309,7 +309,10 @@ class SupervisedDataset(Dataset):
 
         image, text = self.dataset[i]
         sources = [
-            {"from": "human", "value": f"<Image>{DEFAULT_IMAGE_TOKEN}</Image>"},
+            {
+                "from": "human",
+                "value": f"{DEFAULT_IM_START_TOKEN}{DEFAULT_IMAGE_TOKEN}{DEFAULT_IM_END_TOKEN}",
+            },
             {"from": "gpt", "value": text},
         ]
 
@@ -371,7 +374,12 @@ def make_supervised_data_module(
     )
 
 
+def setup():
+    distributed.enable(overwrite=True)
+
+
 def train(attn_implementation=None):
+    setup()
     global local_rank
 
     parser = transformers.HfArgumentParser(

@@ -86,7 +86,7 @@ conv_llava_plain = Conversation(
 )
 
 conv_llama_3 = Conversation(
-    system="A chat between a curious user and an artificial intelligence assistant. The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language. The visual content will be provided with the following format: <Image>visual content</Image>.",
+    system="A chat between a curious user and an artificial intelligence assistant. The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language. The visual content will be provided with the following format: {DEFAULT_IM_START_TOKEN}visual content{DEFAULT_IM_END_TOKEN}.",
     roles=("user", "assistant"),
     messages=(),
     offset=0,
