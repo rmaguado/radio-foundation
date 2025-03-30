@@ -1,12 +1,25 @@
+import os
+import copy
 import torch
 from torchvision import transforms
 import numpy as np
 import nibabel as nib
-import os
 from typing import Tuple, Any
 from einops import rearrange
+from typing import Dict, Sequence
+from torch.utils.data import Dataset
+from transformers import PreTrainedTokenizer
 
 from dinov2.data.datasets.niftis import NiftiCtVolumesFull
+from mllm.llava.mm_utils import tokenizer_image_token
+from mllm.llava import conversation as conversation_lib
+from mllm.llava.constants import (
+    IGNORE_INDEX,
+    DEFAULT_IMAGE_TOKEN,
+    DEFAULT_IM_START_TOKEN,
+    DEFAULT_IM_END_TOKEN,
+)
+from mllm.llava.train.parser import DataArguments
 
 
 class ImageProcessor:
@@ -42,7 +55,7 @@ class ImageProcessor:
         return image
 
 
-class RadiologyReportDataset(NiftiCtVolumesFull):
+class _ReportDataset(NiftiCtVolumesFull):
     def __init__(
         self,
         root_path: str,
@@ -124,3 +137,93 @@ class RadiologyReportDataset(NiftiCtVolumesFull):
             raise RuntimeError(f"can not read image/report for sample {index}") from e
 
         return image, report
+
+
+def preprocess(
+    sources: Sequence[str],
+    tokenizer: PreTrainedTokenizer,
+    conversation: conversation_lib.Conversation,
+) -> Dict:
+    conversation.messages = []
+    for source in sources:
+        conversation.append_message(source["from"], source["value"])
+    prompt_chunks = conversation.get_prompt()
+
+    input_ids = []
+    targets = []
+    for prompt, is_target in prompt_chunks:
+        ids = tokenizer_image_token(prompt, tokenizer, return_tensors="pt")
+        input_ids.append(ids)
+        if not is_target:
+            targets.append(torch.tensor([IGNORE_INDEX] * len(ids)))
+        else:
+            targets.append(ids.clone())
+
+    input_ids = torch.cat(input_ids, dim=0)
+    targets = torch.cat(targets, dim=0)
+
+    return dict(input_ids=input_ids, labels=targets)
+
+
+class RadiologyReportDataset(Dataset):
+    """Dataset for supervised fine-tuning."""
+
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        data_args: DataArguments,
+    ):
+        super().__init__()
+
+        self.tokenizer = tokenizer
+
+        self.dataset = _ReportDataset(
+            root_path=data_args.root_path,
+            dataset_name=data_args.db_name,
+            channels=data_args.channels,
+            mean=data_args.data_mean,
+            std=data_args.data_std,
+        )
+        self.data_args = data_args
+        self.image_tokens = self.data_args.image_tokens
+
+        if data_args.conv_template in conversation_lib.conv_templates:
+            self.conversation_template = conversation_lib.conv_templates[
+                data_args.conv_template
+            ]
+        else:
+            raise ValueError(
+                f"Unknown conversation template: {data_args.conv_template}"
+            )
+
+    def __len__(self):
+        return len(self.dataset)
+
+    @property
+    def modality_lengths(self):
+        return self.dataset.lengths
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+
+        data_dict = {}
+
+        image, text = self.dataset[i]
+        sources = [
+            {
+                "from": "human",
+                "value": f"{DEFAULT_IM_START_TOKEN}{DEFAULT_IMAGE_TOKEN}{DEFAULT_IM_END_TOKEN}",
+            },
+            {"from": "gpt", "value": text},
+        ]
+
+        data_dict = preprocess(
+            copy.deepcopy(sources),
+            self.tokenizer,
+            self.conversation_template,
+        )
+
+        return dict(
+            input_ids=data_dict["input_ids"],
+            labels=data_dict["labels"],
+            image=image,
+        )
