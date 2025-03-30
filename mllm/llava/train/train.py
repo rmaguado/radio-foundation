@@ -515,4 +515,7 @@ def train(attn_implementation=None):
 
 
 if __name__ == "__main__":
-    train()
+    try:
+        train()
+    except Exception as e:
+        logger.exception(e)

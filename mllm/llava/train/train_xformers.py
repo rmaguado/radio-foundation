@@ -7,4 +7,7 @@ replace_llama_attn_with_xformers_attn()
 from mllm.llava.train.train import train
 
 if __name__ == "__main__":
-    train()
+    try:
+        train()
+    except Exception as e:
+        logger.exception(e)
