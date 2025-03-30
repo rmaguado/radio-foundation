@@ -52,18 +52,6 @@ def get_local_rank() -> int:
     return _LOCAL_RANK
 
 
-def get_local_size() -> int:
-    """
-    Returns:
-        The size of the per-machine process group,
-        i.e. the number of processes per machine.
-    """
-    if not is_enabled():
-        return 1
-    assert 0 <= _LOCAL_RANK < _LOCAL_WORLD_SIZE
-    return _LOCAL_WORLD_SIZE
-
-
 def is_main_process() -> bool:
     """
     Returns:
@@ -273,7 +261,7 @@ def enable(
             _check_env_variable(key, value)
         os.environ[key] = value
 
-    dist.init_process_group(backend="nccl", timeout=datetime.timedelta(hours=2))
+    dist.init_process_group(backend="nccl", timeout=datetime.timedelta(minutes=30))
     dist.barrier()
 
     # Finalize setup

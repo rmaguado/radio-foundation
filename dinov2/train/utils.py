@@ -3,7 +3,7 @@ import math
 import torch
 import logging
 
-import dinov2.distributed as distributed
+import distributed
 
 
 logger = logging.getLogger("dinov2")
