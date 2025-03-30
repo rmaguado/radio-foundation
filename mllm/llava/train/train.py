@@ -22,7 +22,6 @@ import pathlib
 from typing import Dict, Optional, Sequence
 from torch.utils.data import Dataset
 import torch
-
 import transformers
 
 from mllm.llava.constants import (
@@ -38,6 +37,7 @@ from mllm.llava.model import *
 from mllm.llava.mm_utils import tokenizer_image_token
 from mllm.llava.train.dataset import RadiologyReportDataset
 from mllm.llava.logging import setup_logging
+import distributed
 
 
 local_rank = None
@@ -73,7 +73,7 @@ class DataArguments:
     channels: int = field(default=1)
     data_mean: float = field(default=0.0)
     data_std: float = field(default=1.0)
-    is_multimodal: bool = False
+    is_multimodal: bool = True
     image_tokens: int = 128
     conv_template: Optional[str] = field(default="plain")
 
@@ -309,7 +309,10 @@ class SupervisedDataset(Dataset):
 
         image, text = self.dataset[i]
         sources = [
-            {"from": "human", "value": f"<Image>{DEFAULT_IMAGE_TOKEN}</Image>"},
+            {
+                "from": "human",
+                "value": f"{DEFAULT_IM_START_TOKEN}{DEFAULT_IMAGE_TOKEN}{DEFAULT_IM_END_TOKEN}",
+            },
             {"from": "gpt", "value": text},
         ]
 
@@ -371,7 +374,12 @@ def make_supervised_data_module(
     )
 
 
+def setup():
+    distributed.enable(overwrite=True)
+
+
 def train(attn_implementation=None):
+    setup()
     global local_rank
 
     parser = transformers.HfArgumentParser(
@@ -386,20 +394,13 @@ def train(attn_implementation=None):
     model_args.image_tokens = data_args.image_tokens
     local_rank = training_args.local_rank
 
-    if model_args.vision_tower is not None:
-        model = LlavaLlamaForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            attn_implementation=attn_implementation,
-            torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-        )
-    else:
-        model = transformers.LlamaForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            attn_implementation=attn_implementation,
-            torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-        )
+    model = LlavaLlamaForCausalLM.from_pretrained(
+        model_args.model_name_or_path,
+        cache_dir=training_args.cache_dir,
+        attn_implementation=attn_implementation,
+        torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+    )
+
     model.config.use_cache = False
 
     if model_args.freeze_backbone:
@@ -442,44 +443,38 @@ def train(attn_implementation=None):
         use_fast=False,
     )
 
-    if model_args.vision_tower is not None:
-        model.get_model().initialize_vision_modules(
-            model_args=model_args, fsdp=training_args.fsdp
-        )
+    model.get_model().initialize_vision_modules(
+        model_args=model_args, fsdp=training_args.fsdp
+    )
 
-        vision_tower = model.get_vision_tower()
-        vision_tower.to(
-            dtype=torch.bfloat16 if training_args.bf16 else torch.float16,
-            device=training_args.device,
-        )
+    vision_tower = model.get_vision_tower()
+    vision_tower.to(
+        dtype=torch.bfloat16 if training_args.bf16 else torch.float16,
+        device=training_args.device,
+    )
 
-        data_args.is_multimodal = True
+    model.config.tokenizer_model_max_length = tokenizer.model_max_length
 
-        model.config.tokenizer_model_max_length = tokenizer.model_max_length
+    model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter = (
+        model_args.tune_mm_mlp_adapter
+    )
+    if model_args.tune_mm_mlp_adapter:
+        model.requires_grad_(False)
+        for p in model.get_model().mm_projector.parameters():
+            p.requires_grad = True
 
-        model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter = (
-            model_args.tune_mm_mlp_adapter
-        )
-        if model_args.tune_mm_mlp_adapter:
-            model.requires_grad_(False)
-            for p in model.get_model().mm_projector.parameters():
-                p.requires_grad = True
+    model.config.freeze_mm_mlp_adapter = training_args.freeze_mm_mlp_adapter
+    if training_args.freeze_mm_mlp_adapter:
+        for p in model.get_model().mm_projector.parameters():
+            p.requires_grad = False
 
-        model.config.freeze_mm_mlp_adapter = training_args.freeze_mm_mlp_adapter
-        if training_args.freeze_mm_mlp_adapter:
-            for p in model.get_model().mm_projector.parameters():
-                p.requires_grad = False
-
-        model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = (
-            model_args.mm_use_im_start_end
-        )
-        model.config.mm_projector_lr = training_args.mm_projector_lr
-        training_args.use_im_start_end = model_args.mm_use_im_start_end
-        model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
-        model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
-
-    tokenizer.pad_token = "<|finetune_right_pad_id|>"
-    tokenizer.pad_token_id = 128004
+    model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = (
+        model_args.mm_use_im_start_end
+    )
+    model.config.mm_projector_lr = training_args.mm_projector_lr
+    training_args.use_im_start_end = model_args.mm_use_im_start_end
+    model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
+    model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     trainer = LLaVATrainer(

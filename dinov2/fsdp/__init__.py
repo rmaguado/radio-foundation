@@ -7,7 +7,6 @@ import os
 from typing import Any
 
 import torch
-import dinov2.distributed as distributed
 from functools import partial
 from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -18,6 +17,8 @@ from torch.distributed.fsdp import FullStateDictConfig
 from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torch.distributed.fsdp._runtime_utils import _reshard
+
+import distributed
 
 
 def get_fsdp_wrapper(model_cfg, modules_to_wrap=set()):

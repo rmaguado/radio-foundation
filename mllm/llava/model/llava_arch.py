@@ -388,6 +388,12 @@ class LlavaMetaForCausalLM(ABC):
             tokenizer.add_tokens([DEFAULT_IMAGE_PATCH_TOKEN], special_tokens=True)
             self.resize_token_embeddings(len(tokenizer))
 
+        if "llama_3" in model_args.model_name_or_path:
+            tokenizer.pad_token = "<|finetune_right_pad_id|>"
+            # tokenizer.pad_token_id = 128004 ### might need to uncomment this later ###
+        else:
+            tokenizer.pad_token = tokenizer.unk_token
+
         if model_args.mm_use_im_start_end:
             num_new_tokens = tokenizer.add_tokens(
                 [DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN], special_tokens=True
