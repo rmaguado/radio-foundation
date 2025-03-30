@@ -10,7 +10,7 @@ import os
 import sqlite3
 
 import torch.distributed as dist
-from distributed import is_main_process, is_enabled
+from dinov2.distributed import is_main_process, is_enabled
 
 
 class BaseDataset:
