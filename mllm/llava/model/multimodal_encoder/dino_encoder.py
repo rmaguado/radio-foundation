@@ -64,10 +64,15 @@ class DINOVisionTower(nn.Module):
 
     @torch.no_grad()
     def forward(self, images):
+        if isinstance(images, torch.Tensor):
+            images = [images]
+        features = []
         with self.autocast_ctx():
-            features = self.feature_model.get_intermediate_layers(
-                images, [self.select_layer], return_class_token=self.use_cls
-            )
+            for img in images:
+                img_features = self.feature_model.get_intermediate_layers(
+                    images, [self.select_layer], return_class_token=self.use_cls
+                )
+                features.append(img_features)
 
         return features
 
