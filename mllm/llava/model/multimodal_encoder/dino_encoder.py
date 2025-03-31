@@ -21,8 +21,6 @@ class DINOVisionTower(nn.Module):
         self.use_cls = self.select_feature == "cls_patch"
         self.path_to_checkpoint = args.mm_vision_checkpoint_path
 
-        self.load_model()
-
         if not delay_load:
             self.load_model()
         elif getattr(args, "unfreeze_mm_vision_tower", False):
@@ -75,8 +73,6 @@ class DINOVisionTower(nn.Module):
                 )
                 features.append(img_features[0])
 
-        print(features[0].shape)
-
         return features
 
     @property
@@ -106,7 +102,7 @@ class DINOVisionTower(nn.Module):
 
     @property
     def hidden_size(self):
-        return self.model_config.student.embed_dim
+        return self.vision_tower.embed_dim
 
     @property
     def num_patches_per_side(self):
