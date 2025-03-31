@@ -40,7 +40,7 @@ class LlavaMetaModel:
             vision_tower = vision_tower[0]
         return vision_tower
 
-    def initialize_vision_modules(self, model_args, dtype, device, fsdp=None):
+    def initialize_vision_modules(self, model_args, device, fsdp=None):
         mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
         pretrain_mm_mlp_adapter = model_args.pretrain_mm_mlp_adapter
@@ -50,17 +50,12 @@ class LlavaMetaModel:
 
         vision_tower = build_vision_tower(model_args)
 
-        print(vision_tower.__dict__.keys())
-
         if fsdp is not None and len(fsdp) > 0:
             self.vision_tower = [vision_tower]
         else:
             self.vision_tower = vision_tower
 
-        self.vision_tower.to(
-            dtype=dtype,
-            device=device,
-        )
+        self.vision_tower.to(device=device)
 
         self.config.use_mm_proj = True
         self.config.mm_projector_type = getattr(
@@ -118,17 +113,11 @@ class LlavaMetaForCausalLM(ABC):
 
         image_features = self.encode_images(images)
 
-        # Let's just add dummy tensors if they do not exist,
-        # it is a headache to deal with None all the time.
-        # But it is not ideal, and if you have a better idea,
-        # please open an issue / submit a PR, thanks.
-        _labels = labels
-        _position_ids = position_ids
-        _attention_mask = attention_mask
         if attention_mask is None:
             attention_mask = torch.ones_like(input_ids, dtype=torch.bool)
         else:
             attention_mask = attention_mask.bool()
+
         if position_ids is None:
             position_ids = torch.arange(
                 0, input_ids.shape[1], dtype=torch.long, device=input_ids.device
@@ -136,7 +125,8 @@ class LlavaMetaForCausalLM(ABC):
         if labels is None:
             labels = torch.full_like(input_ids, IGNORE_INDEX)
 
-        # remove the padding using attention_mask -- FIXME
+        # TODO: remove add padding in the collator as it will be removed and readded here
+        # remove the padding using attention_mask
         input_ids = [
             cur_input_ids[cur_attention_mask]
             for cur_input_ids, cur_attention_mask in zip(input_ids, attention_mask)
@@ -150,7 +140,7 @@ class LlavaMetaForCausalLM(ABC):
         new_labels = []
         cur_image_idx = 0
         for batch_idx, cur_input_ids in enumerate(input_ids):
-            num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
+            num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()  # should be 1
             if num_images == 0:
                 cur_image_features = image_features[cur_image_idx]
                 cur_input_embeds_1 = self.get_model().embed_tokens(cur_input_ids)
@@ -181,7 +171,7 @@ class LlavaMetaForCausalLM(ABC):
                 )
             split_sizes = [x.shape[0] for x in cur_labels_noim]
             cur_input_embeds = self.get_model().embed_tokens(
-                torch.cat(cur_input_ids_noim)
+                torch.cat(cur_input_ids_noim).to(self.device)
             )
             cur_input_embeds_no_im = torch.split(cur_input_embeds, split_sizes, dim=0)
             cur_new_input_embeds = []
@@ -190,6 +180,7 @@ class LlavaMetaForCausalLM(ABC):
             for i in range(num_images + 1):
                 cur_new_input_embeds.append(cur_input_embeds_no_im[i])
                 cur_new_labels.append(cur_labels_noim[i])
+
                 if i < num_images:
                     cur_image_features = image_features[cur_image_idx]
                     cur_image_idx += 1
@@ -205,8 +196,8 @@ class LlavaMetaForCausalLM(ABC):
 
             cur_new_input_embeds = [x.to(self.device) for x in cur_new_input_embeds]
 
-            cur_new_input_embeds = torch.cat(cur_new_input_embeds)
-            cur_new_labels = torch.cat(cur_new_labels)
+            cur_new_input_embeds = torch.cat(cur_new_input_embeds, dim=0)
+            cur_new_labels = torch.cat(cur_new_labels, dim=0)
 
             new_input_embeds.append(cur_new_input_embeds)
             new_labels.append(cur_new_labels)
@@ -286,20 +277,7 @@ class LlavaMetaForCausalLM(ABC):
                         0, cur_len, dtype=position_ids.dtype, device=position_ids.device
                     )
 
-        new_input_embeds = torch.stack(new_input_embeds_padded, dim=0)
-
-        if _labels is None:
-            new_labels = None
-        else:
-            new_labels = new_labels_padded
-
-        if _attention_mask is None:
-            attention_mask = None
-        else:
-            attention_mask = attention_mask.to(dtype=_attention_mask.dtype)
-
-        if _position_ids is None:
-            position_ids = None
+        new_input_embeds = torch.stack(new_input_embeds_padded, dim=0).to(self.device)
 
         return (
             None,
@@ -307,7 +285,7 @@ class LlavaMetaForCausalLM(ABC):
             attention_mask,
             past_key_values,
             new_input_embeds,
-            new_labels,
+            new_labels_padded,
         )
 
     def initialize_vision_tokenizer(self, model_args, tokenizer):
