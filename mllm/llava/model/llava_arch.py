@@ -34,15 +34,17 @@ class LlavaMetaModel:
     def __init__(self, config):
         super().__init__(config)
 
-        if hasattr(config, "mm_vision_tower"):
-            self.vision_tower = build_vision_tower(config, delay_load=True)
-            self.mm_projector = build_vision_projector(config)
-
     def get_vision_tower(self):
         vision_tower = getattr(self, "vision_tower", None)
         if type(vision_tower) is list:
             vision_tower = vision_tower[0]
         return vision_tower
+
+    def get_vision_projector(self):
+        vision_projector = getattr(self, "mm_projector", None)
+        if type(vision_projector) is list:
+            vision_projector = vision_projector[0]
+        return vision_projector
 
     def initialize_vision_modules(self, model_args, fsdp=None):
         vision_tower = model_args.vision_tower
