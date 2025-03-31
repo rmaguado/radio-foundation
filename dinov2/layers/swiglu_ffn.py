@@ -6,9 +6,13 @@
 import os
 from typing import Callable, Optional
 import warnings
+import logging
 
 from torch import Tensor, nn
 import torch.nn.functional as F
+
+
+logger = logging.getLogger("dinov2")
 
 
 class SwiGLUFFN(nn.Module):
@@ -35,19 +39,21 @@ class SwiGLUFFN(nn.Module):
 
 
 XFORMERS_ENABLED = os.environ.get("XFORMERS_DISABLED") is None
+
 try:
     if XFORMERS_ENABLED:
         from xformers.ops import SwiGLU
 
         XFORMERS_AVAILABLE = True
-        # warnings.warn("xFormers is available (SwiGLU)")
     else:
-        # warnings.warn("xFormers is disabled (SwiGLU)")
-        raise ImportError
-except ImportError:
+        XFORMERS_AVAILABLE = False
+except ImportError as e:
+    XFORMERS_AVAILABLE = False
+    logger.exception(f"Importing xformers failed: {e},")
+
+if not XFORMERS_AVAILABLE:
     SwiGLU = SwiGLUFFN
     XFORMERS_AVAILABLE = False
-
     warnings.warn("xFormers is not available (SwiGLU)")
 
 
