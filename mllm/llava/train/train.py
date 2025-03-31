@@ -76,10 +76,8 @@ def train(attn_implementation=None):
         use_fast=False,
     )
 
-    dtype = torch.bfloat16 if training_args.bf16 else torch.float16
     model.get_model().initialize_vision_modules(
         model_args=model_args,
-        dtype=dtype,
         device=training_args.device,
         fsdp=training_args.fsdp,
     )
