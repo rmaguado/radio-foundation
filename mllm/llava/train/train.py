@@ -24,11 +24,9 @@ from mllm.llava.train.llava_trainer import LLaVATrainer
 
 from mllm.llava.model import *
 from mllm.llava.logging import setup_logging
-from mllm.llava.train import (
-    get_args,
-    configure_lora,
-    save_model,
-)
+from mllm.llava.train.parser import get_args
+from mllm.llava.train.lora import configure_lora
+from mllm.llava.train.save import save_model
 from mllm.llava.data.data import make_supervised_data_module
 
 
@@ -78,14 +76,12 @@ def train(attn_implementation=None):
         use_fast=False,
     )
 
+    dtype = torch.bfloat16 if training_args.bf16 else torch.float16
     model.get_model().initialize_vision_modules(
-        model_args=model_args, fsdp=training_args.fsdp
-    )
-
-    vision_tower = model.get_vision_tower()
-    vision_tower.to(
-        dtype=torch.bfloat16 if training_args.bf16 else torch.float16,
+        model_args=model_args,
+        dtype=dtype,
         device=training_args.device,
+        fsdp=training_args.fsdp,
     )
 
     model.config.tokenizer_model_max_length = tokenizer.model_max_length
