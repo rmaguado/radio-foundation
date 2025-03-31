@@ -11,7 +11,7 @@ def get_global_rank():
 
 
 def setup_logging(
-    output: Optional[str] = None,
+    output: str = None,
     *,
     name: Optional[str] = None,
     level: int = logging.DEBUG,
@@ -42,25 +42,17 @@ def setup_logging(
     datefmt = "%Y%m%d %H:%M:%S"
     formatter = logging.Formatter(fmt=fmt, datefmt=datefmt)
 
-    if get_global_rank() == 0:
-        handler = logging.StreamHandler(stream=sys.stdout)
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+    if os.path.splitext(output)[-1] in (".txt", ".log"):
+        filename = output
+    else:
+        filename = os.path.join(output, "logs", "log.txt")
 
-    if output:
-        if os.path.splitext(output)[-1] in (".txt", ".log"):
-            filename = output
-        else:
-            filename = os.path.join(output, "logs", "log.txt")
+    global_rank = get_global_rank()
+    filename = filename + ".rank{}".format(global_rank)
 
-        if not get_global_rank() == 0:
-            global_rank = get_global_rank()
-            filename = filename + ".rank{}".format(global_rank)
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-
-        handler = logging.StreamHandler(open(filename, "a", encoding="utf-8"))
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+    handler = logging.StreamHandler(open(filename, "a", encoding="utf-8"))
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)

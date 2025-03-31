@@ -21,4 +21,6 @@ conda activate mllm
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
-srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS ./mllm/scripts/pretrain.sh $NAME
+deepspeed mllm/llava/train/train.py \
+    --deepspeed "mllm/configs/deepspeed/zero3.json" \
+    --config_path $CONF

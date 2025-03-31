@@ -1,0 +1,26 @@
+model:
+  model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
+  freeze_backbone: False
+  tune_mm_mlp_adapter: False
+  vision_tower: "dino-vit-base-patch14-10"
+  mm_vision_select_layer: -1
+  pretrain_mm_mlp_adapter: None
+  mm_vision_config_path: None
+  mm_vision_checkpoint_path: None
+data:
+  root_path: None
+  db_name: "CT-RATE_train_reports"
+  channels: 10
+  data_mean: -573.8
+  data_std: 461.3
+  image_tokens: 128
+  conv_template: "plain"
+train:
+  cache_dir: None
+  per_device_train_batch_size: 16
+  gradient_accumulation_steps: 1
+  optim: "adamw_torch"
+  freeze_mm_mlp_adapter: False
+  learning_rate: 2e-5
+  mm_projector_lr: 1e-4
+  log_dir: None

@@ -21,14 +21,11 @@ import transformers
 
 from mllm.llava.train.llava_trainer import LLaVATrainer
 
-
 from mllm.llava.model import *
-from mllm.llava.logging import setup_logging
-from mllm.llava.train.parser import get_args
 from mllm.llava.train.lora import configure_lora
 from mllm.llava.train.save import save_model
 from mllm.llava.data.data import make_supervised_data_module
-
+from mllm.llava.train.config import load_config
 
 local_rank = None
 logger = logging.getLogger("mllm")
@@ -36,9 +33,7 @@ logger = logging.getLogger("mllm")
 
 def train(attn_implementation=None):
 
-    model_args, data_args, training_args = get_args()
-
-    setup_logging(output=training_args.log_dir, name="mllm")
+    model_args, data_args, training_args = load_config()
 
     global local_rank
     local_rank = training_args.local_rank
@@ -97,12 +92,7 @@ def train(attn_implementation=None):
         for p in model.get_model().mm_projector.parameters():
             p.requires_grad = False
 
-    model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = (
-        model_args.mm_use_im_start_end
-    )
     model.config.mm_projector_lr = training_args.mm_projector_lr
-    training_args.use_im_start_end = model_args.mm_use_im_start_end
-    model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
     model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
@@ -126,3 +116,5 @@ if __name__ == "__main__":
         train()
     except Exception as e:
         logger.exception(e)
+    finally:
+        torch.distributed.destroy_process_group()
