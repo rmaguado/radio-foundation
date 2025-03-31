@@ -44,6 +44,9 @@ class DINOVisionTower(nn.Module):
         )
         load_pretrained_weights(self.vision_tower, self.path_to_checkpoint, "teacher")
 
+        if self.select_layer < 0:
+            self.select_layer = self.vision_tower.n_blocks + self.select_layer
+
         teacher_dtype_str = (
             self.model_config.compute_precision.teacher.backbone.mixed_precision.param_dtype
         )
@@ -63,22 +66,28 @@ class DINOVisionTower(nn.Module):
         self.is_loaded = True
 
     @torch.no_grad()
-    def forward(self, images):
-        if isinstance(images, torch.Tensor):
-            images = [images]
+    def forward(self, images: list):
         features = []
         with self.autocast_ctx():
             for img in images:
-                img_features = self.feature_model.get_intermediate_layers(
-                    images, [self.select_layer], return_class_token=self.use_cls
+                img_features = self.vision_tower.get_intermediate_layers(
+                    img, [self.select_layer], return_class_token=self.use_cls
                 )
-                features.append(img_features)
+                features.append(img_features[0])
+
+        print(features[0].shape)
 
         return features
 
     @property
     def dummy_feature(self):
-        return torch.zeros(1, self.hidden_size, device=self.device, dtype=self.dtype)
+        num_tokens = self.num_patches
+        if self.use_cls:
+            num_tokens += 1
+
+        return torch.zeros(
+            1, num_tokens, self.hidden_size, device=self.device, dtype=self.dtype
+        )
 
     @property
     def dtype(self):
@@ -97,7 +106,7 @@ class DINOVisionTower(nn.Module):
 
     @property
     def hidden_size(self):
-        return self.model_config.student.full_image_size
+        return self.model_config.student.embed_dim
 
     @property
     def num_patches_per_side(self):
