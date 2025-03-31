@@ -40,35 +40,27 @@ class LlavaMetaModel:
             vision_tower = vision_tower[0]
         return vision_tower
 
-    def get_vision_projector(self):
-        vision_projector = getattr(self, "mm_projector", None)
-        if type(vision_projector) is list:
-            vision_projector = vision_projector[0]
-        return vision_projector
-
-    def initialize_vision_modules(self, model_args, fsdp=None):
-        vision_tower = model_args.vision_tower
+    def initialize_vision_modules(self, model_args, dtype, device, fsdp=None):
         mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
         pretrain_mm_mlp_adapter = model_args.pretrain_mm_mlp_adapter
-        mm_patch_merge_type = model_args.mm_patch_merge_type
 
-        self.config.mm_vision_tower = vision_tower
+        self.config.mm_vision_tower = model_args.vision_tower
         self.config.image_tokens = model_args.image_tokens
 
-        if self.get_vision_tower() is None:
-            vision_tower = build_vision_tower(model_args)
+        vision_tower = build_vision_tower(model_args)
 
-            if fsdp is not None and len(fsdp) > 0:
-                self.vision_tower = [vision_tower]
-            else:
-                self.vision_tower = vision_tower
+        print(vision_tower.__dict__.keys())
+
+        if fsdp is not None and len(fsdp) > 0:
+            self.vision_tower = [vision_tower]
         else:
-            if fsdp is not None and len(fsdp) > 0:
-                vision_tower = self.vision_tower[0]
-            else:
-                vision_tower = self.vision_tower
-            vision_tower.load_model()
+            self.vision_tower = vision_tower
+
+        self.vision_tower.to(
+            dtype=dtype,
+            device=device,
+        )
 
         self.config.use_mm_proj = True
         self.config.mm_projector_type = getattr(
@@ -77,15 +69,8 @@ class LlavaMetaModel:
         self.config.mm_hidden_size = vision_tower.hidden_size
         self.config.mm_vision_select_layer = mm_vision_select_layer
         self.config.mm_vision_select_feature = mm_vision_select_feature
-        self.config.mm_patch_merge_type = mm_patch_merge_type
 
-        if getattr(self, "mm_projector", None) is None:
-            self.mm_projector = build_vision_projector(self.config)
-
-        else:
-            # In case it is frozen by LoRA
-            for p in self.mm_projector.parameters():
-                p.requires_grad = True
+        self.mm_projector = build_vision_projector(self.config)
 
         if pretrain_mm_mlp_adapter is not None:
             mm_projector_weights = torch.load(
@@ -102,6 +87,8 @@ class LlavaMetaModel:
             self.mm_projector.load_state_dict(
                 get_w(mm_projector_weights, "mm_projector")
             )
+
+        self.mm_projector.to(device)
 
 
 class LlavaMetaForCausalLM(ABC):
