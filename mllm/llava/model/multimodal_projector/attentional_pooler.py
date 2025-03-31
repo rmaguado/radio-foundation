@@ -75,19 +75,21 @@ class AttentionalPoolProjector(nn.Module):
         self.mlp = nn.Linear(hidden_dim, hidden_dim)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, mask=None):
-        batch_size, axial_dim, num_tokens, embed_dim = x.size()
+    def forward(self, embeddings, mask=None):
 
-        x = rearrange(x, "b a t e  -> (b a) t e")
+        projected_embeddings = []
 
-        x = self.token_resampler(x)
+        for x in embeddings:
 
-        x = rearrange(x, "(b a) t d -> b (a t) d", a=axial_dim)
+            print(x.shape)
 
-        mask = mask.unsqueeze(1).repeat(1, self.patch_resample_tokens, 1)
+            axial_dim, num_tokens, embed_dim = x.size()
 
-        mask = rearrange(mask, "b a t -> b (a t)")
+            x = self.token_resampler(x)
+            x = rearrange(x, "a t d -> 1 (a t) d")
+            x = self.axial_resampler(x)
+            x = self.mlp(x)
 
-        x = self.axial_resampler(x, mask=mask)
+            projected_embeddings.append(x)
 
-        return self.mlp(x)
+        return projected_embeddings
