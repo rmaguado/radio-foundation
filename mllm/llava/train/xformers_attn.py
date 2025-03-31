@@ -10,8 +10,6 @@ import torch
 import transformers.models.llama.modeling_llama
 from torch import nn
 
-from mllm.llava.train.train import train
-
 logger = logging.getLogger("mllm")
 
 try:

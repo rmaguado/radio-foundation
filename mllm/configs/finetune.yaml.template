@@ -16,11 +16,9 @@ data:
   image_tokens: 128
   conv_template: "plain"
 train:
-  cache_dir: None
   per_device_train_batch_size: 16
   gradient_accumulation_steps: 1
   optim: "adamw_torch"
   freeze_mm_mlp_adapter: False
   learning_rate: 2e-5
   mm_projector_lr: 1e-4
-  log_dir: None

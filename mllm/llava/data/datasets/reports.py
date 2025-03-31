@@ -19,7 +19,6 @@ from mllm.llava.constants import (
     DEFAULT_IM_START_TOKEN,
     DEFAULT_IM_END_TOKEN,
 )
-from mllm.llava.train.parser import DataArguments
 
 
 class ImageProcessor:
@@ -168,11 +167,7 @@ def preprocess(
 class RadiologyReportDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
-    def __init__(
-        self,
-        tokenizer: PreTrainedTokenizer,
-        data_args: DataArguments,
-    ):
+    def __init__(self, tokenizer: PreTrainedTokenizer, data_args):
         super().__init__()
 
         self.tokenizer = tokenizer

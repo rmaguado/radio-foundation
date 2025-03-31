@@ -20,12 +20,10 @@ data:
   conv_template: "plain"
 train:
   deepspeed: "/path/to/deepspeed.json"
-  cache_dir: None
+  cache_dir: "mllm/cache"
   optim: "adamw_torch"
   freeze_mm_mlp_adapter: False
   model_max_length: 512
-  double_quant: True
-  quant_type: "nf4"
   bits: 16
   lora_enable: False
   lora_r: 64
@@ -37,7 +35,6 @@ train:
   mm_projector_lr: 1e-4
   group_by_modality_length: False
   report_to: "none"
-  log_dir: None
   num_train_epochs: 1
   per_device_train_batch_size: 32
   gradient_accumulation_steps: 1

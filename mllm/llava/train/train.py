@@ -19,19 +19,23 @@ import pathlib
 import torch
 import transformers
 
-from mllm.llava.train.llava_trainer import LLaVATrainer
+from mllm.llava.train.trainer import LLaVATrainer
 
 from mllm.llava.model import *
 from mllm.llava.train.lora import configure_lora
 from mllm.llava.train.save import save_model
 from mllm.llava.data.data import make_supervised_data_module
-from mllm.llava.train.config import load_config
+from mllm.llava.config import load_config
+
+from mllm.llava.train.xformers_attn import replace_llama_attn_with_xformers_attn
 
 local_rank = None
 logger = logging.getLogger("mllm")
 
 
 def train(attn_implementation=None):
+
+    replace_llama_attn_with_xformers_attn()
 
     model_args, data_args, training_args = load_config()
 

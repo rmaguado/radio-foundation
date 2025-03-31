@@ -5,6 +5,24 @@ from omegaconf import OmegaConf
 import argparse
 
 
+@dataclass
+class TrainingArguments(transformers.TrainingArguments):
+    cache_dir: Optional[str] = field(default=None)
+    optim: str = field(default="adamw_torch")
+    remove_unused_columns: bool = field(default=False)
+    freeze_mm_mlp_adapter: bool = field(default=False)
+    model_max_length: int = field(default=2048)
+    bits: int = field(default=16, metadata={"help": "How many bits to use."})
+    lora_enable: bool = False
+    lora_r: int = 64
+    lora_alpha: int = 16
+    lora_dropout: float = 0.05
+    lora_weight_path: str = ""
+    lora_bias: str = "none"
+    mm_projector_lr: Optional[float] = None
+    group_by_modality_length: bool = field(default=False)
+
+
 def get_argpase():
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument(
@@ -16,11 +34,16 @@ def get_argpase():
     parser.add_argument(
         "--deepspeed",
         type=str,
-        default="mllm/configs/deepspeed/zero3.json",
-        required=False,
+        required=True,
         help="Path to the .json file.",
     )
-    return parser
+    parser.add_argument(
+        "--local_rank",
+        type=int,
+        default=-1,
+        help="Rank of current process.",
+    )
+    return parser.parse_args()
 
 
 def load_config():
@@ -32,9 +55,7 @@ def load_config():
 
     model_args = cfg["model"]
     data_args = cfg["data"]
-    training_args = transformers.TrainingArguments(
-        **cfg["train"], deepspeed=args.deepspeed
-    )
+    training_args = TrainingArguments(**cfg["train"], deepspeed=args.deepspeed)
 
     model_args.image_tokens = data_args.image_tokens
 

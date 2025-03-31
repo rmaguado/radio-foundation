@@ -5,11 +5,11 @@
 #SBATCH --job-name=$NAME
 #SBATCH --output=$OUT/$NAME/%j.out
 #SBATCH --nodes=1
-#SBATCH --nodelist=compute-cuda-02
+#SBATCH --nodelist=$NODE
 #SBATCH --cpus-per-task=$WORKERS
 
 #SBATCH --ntasks-per-node=$GPUS
-#SBATCH --gres=gpu:$GPUTYPE:$GPUS
+#SBATCH --gres=gpu:$GPUS
 
 #SBATCH --mem=96GB
 #SBATCH --partition=odap-gpu
@@ -21,6 +21,13 @@ conda activate mllm
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
-deepspeed mllm/llava/train/train.py \
+export LOGDIR=$OUT/$NAME/logs
+mkdir -p $LOGDIR
+
+which python
+pip list | grep xformers
+
+deepspeed --enable_each_rank_log $LOGDIR mllm/llava/train/train.py \
     --deepspeed "mllm/configs/deepspeed/zero3.json" \
-    --config_path $CONF
+    --config_path $CONFIG \
+    
