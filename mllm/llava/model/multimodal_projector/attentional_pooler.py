@@ -81,8 +81,6 @@ class AttentionalPoolProjector(nn.Module):
 
         for x in embeddings:
 
-            print(x.shape)
-
             axial_dim, num_tokens, embed_dim = x.size()
 
             x = self.token_resampler(x)
@@ -90,6 +88,6 @@ class AttentionalPoolProjector(nn.Module):
             x = self.axial_resampler(x)
             x = self.mlp(x)
 
-            projected_embeddings.append(x)
+            projected_embeddings.append(x.squeeze())
 
         return projected_embeddings
