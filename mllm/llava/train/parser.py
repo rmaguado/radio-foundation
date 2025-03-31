@@ -70,7 +70,7 @@ class TrainingArguments(transformers.TrainingArguments):
     lora_bias: str = "none"
     mm_projector_lr: float = 1e-4
     group_by_modality_length: bool = field(default=False)
-    report_to: str = field(default=None)
+    report_to: str = field(default="none")
     log_dir: str = field(default=None)
 
 
@@ -81,8 +81,5 @@ def get_args():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     model_args.image_tokens = data_args.image_tokens
-
-    if training_args.log_dir is None:
-        training_args.log_dir = training_args.output_dir
 
     return model_args, data_args, training_args
