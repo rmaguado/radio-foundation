@@ -3,7 +3,7 @@ import torch.nn as nn
 from .attentional_pooler import AttentionalPoolProjector
 
 
-def build_vision_projector(config, delay_load=False, **kwargs):
+def build_vision_projector(config, **kwargs):
     projector_type = getattr(config, "mm_projector_type", "linear")
 
     if projector_type == "attn_pool":
