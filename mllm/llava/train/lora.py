@@ -2,7 +2,7 @@ import torch
 import logging
 
 
-logger = logging.getLogger("mllm")
+logger = logging.getLogger("DeepSpeed")
 
 
 def find_all_linear_names(model):

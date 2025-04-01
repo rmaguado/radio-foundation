@@ -4,7 +4,7 @@ import logging
 from transformers import Trainer
 
 
-logger = logging.getLogger("mllm")
+logger = logging.getLogger("DeepSpeed")
 
 
 def save_model(training_args, model, trainer):

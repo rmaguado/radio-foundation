@@ -30,10 +30,11 @@ from mllm.llava.config import load_config
 from mllm.llava.train.xformers_attn import replace_llama_attn_with_xformers_attn
 
 local_rank = None
-logger = logging.getLogger("mllm")
+logger = logging.getLogger("DeepSpeed")
 
 
 def train(attn_implementation=None):
+    logger.info("Starting training. ")
 
     replace_llama_attn_with_xformers_attn()
 

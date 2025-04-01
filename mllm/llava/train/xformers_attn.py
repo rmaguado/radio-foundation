@@ -10,7 +10,7 @@ import torch
 import transformers.models.llama.modeling_llama
 from torch import nn
 
-logger = logging.getLogger("mllm")
+logger = logging.getLogger("DeepSpeed")
 
 try:
     import xformers.ops
@@ -20,6 +20,7 @@ except ImportError:
 
 def replace_llama_attn_with_xformers_attn():
     transformers.models.llama.modeling_llama.LlamaAttention.forward = xformers_forward
+    logger.info("Replaced Llama attention with xFormers.")
 
 
 def xformers_forward(
