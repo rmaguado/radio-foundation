@@ -3,6 +3,7 @@ from typing import Optional
 import transformers
 from omegaconf import OmegaConf
 import argparse
+import os
 
 
 @dataclass
@@ -30,6 +31,12 @@ def get_argpase():
         type=str,
         required=True,
         help="Root path to the .yaml file.",
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        required=True,
+        help="Path in runs folder to save. ",
     )
     parser.add_argument(
         "--deepspeed",
@@ -60,5 +67,8 @@ def load_config():
     training_args = TrainingArguments(**cfg["train"], deepspeed=args.deepspeed)
 
     model_args.image_tokens = data_args.image_tokens
+
+    with open(os.path.join(args.output_path, "config.yaml"), "w") as f:
+        OmegaConf.save(config=cfg, f=f)
 
     return model_args, data_args, training_args
