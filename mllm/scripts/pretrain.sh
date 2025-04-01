@@ -12,7 +12,7 @@ export WORKERS=$5
 export CONFIG=$6
 
 if [ ! -z $5 ]; then 
-  printf "\n job name | $NAME\n     node | $NODE\nresources | gpu:$GPUS workers:$WORKERS \n\n"
+  printf "\n     name | $NAME\n     node | $NODE\nresources | gpu:$GPUS workers:$WORKERS \n\n"
   mkdir -p $OUT/$NAME
   envsubst '$NAME $NODE $GPUS $WORKERS $CONFIG $OUT' < $DHOME/mllm/scripts/pretrain.template > $OUT/$NAME/train.run
   sbatch $OUT/$NAME/train.run
