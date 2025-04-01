@@ -77,8 +77,8 @@ class ImageProcessor:
             "(g c) w h -> g c w h",
             g=groups,
             c=self.channels,
-            w=target_width,
-            h=target_height,
+            w=self.img_size,
+            h=self.img_size,
         )
 
     def __call__(self, image, slice_thickness):
