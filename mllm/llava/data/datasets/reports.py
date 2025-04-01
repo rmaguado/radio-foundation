@@ -42,13 +42,13 @@ class ImageProcessor:
             pad_1 = (w - h) // 2
             pad_2 = (w - h) - pad_1
             image = torch.nn.functional.pad(
-                image, (0, 0, pad_1, pad_2), value=self.pad_value
+                image, (0, 0, 0, 0, pad_1, pad_2), value=self.pad_value
             )
         else:
             pad_1 = (h - w) // 2
             pad_2 = (h - w) - pad_1
             image = torch.nn.functional.pad(
-                image, (pad_1, pad_2, 0, 0), value=self.pad_value
+                image, (0, 0, pad_1, pad_2, 0, 0), value=self.pad_value
             )
 
         return image
