@@ -4,7 +4,7 @@ model:
   freeze_projector: False
   vision_tower: "dino-vit-base-patch14-10"
   mm_vision_select_layer: -1
-  mm_projector_checkpoint_path: null
+  mm_projector_checkpoint_path: null # REQUIRED
   mm_vision_config_path: null # REQUIRED
   mm_vision_checkpoint_path: null # REQUIRED
 data:
