@@ -6,6 +6,5 @@
 *.tmp
 .env
 .bck
-/runs
-cache_embeddings.log
+**/*.log
 /models*
