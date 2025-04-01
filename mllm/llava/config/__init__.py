@@ -11,7 +11,6 @@ class TrainingArguments(transformers.TrainingArguments):
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
     remove_unused_columns: bool = field(default=False)
-    freeze_mm_mlp_adapter: bool = field(default=False)
     model_max_length: int = field(default=2048)
     bits: int = field(default=16, metadata={"help": "How many bits to use."})
     lora_enable: bool = False

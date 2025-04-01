@@ -43,7 +43,7 @@ class LlavaMetaModel:
     def initialize_vision_modules(self, model_args, device, torch_dtype, fsdp=None):
         mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
-        pretrain_mm_mlp_adapter = model_args.pretrain_mm_mlp_adapter
+        mm_projector_checkpoint_path = model_args.mm_projector_checkpoint_path
 
         self.config.mm_vision_tower = model_args.vision_tower
         self.config.image_tokens = model_args.image_tokens
@@ -67,9 +67,9 @@ class LlavaMetaModel:
 
         self.mm_projector = build_vision_projector(self.config)
 
-        if pretrain_mm_mlp_adapter is not None:
+        if mm_projector_checkpoint_path is not None:
             mm_projector_weights = torch.load(
-                pretrain_mm_mlp_adapter, map_location="cpu"
+                mm_projector_checkpoint_path, map_location="cpu"
             )
 
             def get_w(weights, keyword):

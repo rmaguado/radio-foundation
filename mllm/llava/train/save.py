@@ -98,7 +98,7 @@ def get_mm_adapter_state_maybe_zero_3(named_params, keys_to_match):
 def safe_save_model_for_hf_trainer(trainer: Trainer, output_dir: str):
     """Collects the state dict and dump to disk."""
 
-    if getattr(trainer.args, "tune_mm_mlp_adapter", False):
+    if not getattr(trainer.args, "freeze_projector", False):
         # Only save Adapter
         keys_to_match = ["mm_projector"]
         if getattr(trainer.args, "use_im_start_end", False):
