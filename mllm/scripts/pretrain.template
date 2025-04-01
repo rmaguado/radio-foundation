@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## NAME GPUS GPUTYPE WORKERS
+## NAME NODE GPUS NWORKERS CONFIG
 
 #SBATCH --job-name=$NAME
 #SBATCH --output=$OUT/$NAME/%j.out
@@ -21,13 +21,8 @@ conda activate mllm
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
-export LOGDIR=$OUT/$NAME/logs
-mkdir -p $LOGDIR
-
-which python
-pip list | grep xformers
-
-deepspeed --enable_each_rank_log $LOGDIR mllm/llava/train/train.py \
+deepspeed --enable_each_rank_log $OUT/$NAME/logs mllm/llava/train/train.py \
     --deepspeed "mllm/configs/deepspeed/zero3.json" \
     --config_path $CONFIG \
+    --output_path $OUT/$NAME
     
