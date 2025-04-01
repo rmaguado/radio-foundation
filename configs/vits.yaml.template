@@ -9,6 +9,7 @@ student:
   arch: vit_small
   ffn_layer: mlp
   drop_path_rate: 0.0
+  channels: 10
 teacher:
   warmup_teacher_temp_epochs: 30
 optim:
@@ -16,12 +17,13 @@ optim:
   warmup_epochs: 10
   base_lr: 0.003
 datasets:
-  - name: ct_niftis
+  - name: radiomics_datasets
+    weight: 1.0
     root_path: .
     type: ct
-    storage: nifti
+    storage: dicom
     augmentation: default_ct
-    channels: 4
+    channels: 10
     pixel_range:
       lower: -1000.0
       upper: 1900.0

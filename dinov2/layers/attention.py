@@ -25,9 +25,12 @@ try:
 
         XFORMERS_AVAILABLE = True
     else:
-        raise ImportError
-except ImportError:
+        XFORMERS_AVAILABLE = False
+except ImportError as e:
     XFORMERS_AVAILABLE = False
+    logger.exception(f"Importing xformers failed: {e},")
+
+if not XFORMERS_AVAILABLE:
     warnings.warn("xFormers is not available (Attention)")
 
 

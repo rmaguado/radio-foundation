@@ -18,12 +18,12 @@ def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
         param_group["lr"] = (last_layer_lr if is_last_layer else lr) * lr_multiplier
 
 
-def update_schedules(optimizer, schedulers, train_step):
-    lr = schedulers["lr"][train_step]
-    wd = schedulers["wd"][train_step]
-    momentum = schedulers["momentum"][train_step]
-    teacher_temp = schedulers["teacher_temp"][train_step]
-    last_layer_lr = schedulers["last_layer_lr"][train_step]
+def update_schedules(optimizer, schedulers, iteration):
+    lr = schedulers["lr"][iteration]
+    wd = schedulers["wd"][iteration]
+    momentum = schedulers["momentum"][iteration]
+    teacher_temp = schedulers["teacher_temp"][iteration]
+    last_layer_lr = schedulers["last_layer_lr"][iteration]
     apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
 
     return momentum, teacher_temp
@@ -49,7 +49,7 @@ def apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps):
         optimizer.step()
 
 
-def log_training_step(metric_logger, loss_dict, schedulers, train_step):
+def log_training_step(metric_logger, loss_dict, schedulers, iteration):
     if distributed.get_global_size() > 1:
         for v in loss_dict.values():
             torch.distributed.all_reduce(v)
@@ -58,16 +58,16 @@ def log_training_step(metric_logger, loss_dict, schedulers, train_step):
     }
 
     if math.isnan(sum(loss_dict_reduced.values())):
-        logger.error(f"NaN detected in reduced loss at training step {train_step}")
+        logger.error(f"NaN detected in reduced loss at iteration {iteration}")
         logger.info(f"Reduced loss dict: {loss_dict_reduced}")
         raise AssertionError
 
     losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
-    metric_logger.update(lr=schedulers["lr"][train_step])
-    metric_logger.update(wd=schedulers["wd"][train_step])
-    metric_logger.update(mom=schedulers["momentum"][train_step])
-    metric_logger.update(last_layer_lr=schedulers["last_layer_lr"][train_step])
+    metric_logger.update(lr=schedulers["lr"][iteration])
+    metric_logger.update(wd=schedulers["wd"][iteration])
+    metric_logger.update(mom=schedulers["momentum"][iteration])
+    metric_logger.update(last_layer_lr=schedulers["last_layer_lr"][iteration])
     metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
 
 

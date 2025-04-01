@@ -53,7 +53,6 @@ def train(
     img_mode: str,
     start_iter: int,
     max_iter: int,
-    train_step: int,
 ):
     fp16_scaler = model.fp16_scaler
     grad_accum_counter = 0
@@ -71,12 +70,13 @@ def train(
         "Training",
         max_iter,
         start_iter,
+        accum_steps,
     ):
         if iteration > max_iter:
             return
 
         if should_reset_grad(cfg, grad_accum_counter, accum_steps):
-            mom, teacher_temp = update_schedules(optimizer, schedulers, train_step)
+            mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
             optimizer.zero_grad(set_to_none=True)
 
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
@@ -84,17 +84,20 @@ def train(
         if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
             apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps)
             model.update_teacher(mom)
-            log_training_step(metric_logger, loss_dict, schedulers, train_step)
-            train_step += 1
 
-        if should_eval_model(cfg, iteration):
-            do_test(cfg, model, f"training_{iteration}")
-            torch.cuda.synchronize()
+            log_training_step(metric_logger, loss_dict, schedulers, iteration)
 
-        checkpointer.step(iteration)
+            checkpointer.step(iteration)
+
+            iteration += 1
+
+            if should_eval_model(cfg, iteration):
+                do_test(cfg, model, f"training_{iteration}")
+                torch.cuda.synchronize()
+
         grad_accum_counter += 1
-        iteration += 1
-    return iteration, train_step
+
+    return iteration
 
 
 def do_train(cfg, model, resume=False):
@@ -106,7 +109,6 @@ def do_train(cfg, model, resume=False):
         schedulers,
         checkpointer,
         start_iter,
-        train_step,
         max_iter,
         full_size_iter,
     ) = setup_training_components(cfg, model, resume)
@@ -124,12 +126,11 @@ def do_train(cfg, model, resume=False):
         data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=False)
         metric_logger.set_dataloader(data_loader)
 
-        iteration, train_step = train(
+        iteration = train(
             *train_components,
             img_mode="crop",
             start_iter=start_iter,
             max_iter=max_iter - full_size_iter,
-            train_step=train_step,
         )
 
         logger.info(f"Finished training on resize-crop images.")
@@ -142,7 +143,6 @@ def do_train(cfg, model, resume=False):
         img_mode="full",
         start_iter=iteration,
         max_iter=max_iter,
-        train_step=train_step,
     )
     logger.info("Finished training on full-size images")
 

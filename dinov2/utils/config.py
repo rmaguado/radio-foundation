@@ -3,7 +3,6 @@
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
 
-import math
 import logging
 import os
 
@@ -40,8 +39,13 @@ def default_setup(args):
     seed = getattr(args, "seed", 0)
     rank = distributed.get_global_rank()
 
+    if getattr(args, "debug", False):
+        logging_level = logging.DEBUG
+    else:
+        logging_level = logging.INFO
+
     global logger
-    setup_logging(output=args.output_dir, level=logging.INFO)
+    setup_logging(output=args.output_dir, level=logging_level)
     logger = logging.getLogger("dinov2")
 
     utils.fix_random_seeds(seed + rank)

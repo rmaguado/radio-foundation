@@ -21,6 +21,40 @@ def get_argpase():
     return parser
 
 
+class DicomProcessorDeepRDT(DicomProcessorBase):
+    def __init__(self, config: dict, database):
+        super().__init__(config, database)
+
+    def get_dcm_paths(self, scan_path) -> List[str]:
+        dcm_paths = [
+            os.path.join(scan_path, f)
+            for f in os.listdir(scan_path)
+            if f.endswith(".dcm") and f.startswith("CT")
+        ]
+        return dcm_paths
+
+    def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
+        """
+        Get paths to dicom files and their corresponding mapids.
+        """
+        paths_ids = []
+
+        mapids = [
+            folder
+            for folder in os.listdir(self.absolute_dataset_path)
+            if os.path.isdir(os.path.join(self.absolute_dataset_path, folder))
+            and "_" not in folder
+        ]
+
+        for mapid in mapids:
+            scan_path = os.path.join(self.absolute_dataset_path, mapid)
+
+            if os.path.isdir(scan_path):
+                paths_ids.append((scan_path, mapid))
+
+        return paths_ids
+
+
 def main(args):
     dataset_name = "DeepRDT-lung"
     db_name = "DeepRDT-lung_eval"
@@ -38,7 +72,7 @@ def main(args):
         "db_path": db_path,
     }
     database = DicomEvalBase(config)
-    processor = DicomProcessorBase(config, database)
+    processor = DicomProcessorDeepRDT(config, database)
     processor.prepare_dataset()
 
 

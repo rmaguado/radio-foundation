@@ -22,6 +22,32 @@ class ImageTransform:
         return normalized
 
 
+class ImageTransformResampleSlices:
+    def __init__(self, img_size, mean, std, target_slices=240, channels=10):
+        self.img_size = img_size
+        self.resize = transforms.Resize((img_size, img_size))
+        self.normalize = transforms.Normalize(mean=mean, std=std)
+
+        assert isinstance(target_slices, int), "target_slices must be an integer"
+
+        self.target_slices = target_slices
+        self.channels = channels
+
+    def resample_z(self, image):
+        groups, channels, w, h = image.shape
+        image = image.view(1, 1, groups * channels, w, h)
+        image = torch.nn.functional.interpolate(
+            image, size=(self.target_slices, w, h), mode="trilinear"
+        )
+        return image.view(-1, self.channels, w, h)
+
+    def __call__(self, image):
+        image = self.resize(image)
+        image = self.resample_z(image)
+        image = self.normalize(image)
+        return image
+
+
 class ImageTargetTransform:
     def __init__(self, img_size, mean, std):
         self.img_size = img_size
@@ -65,7 +91,7 @@ def extract_class_tokens(x_tokens_list, n_last_blocks=4):
         [class_token for _, class_token in x_tokens_list[-n_last_blocks:]],
         dim=-1,
     )
-    class_tokens = class_tokens.unsqueeze(0)
+    class_tokens = class_tokens.unsqueeze(1)
     return class_tokens
 
 
@@ -108,7 +134,7 @@ def get_autocast_dtype(cfg):
         return torch.float
 
 
-def load_model(path_to_run, checkpoint_name, device):
+def load_model(path_to_run, checkpoint_name, device, intermediate_layers=4):
     path_to_checkpoint = os.path.join(
         path_to_run, "eval", checkpoint_name, "teacher_checkpoint.pth"
     )
@@ -124,6 +150,8 @@ def load_model(path_to_run, checkpoint_name, device):
     autocast_ctx = partial(
         torch.autocast, enabled=True, dtype=autocast_dtype, device_type="cuda"
     )
-    feature_model = ModelWithIntermediateLayers(model, 4, autocast_ctx)
+    feature_model = ModelWithIntermediateLayers(
+        model, intermediate_layers, autocast_ctx
+    )
 
     return feature_model, config

@@ -74,7 +74,7 @@ class NiftiCtDataset(NiftiVolumes):
         root_path: str,
         channels: int = 1,
         lower_window: int = -1000,
-        upper_window: int = -1900,
+        upper_window: int = 1900,
         transform: Optional[Callable] = lambda _: _,
         target_transform: Optional[Callable] = lambda _: _,
     ) -> None:
@@ -158,27 +158,23 @@ class NiftiCtDataset(NiftiVolumes):
             slice_shape = slice_data.shape
             assert len(slice_shape) == 3, f"Slice shape is {slice_shape}."
 
-            return self.process_ct(slice_data)
+            return self.process_ct(torch.tensor(slice_data, dtype=torch.float32))
         except Exception as e:
             logger.exception(f"Error in loading slice {slice_index} from {nifti_path}.")
 
             return torch.zeros((self.channels, 512, 512), dtype=torch.float32)
 
-    def process_ct(self, volume_data: np.ndarray) -> torch.Tensor:
+    def process_ct(self, volume_data: torch.Tensor) -> torch.Tensor:
         """
         Processes the CT scan data.
 
         Args:
-            volume_data (np.ndarray): The CT scan data.
+            volume_data (torch.Tensor): The CT scan data.
 
         Returns:
             torch.Tensor: The processed CT scan data.
         """
-        volume_data = np.clip(volume_data, self.lower_window, self.upper_window)
-        # volume_data = (volume_data - self.lower_window) / (
-        #    self.upper_window - self.lower_window
-        # )
-        return torch.tensor(volume_data, dtype=torch.float32)
+        return torch.clip(volume_data, self.lower_window, self.upper_window)
 
 
 class NiftiCtVolumesFull(NiftiCtDataset):
@@ -187,7 +183,7 @@ class NiftiCtVolumesFull(NiftiCtDataset):
         super().__init__(*args, **kwargs)
 
     def get_entries_dir(self) -> str:
-        return os.path.join(self.entries_path, f"full.npy")
+        return os.path.join(self.entries_path, f"{self.channels}_channels_full.npy")
 
     def get_image_data(self, index: int) -> torch.Tensor:
         rowid = self.entries[index]
@@ -205,7 +201,7 @@ class NiftiCtVolumesFull(NiftiCtDataset):
         volume_data = nifti_file.get_fdata().astype(np.float32)
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
 
-        return self.process_ct(volume_data)
+        return self.process_ct(torch.tensor(volume_data, dtype=torch.float32))
 
     def get_target(self, index: int) -> Optional[Any]:
         raise NotImplementedError(

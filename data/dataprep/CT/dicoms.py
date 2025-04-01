@@ -279,7 +279,7 @@ class DicomProcessor:
                 series_dicoms.sort(key=lambda x: x[1].ImagePositionPatient[2])
             except AttributeError:
                 logger.warning(
-                    f"Series {series_id} does not have ImagePositionPatient attribute."
+                    f"Series {series_id} does not have ImagePositionPatient attribute. ({series_dicoms[0][0]})"
                 )
                 del grouped_dicoms[series_id]
 
@@ -350,7 +350,7 @@ class DicomProcessor:
                     for dicom_path, dicom in dicoms:
                         self.validator(dicom, data_folder)
                 except AssertionError as e:
-                    logger.error(f"Error validating {data_folder}: {e}")
+                    logger.exception(f"Error validating {data_folder}: {e}")
                     continue
                 except Exception as e:
                     logger.exception(f"Error validating {data_folder}: {e}")

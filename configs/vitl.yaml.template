@@ -1,0 +1,32 @@
+train:
+  batch_size_per_gpu: 56
+  grad_accum_steps: 9
+  full_image:
+    epochs: 5
+    batch_size_per_gpu: 14
+    grad_accum_steps: 36
+student:
+  arch: vit_large
+  ffn_layer: mlp
+  drop_path_rate: 0.4
+  channels: 10
+teacher:
+  warmup_teacher_temp_epochs: 30
+optim:
+  epochs: 100
+  warmup_epochs: 10
+  base_lr: 0.003
+datasets:
+  - name: radiomics_datasets
+    weight: 1.0
+    root_path: .
+    type: ct
+    storage: dicom
+    augmentation: default_ct
+    channels: 10
+    pixel_range:
+      lower: -1000.0
+      upper: 1900.0
+    norm:
+      mean: -573.8
+      std: 461.3

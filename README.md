@@ -4,8 +4,7 @@ This repository is an adaptation of the DINOv2 framework tailored specifically f
 
 ### TODO
 
-- [ ] tests for COVID-19-NY-SBU
-- [ ] script for running benchmark tests
+- [ ] try possible fix for llava linux kernel: downgrade protobuf to version 3.20.3
 - [ ] Randomise sagital and coronal views for nifti dataloader if spacing is cube.
 - [ ] update userguide for data processing
 
@@ -105,4 +104,12 @@ Below is an example command for training without a Slurm system:
 
 ```bash
 ./train.sh --devices 0,1,2,3 --config "configs/quicktest.yaml" --output "runs/quicktest"
+```
+
+# Multimodal
+
+Demo train script:
+
+```bash
+./mllm/scripts/pretrain.sh test compute-cuda-02 L40S 2 8 mllm/configs/pretrain.yaml
 ```
