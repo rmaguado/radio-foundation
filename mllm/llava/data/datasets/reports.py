@@ -71,14 +71,15 @@ class ImageProcessor:
         image = torch.nn.functional.interpolate(
             image, size=(target_slices, target_width, target_height), mode="trilinear"
         ).squeeze()
+        print(image.shape, target_width, target_height)
         image = self.pad_square(image)
         return rearrange(
             image,
             "(g c) w h -> g c w h",
             g=groups,
             c=self.channels,
-            w=self.img_size,
-            h=self.img_size,
+            w=target_width,
+            h=target_height,
         )
 
     def __call__(self, image, slice_thickness):
