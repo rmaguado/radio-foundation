@@ -105,3 +105,11 @@ Below is an example command for training without a Slurm system:
 ```bash
 ./train.sh --devices 0,1,2,3 --config "configs/quicktest.yaml" --output "runs/quicktest"
 ```
+
+# Multimodal
+
+Demo train script:
+
+```bash
+./mllm/scripts/pretrain.sh test compute-cuda-02 L40S 2 8 mllm/configs/pretrain.yaml
+```
