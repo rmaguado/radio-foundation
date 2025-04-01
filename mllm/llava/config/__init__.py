@@ -62,9 +62,13 @@ def load_config():
     cfg = OmegaConf.load(args.config_path)
     cfg = OmegaConf.merge(default_cfg, cfg)
 
+    output_dir = os.path.join(args.output_path, "checkpoints")
+
     model_args = cfg["model"]
     data_args = cfg["data"]
-    training_args = TrainingArguments(**cfg["train"], deepspeed=args.deepspeed)
+    training_args = TrainingArguments(
+        **cfg["train"], deepspeed=args.deepspeed, output_dir=output_dir
+    )
 
     model_args.image_tokens = data_args.image_tokens
 
