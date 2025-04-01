@@ -1,6 +1,6 @@
 model:
   model_name_or_path: "facebook/opt-125m"
-  freeze_backbone: False
+  freeze_backbone: True
   freeze_projector: False
   vision_tower: null
   mm_vision_select_layer: -1
