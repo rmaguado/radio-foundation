@@ -65,7 +65,7 @@ def generate_embeddings(
     futures = queue.Queue(max_saves)
 
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=1, shuffle=False, num_workers=16
+        dataset, batch_size=1, shuffle=False, num_workers=8
     )
 
     t0 = time.time()
@@ -132,7 +132,6 @@ def main():
     data_mean = -573.8
     data_std = 461.3
     channels = config.student.channels
-    max_workers = 16
 
     if args.resample_slices == -1:
         img_processor = ImageTransform(full_image_size, data_mean, data_std)
@@ -157,7 +156,7 @@ def main():
         "transform": img_processor,
     }
     if args.db_storage == "dicom":
-        dataset = DicomFullVolumeEval(**db_params, max_workers=max_workers)
+        dataset = DicomFullVolumeEval(**db_params)
     elif args.db_storage == "nifti":
         dataset = NiftiFullVolumeEval(**db_params)
     elif args.db_storage == "npz":
@@ -166,6 +165,8 @@ def main():
         raise ValueError(
             "Invalid database storage type (--db_storage should be dicom, nifti, or npz)."
         )
+
+    logging.info(dataset.entries[0])
 
     generate_embeddings(
         model,
