@@ -69,18 +69,13 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
         dataset, rowid, map_id = self.entries[index]
 
         self.cursor.execute(
-            f"SELECT row_id, map_id FROM '{dataset}' WHERE rowid = {rowid}"
-        )
-        row_id, map_id = self.cursor.fetchone()
-
-        self.cursor.execute(
             """
             SELECT slice_index, dicom_path
             FROM global 
-            WHERE row_id = ? 
+            WHERE rowid = ? 
             AND dataset = ?
             """,
-            (row_id, dataset),
+            (rowid, dataset),
         )
         stack_rows = self.cursor.fetchall()
         stack_rows.sort(key=lambda x: x[0])
