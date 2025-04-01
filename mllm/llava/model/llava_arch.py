@@ -16,6 +16,7 @@
 from abc import ABC, abstractmethod
 
 import torch
+import logging
 
 from .multimodal_encoder.builder import build_vision_tower
 from .multimodal_projector.builder import build_vision_projector
@@ -27,6 +28,8 @@ from mllm.llava.constants import (
     DEFAULT_IM_START_TOKEN,
     DEFAULT_IM_END_TOKEN,
 )
+
+logger = logging.getLogger("DeepSpeed")
 
 
 class LlavaMetaModel:
@@ -81,6 +84,10 @@ class LlavaMetaModel:
 
             self.mm_projector.load_state_dict(
                 get_w(mm_projector_weights, "mm_projector")
+            )
+
+            logger.info(
+                f"Loaded mm_projector from checkpoint: {mm_projector_checkpoint_path}"
             )
 
         self.mm_projector.to(device)
