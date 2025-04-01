@@ -16,7 +16,7 @@ data:
   image_tokens: 128
   conv_template: "plain"
 train:
-  per_device_train_batch_size: 32
+  per_device_train_batch_size: 32 # aim for 256 total
   gradient_accumulation_steps: 1
   optim: "adamw_torch"
   freeze_mm_mlp_adapter: False
