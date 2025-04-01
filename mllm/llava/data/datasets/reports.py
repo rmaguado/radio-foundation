@@ -35,15 +35,20 @@ class ImageProcessor:
     def pad_square(self, image):
         s, w, h = image.shape
 
-        pad_l = (self.img_size - h) // 2
-        pad_r = self.img_size - h - pad_l
+        if w == h:
+            return image
 
-        if h < self.img_size:
+        if w > h:
+            pad_1 = (w - h) // 2
+            pad_2 = (w - h) - pad_1
             image = torch.nn.functional.pad(
-                image,
-                (0, 0, pad_l, pad_r),
-                mode="constant",
-                value=self.pad_value,
+                image, (0, 0, pad_1, pad_2), value=self.pad_value
+            )
+        else:
+            pad_1 = (h - w) // 2
+            pad_2 = (h - w) - pad_1
+            image = torch.nn.functional.pad(
+                image, (pad_1, pad_2, 0, 0), value=self.pad_value
             )
 
         return image
@@ -51,7 +56,8 @@ class ImageProcessor:
     def resize(self, image, slice_thickness):
         slices, w, h = image.shape
 
-        target_height = self.img_size * h // w
+        target_width = self.img_size if w >= h else self.img_size * w // h
+        target_height = self.img_size if h >= w else self.img_size * h // w
 
         if slice_thickness < self.min_zspacing:
             target_slices = int(slices * self.min_zspacing / slice_thickness)
@@ -63,13 +69,20 @@ class ImageProcessor:
 
         image = image.unsqueeze(0).unsqueeze(0)
         image = torch.nn.functional.interpolate(
-            image, size=(target_slices, self.img_size, target_height), mode="trilinear"
+            image, size=(target_slices, target_width, target_height), mode="trilinear"
+        ).squeeze()
+        image = self.pad_square(image)
+        return rearrange(
+            image,
+            "(g c) w h -> g c w h",
+            g=groups,
+            c=self.channels,
+            w=self.img_size,
+            h=self.img_size,
         )
-        return rearrange(image, "1 1 (g c) w h -> g c w h", g=groups, c=self.channels)
 
     def __call__(self, image, slice_thickness):
         image = self.resize(image, slice_thickness)
-        image = self.pad_square(image)
         image = self.normalize(image)
         return image
 
