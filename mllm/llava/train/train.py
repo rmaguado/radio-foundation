@@ -100,7 +100,7 @@ def train(attn_implementation="flash_attention_2"):
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     trainer = LLaVATrainer(
-        model=model, tokenizer=tokenizer, args=training_args, **data_module
+        model=model, processing_class=tokenizer, args=training_args, **data_module
     )
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
