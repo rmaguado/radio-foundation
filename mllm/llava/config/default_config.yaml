@@ -19,7 +19,6 @@ data:
   image_tokens: 128
   conv_template: "plain"
 train:
-  deepspeed: "/path/to/deepspeed.json"
   cache_dir: "mllm/cache"
   optim: "adamw_torch"
   freeze_mm_mlp_adapter: False
