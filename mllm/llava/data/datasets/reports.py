@@ -22,12 +22,31 @@ from mllm.llava.constants import (
 
 
 class ImageProcessor:
-    def __init__(self, img_size, mean, std, min_zspacing=1.0, channels=10):
+    def __init__(
+        self, img_size, mean, std, min_zspacing=1.0, channels=10, pad_value=-1000
+    ):
         self.img_size = img_size
         self.normalize = transforms.Normalize(mean=mean, std=std)
 
         self.min_zspacing = min_zspacing
         self.channels = channels
+        self.pad_value = pad_value
+
+    def pad_square(self, image):
+        s, w, h = image.shape
+
+        pad_l = (self.img_size - h) // 2
+        pad_r = self.img_size - h - pad_l
+
+        if h < self.img_size:
+            image = torch.nn.functional.pad(
+                image,
+                (0, 0, pad_l, pad_r),
+                mode="constant",
+                value=self.pad_value,
+            )
+
+        return image
 
     def resize(self, image, slice_thickness):
         slices, w, h = image.shape
@@ -50,6 +69,7 @@ class ImageProcessor:
 
     def __call__(self, image, slice_thickness):
         image = self.resize(image, slice_thickness)
+        image = self.pad_square(image)
         image = self.normalize(image)
         return image
 
