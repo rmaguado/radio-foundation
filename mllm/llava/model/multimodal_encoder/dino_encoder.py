@@ -8,7 +8,7 @@ from dinov2.utils.utils import load_pretrained_weights
 
 
 class DINOVisionTower(nn.Module):
-    def __init__(self, vision_tower, args, delay_load=False):
+    def __init__(self, vision_tower, args, torch_dtype, delay_load=False):
         super().__init__()
 
         self.is_loaded = False
@@ -27,6 +27,8 @@ class DINOVisionTower(nn.Module):
             self.load_model()
         else:
             self.cfg_only = self.model_config
+
+        self.output_type = torch_dtype
 
     def load_model(self):
         if self.is_loaded:
@@ -71,7 +73,7 @@ class DINOVisionTower(nn.Module):
                 img_features = self.vision_tower.get_intermediate_layers(
                     img, [self.select_layer], return_class_token=self.use_cls
                 )
-                features.append(img_features[0])
+                features.append(img_features[0].to(self.output_type))
 
         return features
 

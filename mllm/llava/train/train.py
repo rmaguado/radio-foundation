@@ -79,6 +79,7 @@ def train(attn_implementation=None):
     model.get_model().initialize_vision_modules(
         model_args=model_args,
         device=training_args.device,
+        torch_dtype=torch.bfloat16 if training_args.bf16 else torch.float16,
         fsdp=training_args.fsdp,
     )
 

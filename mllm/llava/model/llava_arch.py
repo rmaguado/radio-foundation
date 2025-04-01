@@ -40,7 +40,7 @@ class LlavaMetaModel:
             vision_tower = vision_tower[0]
         return vision_tower
 
-    def initialize_vision_modules(self, model_args, device, fsdp=None):
+    def initialize_vision_modules(self, model_args, device, torch_dtype, fsdp=None):
         mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
         pretrain_mm_mlp_adapter = model_args.pretrain_mm_mlp_adapter
@@ -48,7 +48,7 @@ class LlavaMetaModel:
         self.config.mm_vision_tower = model_args.vision_tower
         self.config.image_tokens = model_args.image_tokens
 
-        vision_tower = build_vision_tower(model_args)
+        vision_tower = build_vision_tower(model_args, torch_dtype=torch_dtype)
 
         if fsdp is not None and len(fsdp) > 0:
             self.vision_tower = [vision_tower]
