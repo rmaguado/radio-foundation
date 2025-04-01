@@ -32,7 +32,7 @@ fi
 if [ ! -z $2 ]; then 
   printf "\nJob  gpus-per_node: $GPUS $GPUTYPE GPUs   Workers per GPU: $WORKERS\n\n"
   mkdir -p $OUT
-  envsubst '$GPUS $GPUTYPE $OUT $WORKERS' < $PWD/cache.template > $OUT/cache.run
+  envsubst '$GPUS $GPUTYPE $OUT $WORKERS' < $PWD/sjob.template > $OUT/cache.run
   sbatch $OUT/cache.run
 
 else

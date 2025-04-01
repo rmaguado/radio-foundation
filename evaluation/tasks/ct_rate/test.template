@@ -15,7 +15,7 @@
 #SBATCH --time=14400
 
 source $HOME/.conda_rc
-conda activate dino2
+conda activate radio
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 

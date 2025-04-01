@@ -1,11 +1,11 @@
 indexed_gzip==1.8.7
-nibabel==5.3.2
-pydicom==3.0.1
-python-dotenv==1.0.1
-tqdm==4.67.1
-python_gdcm>=3.0.10
-pylibjpeg>=2.0 
-pylibjpeg-libjpeg>=2.1
+nibabel
+pydicom
+python-dotenv
+tqdm
+python_gdcm
+pylibjpeg
+pylibjpeg-libjpeg
 pandas
 scikit-learn
 matplotlib
@@ -14,3 +14,5 @@ omegaconf
 fvcore
 einops
 pickleshare
+transformers
+accelerate
