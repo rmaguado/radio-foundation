@@ -43,6 +43,7 @@ class DicomProcessorDeepRDT(DicomProcessorBase):
             folder
             for folder in os.listdir(self.absolute_dataset_path)
             if os.path.isdir(os.path.join(self.absolute_dataset_path, folder))
+            and "_" not in folder
         ]
 
         for mapid in mapids:
