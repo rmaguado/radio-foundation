@@ -49,7 +49,9 @@ def get_argpase():
 def load_config():
     args = get_argpase()
 
-    default_cfg = OmegaConf.create("mllm/llava/config/default_config.yaml")
+    default_cfg = OmegaConf.create(
+        OmegaConf.load("mllm/llava/config/default_config.yaml")
+    )
     cfg = OmegaConf.load(args.config_path)
     cfg = OmegaConf.merge(default_cfg, cfg)
 
