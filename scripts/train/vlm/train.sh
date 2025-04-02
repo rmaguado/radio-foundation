@@ -14,7 +14,7 @@ export CONFIG=$6
 if [ ! -z $5 ]; then 
   printf "\n     name | $NAME\n     node | $NODE\nresources | gpu:$GPUS workers:$WORKERS \n\n"
   mkdir -p $OUT/$NAME
-  envsubst '$NAME $NODE $GPUS $WORKERS $CONFIG $OUT' < $DHOME/scripts/train/vlm/pretrain.template > $OUT/$NAME/train.run
+  envsubst '$NAME $NODE $GPUS $WORKERS $CONFIG $OUT' < $DHOME/scripts/train/vlm/train.template > $OUT/$NAME/train.run
   sbatch $OUT/$NAME/train.run
 
 else

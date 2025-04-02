@@ -24,6 +24,6 @@ export PYTHONPATH=$PWD
 export MASTER_PORT=$(find_port)
 
 deepspeed --master_addr=127.0.0.1 --master_port=$MASTER_PORT --enable_each_rank_log $OUT/$NAME/logs mllm/llava/train/train.py \
-    --deepspeed "mllm/configs/deepspeed/zero3.json" \
+    --deepspeed "mllm/configs/deepspeed/zero2.json" \
     --config_path $CONFIG \
     --output_path $OUT/$NAME
