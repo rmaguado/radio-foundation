@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 import transformers
 from omegaconf import OmegaConf
 import argparse
@@ -13,12 +13,12 @@ class TrainingArguments(transformers.TrainingArguments):
     remove_unused_columns: bool = field(default=False)
     model_max_length: int = field(default=2048)
     bits: int = field(default=16, metadata={"help": "How many bits to use."})
-    lora_enable: bool = False
-    lora_r: int = 64
-    lora_alpha: int = 16
-    lora_dropout: float = 0.05
-    lora_weight_path: str = ""
-    lora_bias: str = "none"
+    lora_enable: bool = field(default=False)
+    lora_r: int = field(default=64)
+    lora_alpha: int = field(default=16)
+    lora_dropout: float = field(default=0.05)
+    lora_weight_path: str = field(default="")
+    lora_bias: str = field(default="none")
     mm_projector_lr: Optional[float] = None
     group_by_modality_length: bool = field(default=False)
 
@@ -62,6 +62,7 @@ def load_config():
     cfg = OmegaConf.merge(default_cfg, cfg)
 
     output_dir = os.path.join(args.output_path, "checkpoints")
+    os.makedirs(output_dir, exist_ok=True)
 
     model_args = cfg["model"]
     data_args = cfg["data"]
