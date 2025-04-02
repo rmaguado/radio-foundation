@@ -1,6 +1,8 @@
 model:
   model_name_or_path: "facebook/opt-125m"
   freeze_backbone: True
+  lora_backbone: False
+  lora_language: False
   vision_tower: null
   mm_vision_select_layer: -1
   checkpoint_path: null
@@ -44,6 +46,6 @@ train:
   logging_steps: 1
   bf16: True
   tf32: True
-  model_max_length: 2048
+  model_max_length: 512
   gradient_checkpointing: True
   dataloader_num_workers: 4

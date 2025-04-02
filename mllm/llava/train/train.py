@@ -80,7 +80,12 @@ def train(attn_implementation="flash_attention_2"):
     )
 
     if training_args.lora_enable:
-        configure_lora(model, training_args)
+        configure_lora(
+            model,
+            training_args,
+            model_args.freeze_backbone,
+            model_args.freeze_language,
+        )
 
     if model_args.checkpoint_path is not None:
         pretrained_weights = torch.load(model_args.checkpoint_path, map_location="cpu")
