@@ -7,3 +7,4 @@ pip install transformers 'accelerate>=0.26.0'
 conda install -c nvidia cuda-compiler
 pip install deepspeed
 pip install flash-attn --no-build-isolation
+pip install peft
