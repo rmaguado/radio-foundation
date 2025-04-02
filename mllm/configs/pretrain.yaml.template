@@ -1,10 +1,9 @@
 model:
   model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
   freeze_backbone: False
-  freeze_projector: True
   vision_tower: "dino-vit-base-patch14-10"
   mm_vision_select_layer: -1
-  mm_projector_checkpoint_path: null
+  checkpoint_path: null
   mm_vision_config_path: null # REQUIRED
   mm_vision_checkpoint_path: null # REQUIRED
 data:
