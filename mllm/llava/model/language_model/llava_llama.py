@@ -56,6 +56,10 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         # Initialize weights and apply final processing
         self.post_init()
 
+    def freeze_language(self):
+        self.model.requires_grad_(False)
+        self.lm_head.requires_grad_(False)
+
     def get_model(self):
         return self.model
 

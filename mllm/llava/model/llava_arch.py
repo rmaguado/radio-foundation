@@ -43,22 +43,27 @@ class LlavaMetaModel:
             vision_tower = vision_tower[0]
         return vision_tower
 
-    def initialize_vision_modules(self, model_args, device, torch_dtype, fsdp=None):
+    def get_mm_projector(self):
+        mm_projector = getattr(self, "mm_projector", None)
+        if type(mm_projector) is list:
+            mm_projector = mm_projector[0]
+        return mm_projector
+
+    def initialize_vision_modules(self, model_args, torch_dtype, fsdp=None):
         mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
-        mm_projector_checkpoint_path = model_args.mm_projector_checkpoint_path
+        checkpoint_path = model_args.checkpoint_path  # copy from here
 
         self.config.mm_vision_tower = model_args.vision_tower
         self.config.image_tokens = model_args.image_tokens
 
         vision_tower = build_vision_tower(model_args, torch_dtype=torch_dtype)
+        vision_tower.requires_grad_(False)
 
         if fsdp is not None and len(fsdp) > 0:
             self.vision_tower = [vision_tower]
         else:
             self.vision_tower = vision_tower
-
-        self.vision_tower.to(device=device)
 
         self.config.use_mm_proj = True
         self.config.mm_projector_type = getattr(
@@ -70,28 +75,6 @@ class LlavaMetaModel:
 
         self.mm_projector = build_vision_projector(self.config)
 
-        if mm_projector_checkpoint_path is not None:
-            mm_projector_weights = torch.load(
-                mm_projector_checkpoint_path, map_location="cpu"
-            )
-
-            def get_w(weights, keyword):
-                return {
-                    k.split(keyword + ".")[1]: v
-                    for k, v in weights.items()
-                    if keyword in k
-                }
-
-            self.mm_projector.load_state_dict(
-                get_w(mm_projector_weights, "mm_projector")
-            )
-
-            logger.info(
-                f"Loaded mm_projector from checkpoint: {mm_projector_checkpoint_path}"
-            )
-
-        self.mm_projector.to(device)
-
 
 class LlavaMetaForCausalLM(ABC):
 
@@ -101,6 +84,9 @@ class LlavaMetaForCausalLM(ABC):
 
     def get_vision_tower(self):
         return self.get_model().get_vision_tower()
+
+    def get_mm_projector(self):
+        return self.get_model().get_mm_projector()
 
     def encode_images(self, images):
         image_features = self.get_model().get_vision_tower()(images)

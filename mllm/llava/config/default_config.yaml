@@ -1,10 +1,9 @@
 model:
   model_name_or_path: "facebook/opt-125m"
   freeze_backbone: True
-  freeze_projector: False
   vision_tower: null
   mm_vision_select_layer: -1
-  mm_projector_checkpoint_path: null
+  checkpoint_path: null
   mm_projector_type: "attn_pool"
   mm_vision_select_feature: "patch"
   mm_vision_config_path: null
