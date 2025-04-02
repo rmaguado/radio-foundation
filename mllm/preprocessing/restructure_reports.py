@@ -2,42 +2,44 @@ import os
 from dotenv import load_dotenv
 import pandas as pd
 import ollama
+from ollama import Client
 import logging
 import time
 import concurrent.futures
 
 
-def get_response(system_prompt, query, model="llama3.3:latest", port=11434):
-    ollama_response = ollama.chat(
+def get_response(system_prompt, query, client, model="llama3.3:latest"):
+    ollama_response = client.chat(
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query},
         ],
-        host=f"http://localhost:{port}",
     )
     return ollama_response["message"]["content"]
 
 
-def process_report(row, system_prompt, output_file, port):
+def process_report(row, system_prompt, output_file, client):
     query = row["Findings_EN"]
     try:
-        response = get_response(system_prompt, query, port=port)
+        response = get_response(system_prompt, query, client)
         start_tag, end_tag = "<report>", "</report>"
         structured_report = (
             response.split(start_tag)[1].split(end_tag)[0].strip()
             if start_tag in response and end_tag in response
             else response
         )
-        structured_report = structured_report.replace("\n", "").replace(",", ";")
+        structured_report = structured_report.replace("\n", "").replace(";", ",")
         with open(output_file, "a", encoding="utf-8") as f:
-            f.write(f"{row['report_id']},{structured_report}\n")
+            f.write(f"{row['report_id']};{structured_report}\n")
     except Exception as e:
         logging.error(f"Error processing report {row['report_id']}: {e}")
-    time.sleep(0.05)  # Reduce API rate limiting issues
+    time.sleep(0.2)
 
 
-def main(ports=[11434, 11435, 11436, 11437]):
+def main(hosts):
+    clients = [Client(host=host) for host in hosts]
+
     logging.basicConfig(
         filename="mllm/preprocessing/out/restructure_reports.log", level=logging.DEBUG
     )
@@ -67,23 +69,24 @@ def main(ports=[11434, 11435, 11436, 11437]):
 
     processed_ids = set()
     output_files = [
-        os.path.join(output_path, f"restructured_reports_{i}.csv") for i in range(4)
+        os.path.join(output_path, f"restructured_reports_{i}.csv")
+        for i in range(len(clients))
     ]
 
     for output_file in output_files:
         if os.path.exists(output_file):
             with open(output_file, "r", encoding="utf-8") as f:
-                processed_ids.update(int(line.split(",")[0]) for line in f)
+                processed_ids.update(int(line.split(";")[0]) for line in f)
 
     df = df[~df["report_id"].isin(processed_ids)].drop_duplicates(subset=["report_id"])
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(ports)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
         futures = []
         for i, (_, row) in enumerate(df.iterrows()):
             output_file = output_files[i % len(output_files)]
-            port = ports[i % len(ports)]
+            client = clients[i % len(hosts)]
             futures.append(
-                executor.submit(process_report, row, system_prompt, output_file, port)
+                executor.submit(process_report, row, system_prompt, output_file, client)
             )
         concurrent.futures.wait(futures)
 
@@ -91,4 +94,8 @@ def main(ports=[11434, 11435, 11436, 11437]):
 
 
 if __name__ == "__main__":
-    main()
+    ports_cc2 = list(range(11434, 11434 + 8))
+    ports_cc3 = list(range(11434, 11434 + 4))
+    hosts_cc2 = [f"http://127.0.0.1:{port}" for port in ports_cc2]
+    hosts_cc3 = [f"http://192.168.36.203:{port}" for port in ports_cc3]
+    main(hosts_cc2 + hosts_cc3)
