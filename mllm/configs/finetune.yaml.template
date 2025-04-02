@@ -1,6 +1,8 @@
 model:
   model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
   freeze_backbone: False
+  lora_backbone: False
+  lora_language: True
   vision_tower: "dino-vit-base-patch14-10"
   mm_vision_select_layer: -1
   checkpoint_path: null # REQUIRED

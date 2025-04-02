@@ -10,8 +10,7 @@ import logging
 logger = logging.getLogger("DeepSpeed")
 
 
-def find_target_linear_names(model):
-    lora_namespan_exclude = ["lm_head", "embed_tokens", "mm_projector"]
+def find_target_linear_names(model, lora_namespan_exclude):
     linear_cls = torch.nn.modules.Linear
     embedding_cls = torch.nn.modules.Embedding
     lora_module_names = []
@@ -25,13 +24,19 @@ def find_target_linear_names(model):
     return lora_module_names
 
 
-def configure_lora(model, training_args):
+def configure_lora(model, training_args, lora_backbone=False, lora_language=True):
     from peft import LoraConfig, get_peft_model
+
+    lora_namespan_exclude = ["lm_head", "embed_tokens", "mm_projector"]
+    if not lora_backbone:
+        lora_namespan_exclude.append("vision_tower")
+    if not lora_language:
+        lora_namespan_exclude.append("layers")
 
     peft_config = LoraConfig(
         r=training_args.lora_r,
         lora_alpha=training_args.lora_alpha,
-        target_modules=find_target_linear_names(model),
+        target_modules=find_target_linear_names(model, lora_namespan_exclude),
         lora_dropout=training_args.lora_dropout,
         bias=training_args.lora_bias,
     )
