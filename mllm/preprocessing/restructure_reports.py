@@ -4,116 +4,90 @@ import pandas as pd
 import ollama
 import logging
 import time
-from tqdm import tqdm
+import concurrent.futures
 
 
-def get_response(system_prompt, query, model="llama3.3:latest"):
-
+def get_response(system_prompt, query, model="llama3.3:latest", port=11434):
     ollama_response = ollama.chat(
         model=model,
         messages=[
-            {
-                "role": "system",
-                "content": system_prompt,
-            },
-            {
-                "role": "user",
-                "content": query,
-            },
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query},
         ],
+        host=f"http://localhost:{port}",
     )
-
     return ollama_response["message"]["content"]
 
 
-def main():
-    logger = configure_logging()
-    load_dotenv()
-    project_path = os.getenv("PROJECTPATH")
-    data_path = os.getenv("DATAPATH")
+def process_report(row, system_prompt, output_file, port):
+    query = row["Findings_EN"]
+    try:
+        response = get_response(system_prompt, query, port=port)
+        start_tag, end_tag = "<report>", "</report>"
+        structured_report = (
+            response.split(start_tag)[1].split(end_tag)[0].strip()
+            if start_tag in response and end_tag in response
+            else response
+        )
+        structured_report = structured_report.replace("\n", "").replace(",", ";")
+        with open(output_file, "a", encoding="utf-8") as f:
+            f.write(f"{row['report_id']},{structured_report}\n")
+    except Exception as e:
+        logging.error(f"Error processing report {row['report_id']}: {e}")
+    time.sleep(0.05)  # Reduce API rate limiting issues
 
-    path_to_reports = os.path.join(
+
+def main(ports=[11434, 11435, 11436, 11437]):
+    logging.basicConfig(
+        filename="mllm/preprocessing/out/restructure_reports.log", level=logging.DEBUG
+    )
+    load_dotenv()
+    project_path, data_path = os.getenv("PROJECTPATH"), os.getenv("DATAPATH")
+    reports_file = os.path.join(
         data_path, "niftis/CT-RATE/dataset/radiology_text_reports/train_reports.csv"
     )
     output_path = os.path.join(project_path, "mllm/preprocessing/out")
     mapping_file = os.path.join(output_path, "report_mapping.csv")
-    restructured_reports_file = os.path.join(output_path, "restructured_reports.csv")
 
     os.makedirs(output_path, exist_ok=True)
-
-    with open(
-        "mllm/preprocessing/prompts/restructure.txt", mode="r", encoding="utf-8"
-    ) as f:
+    with open("mllm/preprocessing/prompts/restructure.txt", "r", encoding="utf-8") as f:
         system_prompt = f.read()
 
-    df = pd.read_csv(path_to_reports)[["VolumeName", "Findings_EN"]]
+    df = pd.read_csv(reports_file)[["VolumeName", "Findings_EN"]]
     df = df[df["Findings_EN"].str.len() >= 400]
 
     if os.path.exists(mapping_file):
-        logger.info("Found existing mapping file.")
         mapping_df = pd.read_csv(mapping_file)
         df = df.merge(mapping_df, on="VolumeName", how="left")
     else:
-        logger.info("Creating new mapping file.")
         unique_reports = df.drop_duplicates(subset="Findings_EN").reset_index(drop=True)
         unique_reports["report_id"] = unique_reports.index
         df = df.merge(unique_reports, on="Findings_EN", how="left")
-        df["VolumeName"] = df["VolumeName_x"]
         df[["VolumeName", "report_id"]].to_csv(mapping_file, index=False)
 
     processed_ids = set()
-    if os.path.exists(restructured_reports_file):
-        with open(restructured_reports_file, "r", encoding="utf-8") as f:
-            processed_ids = {int(line.split(",")[0]) for line in f}
+    output_files = [
+        os.path.join(output_path, f"restructured_reports_{i}.csv") for i in range(4)
+    ]
 
-    for _, row in tqdm(
-        df.drop_duplicates(subset=["report_id"]).iterrows(),
-        total=len(df["report_id"].unique()),
-        desc="Processing reports",
-    ):
-        if row["report_id"] in processed_ids:
-            continue
+    for output_file in output_files:
+        if os.path.exists(output_file):
+            with open(output_file, "r", encoding="utf-8") as f:
+                processed_ids.update(int(line.split(",")[0]) for line in f)
 
-        query = row["Findings_EN"]
+    df = df[~df["report_id"].isin(processed_ids)].drop_duplicates(subset=["report_id"])
 
-        try:
-            response = get_response(system_prompt, query)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(ports)) as executor:
+        futures = []
+        for i, (_, row) in enumerate(df.iterrows()):
+            output_file = output_files[i % len(output_files)]
+            port = ports[i % len(ports)]
+            futures.append(
+                executor.submit(process_report, row, system_prompt, output_file, port)
+            )
+        concurrent.futures.wait(futures)
 
-            start_tag = "<report>"
-            end_tag = "</report>"
-            if start_tag in response and end_tag in response:
-                structured_report = (
-                    response.split(start_tag)[1].split(end_tag)[0].strip()
-                )
-            else:
-                structured_report = response
-
-            structured_report = structured_report.replace("\n", "").replace(",", ";")
-
-            with open(restructured_reports_file, "a", encoding="utf-8") as f:
-                f.write(f"{row['report_id']},{structured_report}\n")
-
-            logger.info(f"Processed report {row['report_id']} successfully.")
-
-        except Exception as e:
-            logger.error(f"Error processing report {row['report_id']}: {e}")
-
-        time.sleep(0.05)
-
-    logger.info("Processing complete. Results saved.")
-
-
-def configure_logging():
-
-    logging.basicConfig(
-        filename="mllm/preprocessing/out/restructure_reports.log",
-        filemode="a",
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.DEBUG,
-    )
-
-    return logging.getLogger("ReportOLlama")
+    logging.info("Processing complete. Results saved.")
 
 
 if __name__ == "__main__":
