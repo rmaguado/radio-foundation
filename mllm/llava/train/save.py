@@ -1,8 +1,6 @@
 import torch
 import os
 import logging
-from transformers import Trainer
-import torch.distributed as dist
 
 
 logger = logging.getLogger("DeepSpeed")
@@ -67,8 +65,6 @@ def save_model(training_args, model, output_dir):
         model.named_parameters(), require_grad_only=True
     )
 
-    logger.info("gathered state_dict")
-
     if training_args.lora_enable:
         lora_state_dict = get_peft_state_maybe_zero_3(
             model.named_parameters(), training_args.lora_bias
@@ -80,7 +76,3 @@ def save_model(training_args, model, output_dir):
             state_dict,
             os.path.join(output_dir, "model.bin"),
         )
-
-    logger.info("waiting by barrier")
-
-    dist.barrier()
