@@ -27,6 +27,7 @@ def get_response(system_prompt, query, model="llama3.3:latest"):
 
 
 def main():
+    logger = configure_logging()
     load_dotenv()
     project_path = os.getenv("PROJECTPATH")
     data_path = os.getenv("DATAPATH")
@@ -45,22 +46,30 @@ def main():
     ) as f:
         system_prompt = f.read()
 
-    df = pd.read_csv(path_to_reports)
+    df = pd.read_csv(path_to_reports)[["VolumeName", "Findings_EN"]]
     df = df[df["Findings_EN"].str.len() >= 400]
 
-    unique_reports = df[["Findings_EN"].drop_duplicates().reset_index(drop=True)]
-    unique_reports["report_id"] = unique_reports.index
-
-    df = df.merge(unique_reports, on="Findings_EN", how="left")
-    df[["VolumeName", "report_id"]].to_csv(mapping_file, index=False)
+    if os.path.exists(mapping_file):
+        logger.info("Found existing mapping file.")
+        mapping_df = pd.read_csv(mapping_file)
+        df = df.merge(mapping_df, on="VolumeName", how="left")
+    else:
+        logger.info("Creating new mapping file.")
+        unique_reports = df.drop_duplicates(subset="Findings_EN").reset_index(drop=True)
+        unique_reports["report_id"] = unique_reports.index
+        df = df.merge(unique_reports, on="Findings_EN", how="left")
+        df["VolumeName"] = df["VolumeName_x"]
+        df[["VolumeName", "report_id"]].to_csv(mapping_file, index=False)
 
     processed_ids = set()
     if os.path.exists(restructured_reports_file):
         with open(restructured_reports_file, "r", encoding="utf-8") as f:
-            processed_ids = {int(line.split("|")[0]) for line in f}
+            processed_ids = {int(line.split(",")[0]) for line in f}
 
     for _, row in tqdm(
-        unique_reports.iterrows(), total=len(unique_reports), desc="Processing reports"
+        df.drop_duplicates(subset=["report_id"]).iterrows(),
+        total=len(df["report_id"].unique()),
+        desc="Processing reports",
     ):
         if row["report_id"] in processed_ids:
             continue
@@ -79,28 +88,33 @@ def main():
             else:
                 structured_report = response
 
-            with open(restructured_reports_file, "a", encoding="utf-8") as f:
-                f.write(f"{row['report_id']}|{structured_report}\n")
+            structured_report = structured_report.replace("\n", "").replace(",", ";")
 
-            logging.info(f"Processed report {row['report_id']} successfully.")
+            with open(restructured_reports_file, "a", encoding="utf-8") as f:
+                f.write(f"{row['report_id']},{structured_report}\n")
+
+            logger.info(f"Processed report {row['report_id']} successfully.")
 
         except Exception as e:
-            logging.error(f"Error processing report {row['report_id']}: {e}")
+            logger.error(f"Error processing report {row['report_id']}: {e}")
 
-        time.sleep(0.1)
+        time.sleep(0.05)
 
-    print("Processing complete. Results saved.")
+    logger.info("Processing complete. Results saved.")
 
 
 def configure_logging():
+
     logging.basicConfig(
         filename="mllm/preprocessing/out/restructure_reports.log",
-        level=logging.INFO,
-        format="%(asctime)s:%(levelname)s:%(message)s",
+        filemode="a",
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.DEBUG,
     )
-    logging.getLogger().addHandler(logging.StreamHandler())
+
+    return logging.getLogger("ReportOLlama")
 
 
 if __name__ == "__main__":
-    configure_logging()
     main()
