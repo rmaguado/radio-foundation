@@ -108,8 +108,14 @@ Below is an example command for training without a Slurm system:
 
 # Multimodal
 
-Demo train script:
+**Pretrain**
 
 ```bash
-./scripts/train/vlm/train.sh test_pretrain compute-cuda-02 L40S 4 8 mllm/configs/pretrain.yaml
+./scripts/train/vlm/train.sh test_pretrain compute-cuda-02 L40S 4 4 mllm/configs/pretrain.yaml mllm/configs/deepspeed/zero2.json
+```
+
+**Finetune**
+
+```bash
+./scripts/train/vlm/train.sh test_finetune compute-cuda-02 L40S 4 4 mllm/configs/finetune.yaml mllm/configs/deepspeed/zero3.json
 ```
