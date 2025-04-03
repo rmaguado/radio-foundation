@@ -25,3 +25,5 @@ train:
   dataloader_num_workers: 8
   save_steps: 0.1
   save_total_limit: null
+  report_to: "tensorboard"
+  logging_dir: "tensorboard/runs"
