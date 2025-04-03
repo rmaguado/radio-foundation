@@ -23,5 +23,5 @@ train:
   mm_projector_lr: 1e-4
   lora_enable: False
   dataloader_num_workers: 8
-  save_steps: 1
+  save_steps: 0.1
   save_total_limit: null
