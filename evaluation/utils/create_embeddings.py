@@ -25,11 +25,7 @@ def get_image_processor(config, mean=None, std=None):
     img_processor = ImageTransform(full_image_size, data_mean, data_std)
 
 
-def get_model(project_path, run_name, checkpoint_name):
-    load_dotenv()
-    project_path = os.getenv("PROJECTPATH")
-
-    path_to_run = os.path.join(project_path, "runs", run_name)
+def get_model(path_to_run, checkpoint_name):
     device = torch.device("cuda")
     feature_model, config = load_model(path_to_run, checkpoint_name, device, 1)
 
@@ -83,3 +79,19 @@ def load_dicom(dicom_folder):
     volume = np.stack([x[0] for x in sorted_images]).astype(np.float32)
 
     return torch.from_numpy(volume)
+
+
+if __name__ == "__main__":
+    path_to_run = "/path/to/run/"  # contains config.yaml
+    checkpoint_name = "training_99999"  # contains a teacher_checkpoint.pth
+    path_to_dicom_folder = "/path/to/dicoms/"
+
+    model, config = get_model(path_to_run, checkpoint_name)
+    image_processor = get_image_processor(config)
+
+    volume = load_dicom(path_to_dicom_folder)
+    volume = image_processor(volume)
+
+    embeddings = generate_embeddings(
+        model, volume, embed_patches=True, embed_cls=True, channels=10
+    )
