@@ -65,6 +65,7 @@ def main(hosts):
         unique_reports = df.drop_duplicates(subset="Findings_EN").reset_index(drop=True)
         unique_reports["report_id"] = unique_reports.index
         df = df.merge(unique_reports, on="Findings_EN", how="left")
+        df["VolumeName"] = df["VolumeName_x"]
         df[["VolumeName", "report_id"]].to_csv(mapping_file, index=False)
 
     processed_ids = set()
