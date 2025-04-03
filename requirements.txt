@@ -14,3 +14,4 @@ omegaconf
 fvcore
 einops
 pickleshare
+tensorboard
