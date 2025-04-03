@@ -10,6 +10,7 @@ export NODE=$2
 export GPUS=$4
 export WORKERS=$5
 export CONFIG=$6
+export ZERO=$7
 
 if [ ! -z $5 ]; then 
   printf "\n     name | $NAME\n     node | $NODE\nresources | gpu:$GPUS workers:$WORKERS \n\n"

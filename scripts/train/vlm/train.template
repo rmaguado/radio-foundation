@@ -30,6 +30,6 @@ deepspeed \
     --master_port=$MASTER_PORT \
     --enable_each_rank_log $OUT/$NAME/logs \
     mllm/llava/train/train.py \
-        --deepspeed "mllm/configs/deepspeed/zero3.json" \
+        --deepspeed $ZERO \
         --config_path $CONFIG \
         --output_path $OUT/$NAME
