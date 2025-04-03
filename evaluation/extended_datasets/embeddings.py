@@ -28,22 +28,27 @@ def get_model(project_path, run_name, checkpoint_name):
 
 
 class CachedEmbeddings:
-    def __init__(self, embeddings_path: str, cls_only: bool = False):
+    def __init__(
+        self, embeddings_path: str, cls_only: bool = False, patch_only: bool = False
+    ):
+        assert not (cls_only and patch_only)
         self.embeddings_path = embeddings_path
         self.cls_only = cls_only
+        self.patch_only = patch_only
 
         self.map_ids = [
             file.split(".npy")[0] for file in os.listdir(self.embeddings_path)
         ]
 
     def get_embeddings(self, map_id: str) -> torch.Tensor:
+        embeddings = np.load(
+            os.path.join(self.embeddings_path, f"{map_id}.npy"), mmap_mode="r"
+        )
         if self.cls_only:
-            embeddings = np.load(
-                os.path.join(self.embeddings_path, f"{map_id}.npy"), mmap_mode="r"
-            )
             return torch.from_numpy(embeddings[:, :1, :].copy()).float()
-        embeddings = np.load(os.path.join(self.embeddings_path, f"{map_id}.npy"))
-        return torch.from_numpy(embeddings).float()
+        if self.patch_only:
+            return torch.from_numpy(embeddings[:, 1:, :].copy()).float()
+        return torch.from_numpy(embeddings.copy()).float()
 
 
 class EmbeddingsGenerator:

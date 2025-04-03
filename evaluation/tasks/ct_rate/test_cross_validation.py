@@ -8,6 +8,7 @@ import time
 
 from evaluation.utils.networks import (
     FullScanClassPredictor,
+    FullScanPatchPredictor,
     FullScanClassPatchPredictor,
 )
 from evaluation.extended_datasets import CachedEmbeddings
@@ -111,6 +112,12 @@ def get_args():
         default=False,
         help="Wether to use only the CLS token or CLS + Patch tokens.",
     )
+    parser.add_argument(
+        "--patch_only",
+        type=bool,
+        default=False,
+        help="Wether to use only the patch token or CLS + Patch tokens.",
+    )
     return parser.parse_args()
 
 
@@ -131,10 +138,10 @@ def get_datasets(args, label):
         args.checkpoint_name,
     )
     train_embeddings_provider = CachedEmbeddings(
-        train_embeddings_path, cls_only=args.cls_only
+        train_embeddings_path, cls_only=args.cls_only, patch_only=args.patch_only
     )
     test_embeddings_provider = CachedEmbeddings(
-        test_embeddings_path, cls_only=args.cls_only
+        test_embeddings_path, cls_only=args.cls_only, patch_only=args.patch_only
     )
 
     train_metadata_path = os.path.join(
@@ -163,6 +170,13 @@ def get_model(args, device):
     if args.cls_only:
         classifier_model = FullScanClassPredictor(
             args.embed_dim, args.hidden_dim, num_labels=1
+        )
+    elif args.patch_only:
+        classifier_model = FullScanPatchPredictor(
+            args.embed_dim,
+            args.hidden_dim,
+            num_labels=1,
+            patch_resample_dim=args.patch_resample_dim,
         )
     else:
         classifier_model = FullScanClassPatchPredictor(

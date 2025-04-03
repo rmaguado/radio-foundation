@@ -5,7 +5,11 @@ import torch
 from dotenv import load_dotenv
 import argparse
 
-from evaluation.utils.networks import FullScanClassPredictor, FullScanPatchPredictor
+from evaluation.utils.networks import (
+    FullScanClassPredictor,
+    FullScanClassPatchPredictor,
+    FullScanPatchPredictor,
+)
 from evaluation.extended_datasets import CachedEmbeddings, EmbeddingsGenerator
 from evaluation.tasks.ct_rate.datasets import CT_RATE
 
@@ -104,6 +108,12 @@ def get_args():
         help="Wether to use only the CLS token or CLS + Patch tokens.",
     )
     parser.add_argument(
+        "--patch_only",
+        type=bool,
+        default=False,
+        help="Wether to use only the patch token or CLS + Patch tokens.",
+    )
+    parser.add_argument(
         "--experiment_name",
         type=str,
         default="default_test",
@@ -122,7 +132,9 @@ def get_dataloaders(args, label):
         args.run_name,
         args.checkpoint_name,
     )
-    embeddings_provider = CachedEmbeddings(embeddings_path, cls_only=args.cls_only)
+    embeddings_provider = CachedEmbeddings(
+        embeddings_path, cls_only=args.cls_only, patch_only=args.patch_only
+    )
 
     metadata_path = os.path.join(
         data_path, "niftis/CT-RATE/multi_abnormality_labels/train_predicted_labels.csv"
@@ -162,8 +174,15 @@ def get_model(args, device):
         classifier_model = FullScanClassPredictor(
             args.embed_dim, args.hidden_dim, num_labels=1
         )
-    else:
+    elif args.patch_only:
         classifier_model = FullScanPatchPredictor(
+            args.embed_dim,
+            args.hidden_dim,
+            num_labels=1,
+            patch_resample_dim=args.patch_resample_dim,
+        )
+    else:
+        classifier_model = FullScanClassPatchPredictor(
             args.embed_dim,
             args.hidden_dim,
             num_labels=1,
