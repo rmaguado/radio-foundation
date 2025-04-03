@@ -6,6 +6,7 @@ import time
 import logging
 import pydicom
 import nibabel as nib
+from einops import rearrange
 
 from evaluation.utils.finetune import (
     load_model,
@@ -22,7 +23,7 @@ def get_image_processor(config, mean=None, std=None):
         norm = config.datasets[0].norm
         mean = norm.mean
         std = norm.std
-    img_processor = ImageTransform(full_image_size, mean, std)
+    return ImageTransform(full_image_size, mean, std)
 
 
 def get_model(path_to_run, checkpoint_name):
@@ -71,12 +72,12 @@ def load_dicom(dicom_folder):
     assert len(unique_series_ids) == 1, "All series ids in folder must be the same."
 
     images_position = [
-        (x.pixel_array * x.RescaleSlope + x.RescaleIntercept, x.ImagePositionPatient)
+        (x.pixel_array * x.RescaleSlope + x.RescaleIntercept, x.ImagePositionPatient[2])
         for x in dicoms
     ]
 
-    sorted_images = images_position.sort(key=lambda x: x[1])
-    volume = np.stack([x[0] for x in sorted_images]).astype(np.float32)
+    images_position.sort(key=lambda x: x[1])
+    volume = np.stack([x[0] for x in images_position]).astype(np.float32)
 
     return torch.from_numpy(volume)
 
