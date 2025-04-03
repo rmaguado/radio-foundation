@@ -37,7 +37,7 @@ def process_report(row, system_prompt, output_file, client):
     time.sleep(0.2)
 
 
-def main(hosts):
+def main(hosts, reports_file):
     clients = [Client(host=host) for host in hosts]
 
     logging.basicConfig(
@@ -46,7 +46,8 @@ def main(hosts):
     load_dotenv()
     project_path, data_path = os.getenv("PROJECTPATH"), os.getenv("DATAPATH")
     reports_file = os.path.join(
-        data_path, "niftis/CT-RATE/dataset/radiology_text_reports/train_reports.csv"
+        data_path,
+        f"niftis/CT-RATE/dataset/radiology_text_reports/{reports_file}",
     )
     output_path = os.path.join(project_path, "mllm/preprocessing/out")
     mapping_file = os.path.join(output_path, "report_mapping.csv")
@@ -99,4 +100,5 @@ if __name__ == "__main__":
     ports_cc3 = list(range(11434, 11434 + 4))
     hosts_cc2 = [f"http://127.0.0.1:{port}" for port in ports_cc2]
     hosts_cc3 = [f"http://192.168.36.203:{port}" for port in ports_cc3]
-    main(hosts_cc2 + hosts_cc3)
+    reports_file = "train_reports.csv"
+    main(hosts_cc2 + hosts_cc3, reports_file)
