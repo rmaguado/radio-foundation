@@ -22,7 +22,7 @@ def get_image_processor(config, mean=None, std=None):
         norm = config.datasets[0].norm
         mean = norm.mean
         std = norm.std
-    img_processor = ImageTransform(full_image_size, data_mean, data_std)
+    img_processor = ImageTransform(full_image_size, mean, std)
 
 
 def get_model(path_to_run, checkpoint_name):
