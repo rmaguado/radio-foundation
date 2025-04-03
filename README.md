@@ -111,5 +111,5 @@ Below is an example command for training without a Slurm system:
 Demo train script:
 
 ```bash
-./scripts/train/vlm/pretrain.sh test2 compute-cuda-02 L40S 4 8 mllm/configs/pretrain.yaml
+./scripts/train/vlm/train.sh test_pretrain compute-cuda-02 L40S 4 8 mllm/configs/pretrain.yaml
 ```
