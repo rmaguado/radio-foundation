@@ -25,12 +25,12 @@ class CT_RATE_Processor(NiftiProcessorBase):
     def __init__(self, config: dict, database):
         super().__init__(config, database)
 
-        self.reports_df = pd.read_csv(config["reports_path"])
+        self.reports_df = pd.read_csv(config["reports_path"], delimiter=";")
 
     def get_text_data(self, map_id: int) -> str:
         report = (
             self.reports_df.loc[
-                self.reports_df["VolumeName"] == f"{map_id}.nii.gz", "Findings_EN"
+                self.reports_df["VolumeName"] == f"{map_id}.nii.gz", "report"
             ]
             .values[0]
             .strip()
@@ -39,15 +39,13 @@ class CT_RATE_Processor(NiftiProcessorBase):
 
 
 def main(args):
-    dataset_name = "CT-RATE_train"
+    dataset_name = "train"  # name of the data folder within the CT-RATE folder
     db_name = "CT-RATE_train_reports"
     dataset_path = os.path.join(args.root_path, dataset_name)
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Dataset path {dataset_path} does not exist.")
 
-    reports_path = os.path.join(
-        args.root_path, "dataset/radiology_text_reports/train_reports.csv"
-    )
+    reports_path = "mllm/preprocessing/out/combined_reports.csv"
 
     db_dir = os.path.join("data/index", db_name)
     os.makedirs(db_dir, exist_ok=True)
