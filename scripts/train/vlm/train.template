@@ -11,7 +11,7 @@
 #SBATCH --ntasks-per-node=$GPUS
 #SBATCH --gres=gpu:$GPUS
 
-#SBATCH --mem=96GB
+#SBATCH --mem=$MEMORY
 #SBATCH --partition=odap-gpu
 #SBATCH --signal=USR2@120
 #SBATCH --time=14400
