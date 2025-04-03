@@ -27,7 +27,6 @@ def get_image_processor(config, mean=None, std=None):
 
 
 def get_model(path_to_run, checkpoint_name):
-    device = torch.device("cuda")
     feature_model, config = load_model(path_to_run, checkpoint_name, device, 1)
 
     return feature_model, config
@@ -52,8 +51,8 @@ def generate_embeddings(
     for i in range(0, volume.shape[0], max_batch_size):
         upper_range = min(i + max_batch_size, volume.shape[0])
         with torch.no_grad():
-            x_tokens_list = model(volume[i:upper_range].to(device))
-        embeddings.append(embed_fcn(x_tokens_list).cpu().numpy())
+            x_tokens_list = model(volume[i:upper_range])
+        embeddings.append(embed_fcn(x_tokens_list).cpu())
 
     embeddings = torch.concatenate(embeddings, axis=0)
 
@@ -87,12 +86,15 @@ if __name__ == "__main__":
     checkpoint_name = "training_99999"  # contains a teacher_checkpoint.pth
     path_to_dicom_folder = "/path/to/dicoms/"
 
+    device = torch.device("cuda")
+
     model, config = get_model(path_to_run, checkpoint_name)
+    model.to(device)
     image_processor = get_image_processor(config)
 
     volume = load_dicom(path_to_dicom_folder)
     volume = image_processor(volume)
 
     embeddings = generate_embeddings(
-        model, volume, embed_patches=True, embed_cls=True, channels=10
+        model, volume.to(device), embed_patches=True, embed_cls=True, channels=10
     )
