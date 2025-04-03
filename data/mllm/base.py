@@ -102,7 +102,7 @@ class NiftiProcessorBase(NiftiProcessor):
             logger.exception(
                 f"Metadata extraction failed for {nifti_path} (mad_id: {map_id}): {e}"
             )
-            return
+            return 0
 
         try:
             text = self.get_text_data(map_id)
@@ -110,7 +110,7 @@ class NiftiProcessorBase(NiftiProcessor):
             logger.exception(
                 f"Text extraction failed for {nifti_path} (mad_id: {map_id}): {e}"
             )
-            return
+            return 0
 
         rel_nifti_path = os.path.relpath(nifti_path, self.absolute_dataset_path)
         self.database.insert_global_data(
@@ -118,6 +118,8 @@ class NiftiProcessorBase(NiftiProcessor):
         )
 
         logger.info(f"Processed nifti: {nifti_path} (map_id: {map_id}).")
+
+        return 1
 
     def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
         """
@@ -157,8 +159,7 @@ class NiftiProcessorBase(NiftiProcessor):
 
         for nii_path, map_id in tqdm(paths_ids):
             try:
-                self.process_volume(nii_path, map_id)
-                volume_counts += 1
+                volume_counts += self.process_volume(nii_path, map_id)
             except Exception as e:
                 logger.exception(
                     f"Error processing nifti {nii_path} (map_id: {map_id}): {e}"
