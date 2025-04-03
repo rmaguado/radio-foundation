@@ -92,7 +92,6 @@ def train(attn_implementation="flash_attention_2"):
         model.load_state_dict(pretrained_weights, strict=False)
 
         logger.info(f"Loaded weights from checkpoint: {model_args.checkpoint_path}")
-        logger.info(pretrained_weights.keys())
 
     model.get_vision_tower().to(training_args.device)
     model.get_mm_projector().to(training_args.device)
