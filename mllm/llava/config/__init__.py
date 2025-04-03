@@ -11,7 +11,7 @@ class TrainingArguments(transformers.TrainingArguments):
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
     remove_unused_columns: bool = field(default=False)
-    model_max_length: int = field(default=512)
+    model_max_length: int = field(default=1024)
     bits: int = field(default=16, metadata={"help": "How many bits to use."})
     lora_enable: bool = field(default=False)
     lora_r: int = field(default=64)
