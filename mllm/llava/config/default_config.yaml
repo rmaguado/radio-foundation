@@ -45,6 +45,6 @@ train:
   logging_steps: 1
   bf16: True
   tf32: True
-  model_max_length: 512
+  model_max_length: 1024
   gradient_checkpointing: True
   dataloader_num_workers: 4
