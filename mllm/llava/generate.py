@@ -40,8 +40,8 @@ def generate():
         configure_lora(
             model,
             training_args,
-            model_args.freeze_backbone,
-            model_args.freeze_language,
+            model_args.lora_backbone,
+            model_args.lora_language,
         )
 
     pretrained_weights = torch.load(model_args.checkpoint_path, map_location="cpu")

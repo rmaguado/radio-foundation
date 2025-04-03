@@ -83,8 +83,8 @@ def train(attn_implementation="flash_attention_2"):
         configure_lora(
             model,
             training_args,
-            model_args.freeze_backbone,
-            model_args.freeze_language,
+            model_args.lora_backbone,
+            model_args.lora_language,
         )
 
     if model_args.checkpoint_path is not None:
