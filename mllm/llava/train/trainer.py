@@ -149,6 +149,21 @@ class LengthGroupedSampler(Sampler):
         return iter(indices)
 
 
+class LongestFirstSampler(Sampler):
+    def __init__(self, lengths: Optional[List[int]] = None, **kwargs):
+        if lengths is None:
+            raise ValueError("Lengths must be provided.")
+
+        self.lengths = lengths
+
+    def __len__(self):
+        return len(self.lengths)
+
+    def __iter__(self):
+        indices = torch.argsort(torch.tensor(self.lengths), descending=True).tolist()
+        return iter(indices)
+
+
 class LLaVATrainer(Trainer):
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
@@ -283,6 +298,7 @@ class LLaVATrainer(Trainer):
 
         save_model(self.args, self.model, output_dir)
 
+        # self.state.stateful_callbacks["TrainerControl"] = self.control.state()
         self.state.save_to_json(os.path.join(output_dir, "trainer_state.json"))
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
