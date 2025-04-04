@@ -229,7 +229,7 @@ class RadiologyReportDataset(Dataset):
 
     @property
     def modality_lengths(self):
-        return self.dataset.lengths
+        raise NotImplementedError
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
 
