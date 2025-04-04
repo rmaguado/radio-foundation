@@ -283,11 +283,8 @@ class LLaVATrainer(Trainer):
 
         save_model(self.args, self.model, output_dir)
 
-        logger.info("exited save_model")
+        self.state.save_to_json(os.path.join(output_dir, "trainer_state.json"))
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         logger.info("called _save")
-        # super()._save(output_dir, state_dict)
         save_model(self.args, self.model, output_dir)
-
-        logger.info("exited save_model")
