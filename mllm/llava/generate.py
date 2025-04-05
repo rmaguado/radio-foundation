@@ -8,6 +8,8 @@ from mllm.llava.train.lora import configure_lora
 from mllm.llava.data.data import make_supervised_data_module
 from mllm.llava.config import load_generate_config
 
+from mllm.llava.constants import IMAGE_TOKEN_INDEX, IGNORE_INDEX
+
 
 def generate():
     model_args, data_args, training_args, output_dir = load_generate_config()
@@ -51,9 +53,6 @@ def generate():
     logging.info(f"Loaded weights")
     logging.info(pretrained_weights.keys())
 
-    # model.get_vision_tower().to(training_args.device)
-    # model.get_mm_projector().to(training_args.device)
-
     model.config.tokenizer_model_max_length = tokenizer.model_max_length
     model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
 
@@ -75,29 +74,39 @@ def generate():
     os.makedirs(outdir, exist_ok=True)
     logging.info(f"Output directory: {outdir}")
 
-    for batch in dataloader:
-        if "image" in batch:
-            batch["images"] = batch.pop("image")
+    batch = next(iter(dataloader))
 
-        input_ids = batch.pop("input_ids").to(training_args.device)
-        attention_mask = batch.pop("attention_mask").to(training_args.device)
-        images = [x.to(training_args.device) for x in batch.pop("images")]
+    if "image" in batch:
+        batch["images"] = batch.pop("image")
 
-        with torch.inference_mode():
-            outputs = model.generate(
-                input_ids,
-                attention_mask=attention_mask,
-                images=images,
-                max_length=training_args.model_max_length,
-                pad_token_id=tokenizer.pad_token_id,
-            )
+    logging.info(batch.keys())
 
-        for i, output in enumerate(outputs):
-            output = tokenizer.decode(output, skip_special_tokens=True)
-            with open(os.path.join(outdir, f"output_{i}.txt"), "w") as f:
-                f.write(output)
+    input_ids = batch.pop("input_ids").to(training_args.device)
+    attention_mask = batch.pop("attention_mask").to(training_args.device)
+    images = [x.to(training_args.device) for x in batch.pop("images")]
+    labels = batch.pop("labels").to(training_args.device)
 
-        break
+    for i, input_id in enumerate(input_ids[0]):
+        is_input = input_id == labels[0][i]
+        if input_id == IMAGE_TOKEN_INDEX:
+            logging.info(f"{input_id}: <image> {is_input} {attention_mask[0][i]}")
+            continue
+        decoded_text = tokenizer.decode(input_id, skip_special_tokens=True)
+        logging.info(f"{input_id}: {decoded_text} {is_input} {attention_mask[0][i]}")
+
+    with torch.inference_mode():
+        outputs = model.generate(
+            input_ids,
+            attention_mask=attention_mask,
+            images=images,
+            max_length=training_args.model_max_length,
+            pad_token_id=tokenizer.pad_token_id,
+        )
+
+    for i, output in enumerate(outputs):
+        output = tokenizer.decode(output, skip_special_tokens=True)
+        with open(os.path.join(outdir, f"output_{i}.txt"), "w") as f:
+            f.write(output)
 
 
 if __name__ == "__main__":
@@ -105,5 +114,3 @@ if __name__ == "__main__":
         generate()
     except Exception as e:
         logging.exception(e)
-    finally:
-        torch.distributed.destroy_process_group()
