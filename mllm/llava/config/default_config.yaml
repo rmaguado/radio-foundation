@@ -42,8 +42,6 @@ train:
   weight_decay: 0.0
   warmup_ratio: 0.03
   lr_scheduler_type: "cosine"
-  lr_scheduler_kwargs:
-    min_lr: 1e-5
   logging_steps: 1
   bf16: True
   tf32: True
