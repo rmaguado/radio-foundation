@@ -86,6 +86,12 @@ def generate():
     images = [x.to(training_args.device) for x in batch.pop("images")]
     labels = batch.pop("labels").to(training_args.device)
 
+    assert input_ids.shape[0] == 1, "Needs batch size 1"
+
+    input_ids = input_ids[labels == IGNORE_INDEX].unsqueeze(0)
+    attention_mask = attention_mask[labels == IGNORE_INDEX].unsqueeze(0)
+    labels = labels[labels == IGNORE_INDEX].unsqueeze(0)
+
     for i, input_id in enumerate(input_ids[0]):
         is_input = input_id == labels[0][i]
         if input_id == IMAGE_TOKEN_INDEX:
