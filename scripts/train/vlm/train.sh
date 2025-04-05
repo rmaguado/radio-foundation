@@ -12,7 +12,7 @@ export WORKERS=$4
 export CONFIG=$5
 export ZERO=$6
 
-export MEMORY=$(($GPUS*50))GB
+export MEMORY=$(($GPUS*96))GB
 
 if [ ! -z $6 ]; then 
   printf "\n     name | $NAME\n     node | $NODE\nresources | gpu:$GPUS workers:$WORKERS \n\n"
