@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 import transformers
 from omegaconf import OmegaConf
+from datetime import datetime
 import argparse
 import os
 
@@ -23,7 +24,7 @@ class TrainingArguments(transformers.TrainingArguments):
     group_by_modality_length: bool = field(default=False)
 
 
-def get_argpase():
+def get_train_args():
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument(
         "--config_path",
@@ -49,11 +50,36 @@ def get_argpase():
         default=-1,
         help="Rank of current process.",
     )
+
     return parser.parse_args()
 
 
-def load_config():
-    args = get_argpase()
+def get_generate_args():
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument(
+        "--config_path",
+        type=str,
+        required=True,
+        help="Root path to the .yaml file.",
+    )
+    parser.add_argument(
+        "--load_checkpoint_path",
+        type=str,
+        required=True,
+        help="Path to the checkpoint to load from.",
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        required=True,
+        help="Path to save generated text. ",
+    )
+
+    return parser.parse_args()
+
+
+def load_train_config():
+    args = get_train_args()
 
     default_cfg = OmegaConf.create(
         OmegaConf.load("mllm/llava/config/default_config.yaml")
@@ -66,6 +92,10 @@ def load_config():
 
     model_args = cfg["model"]
     data_args = cfg["data"]
+    training_args = cfg["train"]
+    training_args.logging_dir = os.path.join(
+        training_args.logging_dir, datetime.now().strftime("%Y%m%d_%H%M%S")
+    )
     training_args = TrainingArguments(
         **cfg["train"], deepspeed=args.deepspeed, output_dir=output_dir
     )
@@ -76,3 +106,26 @@ def load_config():
         OmegaConf.save(config=cfg, f=f)
 
     return model_args, data_args, training_args
+
+
+def load_generate_config():
+    args = get_generate_args()
+
+    default_cfg = OmegaConf.create(
+        OmegaConf.load("mllm/llava/config/default_config.yaml")
+    )
+    cfg = OmegaConf.load(args.config_path)
+    cfg = OmegaConf.merge(default_cfg, cfg)
+
+    output_dir = args.output_path
+    os.makedirs(output_dir, exist_ok=True)
+
+    model_args = cfg["model"]
+    data_args = cfg["data"]
+    training_args = cfg["train"]
+    model_args.checkpoint_path = args.load_checkpoint_path
+    training_args = TrainingArguments(**cfg["train"], output_dir=output_dir)
+
+    model_args.image_tokens = data_args.image_tokens
+
+    return model_args, data_args, training_args, output_dir

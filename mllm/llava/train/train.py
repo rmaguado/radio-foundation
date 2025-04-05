@@ -28,7 +28,7 @@ from mllm.llava.model import *
 from mllm.llava.train.lora import configure_lora
 from mllm.llava.train.save import save_model
 from mllm.llava.data.data import make_supervised_data_module
-from mllm.llava.config import load_config
+from mllm.llava.config import load_train_config
 
 
 local_rank = None
@@ -38,7 +38,7 @@ logger = logging.getLogger("DeepSpeed")
 def train(attn_implementation="flash_attention_2"):
     logger.info("Starting training. ")
 
-    model_args, data_args, training_args = load_config()
+    model_args, data_args, training_args = load_train_config()
 
     global local_rank
     local_rank = training_args.local_rank

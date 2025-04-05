@@ -6,14 +6,14 @@ import transformers
 from mllm.llava.model import *
 from mllm.llava.train.lora import configure_lora
 from mllm.llava.data.data import make_supervised_data_module
-from mllm.llava.config import load_config
-
-
-logger = logging.getLogger("DeepSpeed")
+from mllm.llava.config import load_generate_config
 
 
 def generate():
-    model_args, data_args, training_args = load_config()
+    model_args, data_args, training_args, output_dir = load_generate_config()
+    logging.basicConfig(
+        filename=os.path.join(output_dir, "generate.log"), level=logging.DEBUG
+    )
 
     model = LlavaLlamaForCausalLM.from_pretrained(
         model_args.model_name_or_path,
@@ -44,11 +44,12 @@ def generate():
             model_args.lora_language,
         )
 
+    logging.info(f"Loading from checkpoint: {model_args.checkpoint_path}")
     pretrained_weights = torch.load(model_args.checkpoint_path, map_location="cpu")
     model.load_state_dict(pretrained_weights, strict=False)
 
-    logger.info(f"Loaded weights from checkpoint: {model_args.checkpoint_path}")
-    logger.info(pretrained_weights.keys())
+    logging.info(f"Loaded weights")
+    logging.info(pretrained_weights.keys())
 
     model.get_vision_tower().to(training_args.device)
     model.get_mm_projector().to(training_args.device)
@@ -71,9 +72,10 @@ def generate():
         "evaluation",
     )
     os.makedirs(outdir, exist_ok=True)
-    logger.info(f"Output directory: {outdir}")
+    logging.info(f"Output directory: {outdir}")
 
     for batch in dataloader:
+        logging.info(batch.keys())
         if "image" in batch:
             batch["images"] = batch.pop("image")
 
@@ -83,10 +85,10 @@ def generate():
 
         with torch.no_grad():
             outputs = model.generate(
-                input_ids=input_ids,
+                input_ids,
                 attention_mask=attention_mask,
                 images=images,
-                max_length=training_args.max_length,
+                max_length=training_args.model_max_length,
             )
 
         for i, output in enumerate(outputs):
@@ -99,6 +101,6 @@ if __name__ == "__main__":
     try:
         generate()
     except Exception as e:
-        logger.exception(e)
+        logging.exception(e)
     finally:
         torch.distributed.destroy_process_group()
