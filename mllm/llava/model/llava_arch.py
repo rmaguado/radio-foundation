@@ -103,6 +103,15 @@ class LlavaMetaForCausalLM(ABC):
         images,
         image_sizes=None,
     ):
+        if images is None:
+            return (
+                input_ids,
+                position_ids,
+                attention_mask,
+                past_key_values,
+                None,
+                labels,
+            )
 
         image_features = self.encode_images(images)
 
