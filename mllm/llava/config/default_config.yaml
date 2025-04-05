@@ -1,5 +1,5 @@
 model:
-  model_name_or_path: "facebook/opt-125m"
+  model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
   lora_backbone: False
   lora_language: False
   vision_tower: null
