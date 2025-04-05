@@ -111,11 +111,17 @@ Below is an example command for training without a Slurm system:
 **Pretrain**
 
 ```bash
-./scripts/train/vlm/train.sh test_pretrain compute-cuda-02 L40S 4 4 mllm/configs/pretrain.yaml mllm/configs/deepspeed/zero3.json
+./scripts/train/vlm/train.sh test_pretrain compute-cuda-02 8 8 mllm/configs/pretrain.yaml mllm/configs/deepspeed/zero3.json
 ```
 
 **Finetune**
 
 ```bash
-./scripts/train/vlm/train.sh test_finetune compute-cuda-02 L40S 4 4 mllm/configs/finetune.yaml mllm/configs/deepspeed/zero3.json
+./scripts/train/vlm/train.sh test_finetune compute-cuda-02 4 4 mllm/configs/finetune.yaml mllm/configs/deepspeed/zero3.json
+```
+
+**Generate**
+
+```bash
+./scripts/generate/generate.sh test_generate compute-cuda-02 runs/test_pretrain/config.yaml runs/test_pretrain/final/model.bin
 ```
