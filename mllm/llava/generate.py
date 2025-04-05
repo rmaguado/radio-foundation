@@ -51,13 +51,14 @@ def generate():
     logging.info(f"Loaded weights")
     logging.info(pretrained_weights.keys())
 
-    model.get_vision_tower().to(training_args.device)
-    model.get_mm_projector().to(training_args.device)
+    # model.get_vision_tower().to(training_args.device)
+    # model.get_mm_projector().to(training_args.device)
 
     model.config.tokenizer_model_max_length = tokenizer.model_max_length
     model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
 
     model.requires_grad_(False)
+    model.to(training_args.device)
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     dataloader = torch.utils.data.DataLoader(
@@ -75,26 +76,28 @@ def generate():
     logging.info(f"Output directory: {outdir}")
 
     for batch in dataloader:
-        logging.info(batch.keys())
         if "image" in batch:
             batch["images"] = batch.pop("image")
 
         input_ids = batch.pop("input_ids").to(training_args.device)
         attention_mask = batch.pop("attention_mask").to(training_args.device)
-        images = batch.pop("images").to(training_args.device)
+        images = [x.to(training_args.device) for x in batch.pop("images")]
 
-        with torch.no_grad():
+        with torch.inference_mode():
             outputs = model.generate(
                 input_ids,
                 attention_mask=attention_mask,
                 images=images,
                 max_length=training_args.model_max_length,
+                pad_token_id=tokenizer.pad_token_id,
             )
 
         for i, output in enumerate(outputs):
             output = tokenizer.decode(output, skip_special_tokens=True)
             with open(os.path.join(outdir, f"output_{i}.txt"), "w") as f:
                 f.write(output)
+
+        break
 
 
 if __name__ == "__main__":
