@@ -10,6 +10,7 @@ student:
   ffn_layer: swiglu
   drop_path_rate: 0.3
   layerscale: 1.0e-05
+  block_chunks: 4
   channels: 10
   patch_size: 16
   full_image_size: 448
