@@ -9,6 +9,7 @@ import os
 import sys
 from typing import Optional
 
+from .helpers import MetricLogger
 import dinov2.distributed as distributed
 
 
