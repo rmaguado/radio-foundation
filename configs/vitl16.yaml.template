@@ -1,21 +1,24 @@
 train:
-  batch_size_per_gpu: 56
+  batch_size_per_gpu: 56 # 3072 total
   grad_accum_steps: 9
   full_image:
-    epochs: 5
+    epochs: 20
     batch_size_per_gpu: 14
     grad_accum_steps: 36
 student:
   arch: vit_large
-  ffn_layer: mlp
-  drop_path_rate: 0.4
+  ffn_layer: swiglu
+  drop_path_rate: 0.3
+  layerscale: 1.0e-05
   channels: 10
+  patch_size: 16
+  full_image_size: 448
 teacher:
   warmup_teacher_temp_epochs: 30
 optim:
-  epochs: 100
+  epochs: 150
   warmup_epochs: 10
-  base_lr: 0.003
+  base_lr: 3.5e-4
 datasets:
   - name: radiomics_datasets
     weight: 1.0
