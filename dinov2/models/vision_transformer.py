@@ -73,9 +73,13 @@ def get_embedding_layer(
         )
 
 
-class BlockChunk(nn.ModuleList):
+class BlockChunk(nn.Module):
+    def __init__(self, blocks):
+        super().__init__()
+        self.blocks = nn.ModuleList(blocks)
+
     def forward(self, x):
-        for b in self:
+        for b in self.blocks:
             x = b(x)
         return x
 
