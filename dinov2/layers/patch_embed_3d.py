@@ -57,6 +57,9 @@ class PatchEmbed3D(nn.Module):
             image_HW[0] // patch_HW[0],
             image_HW[1] // patch_HW[1],
         )
+        assert (
+            img_depth % in_chans == 0
+        ), "img_depth must be divisible by in_chans when using patch embed_3d"
 
         self.img_size = image_HW
         self.patch_size = patch_DHW
