@@ -20,6 +20,7 @@ from torch.nn.init import trunc_normal_
 from dinov2.layers import (
     Mlp,
     PatchEmbed,
+    PatchEmbed3D,
     CnnEmbed,
     SwiGLUFFNFused,
     MemEffAttention,
@@ -58,6 +59,14 @@ def get_embedding_layer(
             patch_size=patch_size,
             in_chans=in_chans,
             embed_dim=embed_dim,
+        )
+    elif embed_layer == "patch3d":
+        return PatchEmbed3D(
+            img_size=img_size,
+            patch_size=patch_size,
+            in_chans=in_chans,
+            embed_dim=embed_dim,
+            img_depth=240,
         )
     elif embed_layer == "conv":
         return CnnEmbed(
@@ -100,7 +109,7 @@ class DinoVisionTransformer(nn.Module):
         drop_path_rate=0.0,
         drop_path_uniform=False,
         init_values=None,  # for layerscale: None or 0 => no layerscale
-        embed_layer="patch",  # 'patch' or 'conv'
+        embed_layer="patch",  # 'patch', 'patch3d', or 'conv'
         conv_channels=0,
         act_layer=nn.GELU,
         block_fn=Block,
