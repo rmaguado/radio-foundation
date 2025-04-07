@@ -51,7 +51,7 @@ class AttentionalPoolProjector(nn.Module):
         self,
         embed_dim,
         hidden_dim,
-        patch_resample_tokens=64,
+        patch_resample_tokens=16,
         axial_resample_tokens=128,
         dropout=0.5,
     ):
