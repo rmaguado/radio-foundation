@@ -201,7 +201,7 @@ class LlavaMetaForCausalLM(ABC):
         attention_mask = torch.zeros(
             (batch_size, max_len),
             dtype=attention_mask.dtype,
-            device=attention_mask.device,
+            device=self.device,
         )
         position_ids = torch.zeros(
             (batch_size, max_len), dtype=torch.long, device=self.device
@@ -229,7 +229,7 @@ class LlavaMetaForCausalLM(ABC):
                     new_labels_padded[i, -cur_len:] = cur_new_labels
                     attention_mask[i, -cur_len:] = True
                     position_ids[i, -cur_len:] = torch.arange(
-                        0, cur_len, dtype=position_ids.dtype, device=position_ids.device
+                        0, cur_len, dtype=position_ids.dtype, device=self.device
                     )
             else:
                 new_input_embeds_padded.append(
@@ -249,7 +249,7 @@ class LlavaMetaForCausalLM(ABC):
                     new_labels_padded[i, :cur_len] = cur_new_labels
                     attention_mask[i, :cur_len] = True
                     position_ids[i, :cur_len] = torch.arange(
-                        0, cur_len, dtype=position_ids.dtype, device=position_ids.device
+                        0, cur_len, dtype=position_ids.dtype, device=self.device
                     )
 
         new_input_embeds = torch.stack(new_input_embeds_padded, dim=0).to(self.device)
