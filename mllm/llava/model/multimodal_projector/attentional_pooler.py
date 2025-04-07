@@ -71,7 +71,7 @@ class AttentionalPoolProjector(nn.Module):
             latent_dim=hidden_dim,
             num_queries=axial_resample_tokens,
         )
-        self.norm = nn.LayerNorm(embed_dim)
+        self.norm = nn.LayerNorm(hidden_dim)
         self.proj = nn.Linear(hidden_dim, hidden_dim)
         # self.proj = nn.Sequential(
         #    nn.Linear(hidden_dim, hidden_dim),
