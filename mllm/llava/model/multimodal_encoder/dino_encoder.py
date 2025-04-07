@@ -65,7 +65,6 @@ class DINOVisionTower(nn.Module):
 
         self.is_loaded = True
 
-    @torch.no_grad()
     def forward(self, images: list):
         features = []
         with self.autocast_ctx():
