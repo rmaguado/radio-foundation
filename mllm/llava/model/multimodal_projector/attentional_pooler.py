@@ -71,8 +71,13 @@ class AttentionalPoolProjector(nn.Module):
             latent_dim=hidden_dim,
             num_queries=axial_resample_tokens,
         )
-        self.mlp = nn.Linear(hidden_dim, hidden_dim)
-        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(embed_dim)
+        self.proj = nn.Linear(hidden_dim, hidden_dim)
+        # self.proj = nn.Sequential(
+        #    nn.Linear(hidden_dim, hidden_dim),
+        #    nn.GELU(),
+        #    nn.Linear(hidden_dim, hidden_dim),
+        # )
 
     def forward(self, embeddings, mask=None):
 
@@ -85,7 +90,9 @@ class AttentionalPoolProjector(nn.Module):
             x = self.token_resampler(x)
             x = rearrange(x, "a t d -> 1 (a t) d")
             x = self.axial_resampler(x)
-            x = self.mlp(x)
+            x = rearrange(x, "1 t d -> t d")
+            x = self.norm(x)
+            x = self.proj(x)
 
             projected_embeddings.append(x.squeeze())
 
