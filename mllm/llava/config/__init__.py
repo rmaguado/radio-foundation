@@ -95,6 +95,8 @@ def load_train_config():
     )
 
     model_args.image_tokens = data_args.image_tokens
+    training_args.lora_bias = model_args.lora_backbone.lora_bias
+    assert model_args.lora_backbone.lora_bias == model_args.lora_language.lora_bias
 
     with open(os.path.join(args.output_path, "config.yaml"), "w") as f:
         OmegaConf.save(config=cfg, f=f)
