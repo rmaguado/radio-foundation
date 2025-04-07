@@ -168,7 +168,7 @@ class LlavaMetaForCausalLM(ABC):
                     torch.full(
                         (cur_image_features.shape[0],),
                         IGNORE_INDEX,
-                        device=cur_labels.device,
+                        device=self.device,
                         dtype=cur_labels.dtype,
                     ),
                     after_labels,
