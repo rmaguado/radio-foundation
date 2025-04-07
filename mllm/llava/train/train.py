@@ -42,8 +42,6 @@ def train(attn_implementation="flash_attention_2"):
 
     global local_rank
     local_rank = training_args.local_rank
-    if dist.is_initialized():
-        dist.barrier(device_ids=[local_rank])
 
     model = LlavaLlamaForCausalLM.from_pretrained(
         model_args.model_name_or_path,
