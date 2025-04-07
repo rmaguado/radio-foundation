@@ -79,13 +79,13 @@ def train(attn_implementation="flash_attention_2"):
         fsdp=training_args.fsdp,
     )
 
-    if training_args.lora_enable:
-        configure_lora(
-            model,
-            training_args,
-            model_args.lora_backbone,
-            model_args.lora_language,
-        )
+    if training_args.bits == 16:
+        if training_args.bf16:
+            model.to(torch.bfloat16)
+        if training_args.fp16:
+            model.to(torch.float16)
+
+    configure_lora(model.get_model(), model_args)
 
     if model_args.checkpoint_path is not None:
         pretrained_weights = torch.load(model_args.checkpoint_path, map_location="cpu")

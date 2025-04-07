@@ -65,11 +65,10 @@ def save_model(training_args, model, output_dir):
         model.named_parameters(), require_grad_only=True
     )
 
-    if training_args.lora_enable:
-        lora_state_dict = get_peft_state_maybe_zero_3(
-            model.named_parameters(), training_args.lora_bias
-        )
-        state_dict.update(lora_state_dict)
+    lora_state_dict = get_peft_state_maybe_zero_3(
+        model.named_parameters(), training_args.lora_bias
+    )
+    state_dict.update(lora_state_dict)
 
     if training_args.local_rank < 1:
         torch.save(

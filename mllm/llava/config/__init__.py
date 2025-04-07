@@ -14,12 +14,6 @@ class TrainingArguments(transformers.TrainingArguments):
     remove_unused_columns: bool = field(default=False)
     model_max_length: int = field(default=1024)
     bits: int = field(default=16, metadata={"help": "How many bits to use."})
-    lora_enable: bool = field(default=False)
-    lora_r: int = field(default=64)
-    lora_alpha: int = field(default=16)
-    lora_dropout: float = field(default=0.05)
-    lora_weight_path: str = field(default="")
-    lora_bias: str = field(default="none")
     mm_projector_lr: Optional[float] = None
     group_by_modality_length: bool = field(default=False)
 

@@ -1,7 +1,9 @@
 model:
   model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
-  lora_backbone: False
-  lora_language: True
+  lora_backbone:
+    lora_enable: True
+  lora_language:
+    lora_enable: True
   vision_tower: "dino-vit-base-patch14-10"
   mm_vision_select_layer: -1
   checkpoint_path: null # REQUIRED
@@ -21,7 +23,6 @@ train:
   optim: "adamw_torch"
   learning_rate: 2e-5
   mm_projector_lr: 1e-4
-  lora_enable: True
   dataloader_num_workers: 8
   save_steps: 0.1
   save_total_limit: null

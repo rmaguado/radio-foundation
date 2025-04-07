@@ -1,7 +1,17 @@
 model:
   model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
-  lora_backbone: False
-  lora_language: False
+  lora_backbone:
+    lora_enable: False
+    lora_r: 8
+    lora_alpha: 16
+    lora_dropout: 0.05
+    lora_bias: "none"
+  lora_language:
+    lora_enable: False
+    lora_r: 64
+    lora_alpha: 128
+    lora_dropout: 0.05
+    lora_bias: "none"
   vision_tower: null
   mm_vision_select_layer: -1
   checkpoint_path: null
@@ -22,12 +32,6 @@ train:
   cache_dir: "mllm/cache"
   optim: "adamw_torch"
   bits: 16
-  lora_enable: False
-  lora_r: 64
-  lora_alpha: 16
-  lora_dropout: 0.05
-  lora_weight_path: null
-  lora_bias: "none"
   learning_rate: 1e-3
   mm_projector_lr: 1e-4
   group_by_modality_length: False

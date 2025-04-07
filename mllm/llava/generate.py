@@ -38,13 +38,10 @@ def generate():
         fsdp=training_args.fsdp,
     )
 
-    if training_args.lora_enable:
-        configure_lora(
-            model,
-            training_args,
-            model_args.lora_backbone,
-            model_args.lora_language,
-        )
+    configure_lora(
+        model,
+        model_args,
+    )
 
     logging.info(f"Loading from checkpoint: {model_args.checkpoint_path}")
     pretrained_weights = torch.load(model_args.checkpoint_path, map_location="cpu")

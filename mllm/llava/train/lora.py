@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger("DeepSpeed")
 
 
-def find_target_linear_names(model, lora_namespan_exclude):
+def find_target_linear_names(model, lora_namespan_exclude=[]):
     linear_cls = torch.nn.modules.Linear
     embedding_cls = torch.nn.modules.Embedding
     lora_module_names = []
@@ -24,26 +24,27 @@ def find_target_linear_names(model, lora_namespan_exclude):
     return lora_module_names
 
 
-def configure_lora(model, training_args, lora_backbone=False, lora_language=True):
+def _configure_lora_module(module, args):
     from peft import LoraConfig, get_peft_model
 
-    lora_namespan_exclude = ["lm_head", "embed_tokens", "mm_projector"]
-    if not lora_backbone:
-        lora_namespan_exclude.append("vision_tower")
-    if not lora_language:
-        lora_namespan_exclude.append("layers")
-
     peft_config = LoraConfig(
-        r=training_args.lora_r,
-        lora_alpha=training_args.lora_alpha,
-        target_modules=find_target_linear_names(model, lora_namespan_exclude),
-        lora_dropout=training_args.lora_dropout,
-        bias=training_args.lora_bias,
+        r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        target_modules=find_target_linear_names(module),
+        lora_dropout=args.lora_dropout,
+        bias=args.lora_bias,
     )
-    if training_args.bits == 16:
-        if training_args.bf16:
-            model.to(torch.bfloat16)
-        if training_args.fp16:
-            model.to(torch.float16)
-    logger.info("Adding LoRA adapters.")
-    return get_peft_model(model, peft_config)
+    return get_peft_model(module, peft_config)
+
+
+def configure_lora(model, model_args):
+    backbone_settings = model_args.lora_backbone
+
+    if backbone_settings.lora_enable:
+        _configure_lora_module(model.vision_tower.vision_tower, backbone_settings)
+        logger.info("Adding LoRA adapters to vision tower.")
+
+    language_settings = model_args.lora_language
+    if language_settings.lora_enable:
+        _configure_lora_module(model.layers, language_settings)
+        logger.info("Adding LoRA adapters to language model.")
