@@ -93,11 +93,19 @@ conv_llama_3 = Conversation(
     sep_style=SeparatorStyle.LLAMA_3,
 )
 
+report_llama_3 = Conversation(
+    system="You are a radiology assistant specialized in interpreting chest CT scans and generating concise, accurate radiology reports. Using the provided visual tokens, identify relevant findings, describe them using standard radiological terminology, and produce a clear, well-structured report.",
+    roles=("user", "assistant"),
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.LLAMA_3,
+)
+
 
 default_conversation = conv_llava_plain
 conv_templates = {
     "plain": conv_llava_plain,
-    "llama_3": conv_llama_3,
+    "llama_3": report_llama_3,
 }
 
 
