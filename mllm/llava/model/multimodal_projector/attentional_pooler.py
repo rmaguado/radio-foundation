@@ -53,7 +53,6 @@ class AttentionalPoolProjector(nn.Module):
         hidden_dim,
         patch_resample_tokens=16,
         axial_resample_tokens=128,
-        dropout=0.5,
     ):
         super().__init__()
 
