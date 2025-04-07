@@ -23,7 +23,7 @@ from mllm.llava.constants import (
 
 class ImageProcessor:
     def __init__(
-        self, img_size, mean, std, min_zspacing=1.0, channels=10, pad_value=-1000
+        self, img_size, mean, std, min_zspacing=1.5, channels=10, pad_value=-1000
     ):
         self.img_size = img_size
         self.normalize = transforms.Normalize(mean=mean, std=std)
@@ -60,7 +60,7 @@ class ImageProcessor:
         target_height = self.img_size if h >= w else self.img_size * h // w
 
         if slice_thickness < self.min_zspacing:
-            target_slices = int(slices * self.min_zspacing / slice_thickness)
+            target_slices = int(slices * slice_thickness / self.min_zspacing)
         else:
             target_slices = slices
 
@@ -96,7 +96,7 @@ class _ReportDataset(NiftiCtVolumesFull):
         img_size: int = 504,
         mean: float = 0.0,
         std: float = 1.0,
-        min_zspacing=1.0,
+        min_zspacing=1.5,
     ):
         super().__init__(
             dataset_name=dataset_name,
