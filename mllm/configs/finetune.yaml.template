@@ -16,7 +16,7 @@ data:
   data_mean: -573.8
   data_std: 461.3
   image_tokens: 128
-  conv_template: "plain"
+  conv_template: "llama_3"
 train:
   per_device_train_batch_size: 16 # aim for 128 total
   gradient_accumulation_steps: 1
