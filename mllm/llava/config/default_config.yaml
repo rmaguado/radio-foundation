@@ -16,7 +16,7 @@ model:
   mm_vision_select_layer: -1
   checkpoint_path: null
   mm_projector_type: "attn_pool"
-  mm_vision_select_feature: "patch"
+  mm_vision_select_feature: "cls_patch"
   mm_vision_config_path: null
   mm_vision_checkpoint_path: null
 data:
@@ -41,7 +41,7 @@ train:
   gradient_accumulation_steps: 1
   eval_strategy: "no"
   save_strategy: "steps"
-  save_steps: 24000
+  save_steps: 1
   save_total_limit: null
   weight_decay: 0.0
   warmup_ratio: 0.03

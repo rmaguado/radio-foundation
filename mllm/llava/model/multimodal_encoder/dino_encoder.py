@@ -73,7 +73,22 @@ class DINOVisionTower(nn.Module):
                 img_features = self.vision_tower.get_intermediate_layers(
                     img, [self.select_layer], return_class_token=self.use_cls
                 )
-                features.append(img_features[0].to(self.output_type))
+                if self.use_cls:
+                    img_features = torch.cat(
+                        [
+                            torch.cat(
+                                [class_token.unsqueeze(1), layer_patch_tokens], dim=1
+                            )
+                            for layer_patch_tokens, class_token in img_features
+                        ],
+                        dim=-1,
+                    )
+                else:
+                    img_features = torch.cat(
+                        [layer_patch_tokens for layer_patch_tokens, _ in img_features],
+                        dim=-1,
+                    )
+                features.append(img_features.to(self.output_type))
 
         return features
 
