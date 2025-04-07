@@ -91,9 +91,6 @@ def train(attn_implementation="flash_attention_2"):
 
         logger.info(f"Loaded weights from checkpoint: {model_args.checkpoint_path}")
 
-    model.get_vision_tower().to(training_args.device)
-    model.get_mm_projector().to(training_args.device)
-
     model.config.tokenizer_model_max_length = tokenizer.model_max_length
 
     for p in model.get_model().mm_projector.parameters():
