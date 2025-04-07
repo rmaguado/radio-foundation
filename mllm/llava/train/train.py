@@ -51,7 +51,6 @@ def train(attn_implementation="flash_attention_2"):
     )
 
     model.config.use_cache = False
-    model.freeze_language()
 
     if training_args.gradient_checkpointing:
         if hasattr(model, "enable_input_require_grads"):
@@ -70,6 +69,7 @@ def train(attn_implementation="flash_attention_2"):
         padding_side="right",
         use_fast=False,
     )
+    model.freeze_language()
 
     model.get_model().initialize_vision_modules(
         model_args=model_args,
