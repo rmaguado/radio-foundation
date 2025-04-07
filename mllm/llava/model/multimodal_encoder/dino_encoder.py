@@ -23,6 +23,9 @@ class DINOVisionTower(nn.Module):
         self.select_feature = getattr(args, "mm_vision_select_feature", "patch")
 
         self.use_cls = self.select_feature == "cls_patch"
+        self.extract_fnc = (
+            self.extract_cls_patch if self.use_cls else self.extract_patch
+        )
         self.path_to_checkpoint = args.mm_vision_checkpoint_path
 
         if not delay_load:
@@ -57,26 +60,33 @@ class DINOVisionTower(nn.Module):
 
         self.is_loaded = True
 
+    def extract_cls_patch(self, img_features):
+        return torch.cat(
+            [
+                torch.cat([class_token.unsqueeze(1), layer_patch_tokens], dim=1)
+                for layer_patch_tokens, class_token in img_features
+            ],
+            dim=-1,
+        )
+
+    def extract_patch(self, img_features):
+        return torch.cat(
+            [layer_patch_tokens for layer_patch_tokens, _ in img_features],
+            dim=-1,
+        )
+
     def forward(self, images: list):
         features = []
+
         for img in images:
-            img_features = self.vision_tower.get_intermediate_layers(
+
+            img_features = []
+
+            x_tokens = self.vision_tower.get_intermediate_layers(
                 img, [self.select_layer], return_class_token=self.use_cls
             )
-            if self.use_cls:
-                img_features = torch.cat(
-                    [
-                        torch.cat([class_token.unsqueeze(1), layer_patch_tokens], dim=1)
-                        for layer_patch_tokens, class_token in img_features
-                    ],
-                    dim=-1,
-                )
-            else:
-                img_features = torch.cat(
-                    [layer_patch_tokens for layer_patch_tokens, _ in img_features],
-                    dim=-1,
-                )
-            features.append(img_features.to(self.output_type))
+            feat = self.extract_fnc(x_tokens)
+            features.append(feat)
 
         return features
 
