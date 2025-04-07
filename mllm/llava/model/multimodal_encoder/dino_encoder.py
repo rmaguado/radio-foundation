@@ -53,47 +53,30 @@ class DINOVisionTower(nn.Module):
 
         logger.info(f"Chosen select layer for vision tower: {self.select_layer}.")
 
-        teacher_dtype_str = (
-            self.model_config.compute_precision.teacher.backbone.mixed_precision.param_dtype
-        )
-        if teacher_dtype_str == "fp16":
-            autocast_dtype = torch.half
-        elif teacher_dtype_str == "bf16":
-            autocast_dtype = torch.bfloat16
-        else:
-            autocast_dtype = torch.float
-
-        self.autocast_ctx = partial(
-            torch.autocast, enabled=True, dtype=autocast_dtype, device_type="cuda"
-        )
-
         self.vision_tower.requires_grad_(False)
 
         self.is_loaded = True
 
     def forward(self, images: list):
         features = []
-        with self.autocast_ctx():
-            for img in images:
-                img_features = self.vision_tower.get_intermediate_layers(
-                    img, [self.select_layer], return_class_token=self.use_cls
+        for img in images:
+            img_features = self.vision_tower.get_intermediate_layers(
+                img, [self.select_layer], return_class_token=self.use_cls
+            )
+            if self.use_cls:
+                img_features = torch.cat(
+                    [
+                        torch.cat([class_token.unsqueeze(1), layer_patch_tokens], dim=1)
+                        for layer_patch_tokens, class_token in img_features
+                    ],
+                    dim=-1,
                 )
-                if self.use_cls:
-                    img_features = torch.cat(
-                        [
-                            torch.cat(
-                                [class_token.unsqueeze(1), layer_patch_tokens], dim=1
-                            )
-                            for layer_patch_tokens, class_token in img_features
-                        ],
-                        dim=-1,
-                    )
-                else:
-                    img_features = torch.cat(
-                        [layer_patch_tokens for layer_patch_tokens, _ in img_features],
-                        dim=-1,
-                    )
-                features.append(img_features.to(self.output_type))
+            else:
+                img_features = torch.cat(
+                    [layer_patch_tokens for layer_patch_tokens, _ in img_features],
+                    dim=-1,
+                )
+            features.append(img_features.to(self.output_type))
 
         return features
 
