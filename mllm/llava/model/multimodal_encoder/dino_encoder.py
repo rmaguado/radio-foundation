@@ -2,9 +2,13 @@ import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 from functools import partial
+import logging
 
 from dinov2.models import build_model_from_cfg
 from dinov2.utils.utils import load_pretrained_weights
+
+
+logger = logging.getLogger("DeepSpeed")
 
 
 class DINOVisionTower(nn.Module):
@@ -46,6 +50,8 @@ class DINOVisionTower(nn.Module):
 
         if self.select_layer < 0:
             self.select_layer = self.vision_tower.n_blocks + self.select_layer
+
+        logger.info(f"Chosen select layer for vision tower: {self.select_layer}.")
 
         teacher_dtype_str = (
             self.model_config.compute_precision.teacher.backbone.mixed_precision.param_dtype
