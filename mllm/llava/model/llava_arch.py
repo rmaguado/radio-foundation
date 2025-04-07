@@ -122,6 +122,7 @@ class LlavaMetaForCausalLM(ABC):
 
         if labels is None:
             labels = torch.full_like(input_ids, IGNORE_INDEX)
+        labels_dtype = labels.dtype
 
         input_ids = [
             cur_input_ids[cur_attention_mask]
