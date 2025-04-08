@@ -22,6 +22,7 @@ cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
 export MASTER_PORT=$(find_port)
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 deepspeed \
     --num_gpus=$GPUS \
