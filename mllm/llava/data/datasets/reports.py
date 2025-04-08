@@ -23,7 +23,14 @@ from mllm.llava.constants import (
 
 class ImageProcessor:
     def __init__(
-        self, img_size, mean, std, min_zspacing=1.5, channels=10, pad_value=-1000
+        self,
+        img_size,
+        mean,
+        std,
+        min_zspacing=1.5,
+        channels=10,
+        pad_value=-1000,
+        max_slices=500,
     ):
         self.img_size = img_size
         self.normalize = transforms.Normalize(mean=mean, std=std)
@@ -31,6 +38,9 @@ class ImageProcessor:
         self.min_zspacing = min_zspacing
         self.channels = channels
         self.pad_value = pad_value
+        self.max_slices = max_slices
+
+        assert max_slices % channels == 0, "max_slices must be divisible by channels"
 
     def pad_square(self, image):
         s, w, h = image.shape
@@ -53,6 +63,17 @@ class ImageProcessor:
 
         return image
 
+    def clip_slices(self, image):
+        slices, w, h = image.shape
+
+        if slices > self.max_slices:
+            start = (slices - self.max_slices) // 2
+            end = start + self.max_slices
+
+            image = image[start:end]
+
+        return image
+
     def resize(self, image, slice_thickness):
         slices, w, h = image.shape
 
@@ -72,10 +93,10 @@ class ImageProcessor:
             image, size=(target_slices, target_width, target_height), mode="trilinear"
         ).squeeze()
         image = self.pad_square(image)
+        image = self.clip_slices(image)
         return rearrange(
             image,
             "(g c) w h -> g c w h",
-            g=groups,
             c=self.channels,
             w=self.img_size,
             h=self.img_size,
@@ -97,6 +118,7 @@ class _ReportDataset(NiftiCtVolumesFull):
         mean: float = 0.0,
         std: float = 1.0,
         min_zspacing=1.5,
+        max_slices=500,
     ):
         super().__init__(
             dataset_name=dataset_name,
@@ -106,7 +128,12 @@ class _ReportDataset(NiftiCtVolumesFull):
         )
 
         self.image_processor = ImageProcessor(
-            img_size, mean, std, min_zspacing, channels
+            img_size=img_size,
+            mean=mean,
+            std=std,
+            min_zspacing=min_zspacing,
+            channels=channels,
+            max_slices=max_slices,
         )
 
     def create_entries(self) -> np.ndarray:
