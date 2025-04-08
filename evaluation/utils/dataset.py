@@ -113,6 +113,45 @@ class BalancedSampler(Sampler):
         return 2 * self.n_samples
 
 
+class ScoreStratifiedBalancedSampler(Sampler):
+    def __init__(self, dataset, n_bins=10, samples_per_bin=None):
+        self.dataset = dataset
+        self.labels = [dataset.get_target(i) for i in range(len(dataset))]
+        self.scores = [dataset.get_score(i) for i in range(len(dataset))]
+        self.bin_edges = np.quantile(self.scores, np.linspace(0, 1, n_bins + 1))
+        self.samples_per_bin = samples_per_bin
+        self.binned_indices = self._bin_indices()
+
+    def _bin_indices(self):
+        binned_indices = {}
+        for bin_idx in range(len(self.bin_edges) - 1):
+            bin_min = self.bin_edges[bin_idx]
+            bin_max = self.bin_edges[bin_idx + 1]
+            bin_pos = [i for i, (label, score) in enumerate(zip(self.labels, self.scores))
+                       if label == 1 and bin_min <= score <= bin_max]
+            bin_neg = [i for i, (label, score) in enumerate(zip(self.labels, self.scores))
+                       if label == 0 and bin_min <= score <= bin_max]
+            n_samples = min(len(bin_pos), len(bin_neg))
+            if self.samples_per_bin:
+                n_samples = min(n_samples, self.samples_per_bin)
+            binned_indices[bin_idx] = (bin_pos, bin_neg, n_samples)
+        return binned_indices
+
+    def __iter__(self):
+        sampled_indices = []
+        for bin_idx, (pos_idx, neg_idx, n_samples) in self.binned_indices.items():
+            if n_samples == 0:
+                continue
+            pos_sampled = np.random.choice(pos_idx, n_samples, replace=len(pos_idx) < n_samples)
+            neg_sampled = np.random.choice(neg_idx, n_samples, replace=len(neg_idx) < n_samples)
+            sampled_indices.extend(pos_sampled)
+            sampled_indices.extend(neg_sampled)
+        np.random.shuffle(sampled_indices)
+        return iter(sampled_indices)
+
+    def __len__(self):
+        return sum(2 * n_samples for _, _, n_samples in self.binned_indices.values())
+
 def collate_sequences(batch):
     embeddings, labels = zip(*batch)
     batch_size = len(embeddings)
