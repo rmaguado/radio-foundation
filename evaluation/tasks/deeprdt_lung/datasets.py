@@ -9,48 +9,63 @@ class DeepRDT_lung:
         embeddings_provider: Any,
         metadata_path: str,
         label: str,
+        true_category: str,
     ):
         self.df = pd.read_csv(metadata_path)
         self.label = label
+        self.true_category = true_category.strip().lower()
         self.embeddings_provider = embeddings_provider
         self.map_ids = self.embeddings_provider.map_ids
         self.targets = self.index_targets()
 
+    def is_valid_value(self, val: Any) -> bool:
+        """Check if value is valid (not missing/blank/na/nan)"""
+        if pd.isna(val):
+            return False
+        val_str = str(val).strip().lower()
+        return val_str not in {"", "na", "nan", "none"}
+
     def index_targets(self):
-        map_id_alias = {}
-        for map_id in self.map_ids:
-            if "_" in map_id:
-                map_id_alias[map_id] = map_id.split("_")[0]
+        if self.label not in self.df.columns:
+            raise ValueError(f"Label '{self.label}' not found in metadata.")
 
-        df_filtered = self.df[self.df["MAPID"].isin(map_id_alias.values())]
+        df_filtered = self.df[self.df["MAPID"].isin(self.map_ids)]
 
-        if self.label == "respuesta":
-            target_fn = self.get_response
-        elif self.label == "sexo":
-            target_fn = self.get_sex
-        elif self.label == "tabaco":
-            target_fn = self.get_tabaco
-        else:
-            raise ValueError(f"Label {self.label} not implemented.")
+        label_series = df_filtered[self.label].astype(str).str.strip().str.lower()
 
-        targets = df_filtered.set_index("MAPID")[self.label].to_dict()
+        # Apply validity mask
+        valid_mask = label_series.apply(self.is_valid_value)
+        valid_values = label_series[valid_mask].unique()
+
+        print("Categories:", valid_values)
+
+        if len(valid_values) != 2:
+            raise ValueError(
+                f"Label '{self.label}' must have exactly 2 unique non-missing values. Found: {valid_values}"
+            )
+
+        if self.true_category not in valid_values:
+            raise ValueError(
+                f"Provided true_category '{self.true_category}' not found in label values: {valid_values}"
+            )
+
+        def target_fn(val: Any) -> Any:
+            val_str = str(val).strip().lower()
+            if not self.is_valid_value(val_str):
+                return None
+            return val_str == self.true_category
+
+        target_column = df_filtered.set_index("MAPID")[self.label]
         targets = {
-            map_id: target_fn(targets[map_id_alias[map_id]]) for map_id in self.map_ids
+            map_id: target_fn(target_column[map_id])
+            for map_id in self.map_ids
+            if map_id in target_column
         }
+
+        targets = {k: v for k, v in targets.items() if v is not None}
+        self.map_ids = [k for k in self.map_ids if k in targets]
+
         return targets
-
-    def get_response(self, entry: str) -> bool:
-        return entry in [
-            "1-Completa",
-            "2-Parcial",
-        ]  # 1-Completa, 2-Parcial, 3-Estable, 4-Progresion
-
-    def get_sex(self, entry: str) -> bool:
-        assert entry in ["Hombre", "Mujer"]
-        return entry == "Hombre"
-
-    def get_tabaco(self, entry: str) -> bool:
-        return entry != "Nunca"
 
     def get_target(self, index):
         return self.targets[self.map_ids[index]]
@@ -62,5 +77,4 @@ class DeepRDT_lung:
         map_id = self.map_ids[index]
         label = self.get_target(index)
         embeddings = self.embeddings_provider.get_embeddings(map_id)
-
         return embeddings, label

@@ -26,21 +26,33 @@ from evaluation.utils.metrics import save_metrics, save_predictions, print_metri
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--outcome",
+        type=str,
+        default="response",
+        help="Outcome variable to be predicted.",
+    )
+    parser.add_argument(
+        "--predict",
+        type=str,
+        default="True",
+        help="Category to be predicted.",
+    )
+    parser.add_argument(
         "--experiment_name",
         type=str,
-        default="default_test",
+        default="outcome",
         help="Name of experiment. Used to differentiate save files.",
     )
     parser.add_argument(
         "--run_name",
         type=str,
-        default="vitb-14.10",
+        default="base10pat",
         help="Name of folder in /runs used to generate embeddings",
     )
     parser.add_argument(
         "--checkpoint_name",
         type=str,
-        default="unnamed_checkpoint",
+        default="f",
         help="Name of checkpoint in /runs/{$run_name}/checkpoints",
     )
     parser.add_argument(
@@ -70,25 +82,31 @@ def get_args():
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=4,
+        default=8,
         help="Number of samples in each batch. ",
     )
     parser.add_argument(
         "--accum_steps",
         type=int,
-        default=8,
+        default=4,
         help="Number of steps to accumulate gradients before updating model parameters.",
     )
     parser.add_argument(
         "--epochs",
         type=int,
-        default=10,
+        default=100,
         help="Number of times to validate between training.",
+    )
+    parser.add_argument(
+        "--num_folds",
+        type=int,
+        default=5,
+        help="Number of cross-validation folds.",
     )
     parser.add_argument(
         "--cls_only",
         type=bool,
-        default=False,
+        default=True,
         help="Wether to use only the CLS token or CLS + Patch tokens.",
     )
     parser.add_argument(
@@ -100,13 +118,13 @@ def get_args():
     return parser.parse_args()
 
 
-def get_datasets(args, label):
+def get_datasets(args, label, true_category):
     project_path = os.getenv("PROJECTPATH")
     data_path = os.getenv("DATAPATH")
 
     train_embeddings_path = os.path.join(
         project_path,
-        "evaluation/cache/DeepRDT-lung",
+        "evaluation/cache/DeepRDT-lung_eval",
         args.run_name,
         args.checkpoint_name,
     )
@@ -118,10 +136,8 @@ def get_datasets(args, label):
         project_path, "evaluation/tasks/deeprdt_lung/metadata.csv"
     )
 
-    train_dataset = CT_RATE(
-        train_embeddings_provider,
-        train_metadata_path,
-        label,
+    train_dataset = DeepRDT_lung(
+        train_embeddings_provider, train_metadata_path, label, true_category
     )
 
     return train_dataset
@@ -163,7 +179,7 @@ def train_and_evaluate_model(
 
     classifier_model = get_model(args, device)
     optimizer = torch.optim.SGD(
-        classifier_model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4
+        classifier_model.parameters(), lr=1e-3, momentum=0.9, weight_decay=0.0
     )
     criterion = torch.nn.BCEWithLogitsLoss()
 
@@ -230,16 +246,17 @@ def train_and_evaluate_model(
     print(f"Finished training in {tf:.4f} seconds. \n")
 
 
-def run_evaluation(args, label):
+def run_evaluation(args, label, true_category):
     project_path = os.getenv("PROJECTPATH")
+
+    n_folds = args.num_folds
 
     output_path = os.path.join(
         project_path,
         args.output_dir,
         args.run_name,
-        args.checkpoint_name,
-        args.experiment_name,
         label,
+        args.experiment_name,
     )
     os.makedirs(output_path, exist_ok=True)
 
@@ -247,13 +264,13 @@ def run_evaluation(args, label):
 
     device = torch.device("cuda")
 
-    train_val_dataset = get_datasets(args, label)
+    train_val_dataset = get_datasets(args, label, true_category)
 
-    cv_folds = cross_validation_split(train_val_dataset, 5)
+    cv_folds = cross_validation_split(train_val_dataset, n_folds)
 
     for fold_idx, (train_dataset, val_dataset) in enumerate(cv_folds):
 
-        print(f"Running fold {fold_idx + 1}/5\n")
+        print(f"Running fold {fold_idx + 1}/n_folds\n")
 
         train_and_evaluate_model(
             args,
@@ -265,10 +282,10 @@ def run_evaluation(args, label):
 
 
 def run_benchmarks(args):
-    labels = ["respuesta"]
+    label = args.outcome
+    true_category = str(args.predict)
 
-    for label in labels:
-        run_evaluation(args, label)
+    run_evaluation(args, label, true_category)
 
 
 if __name__ == "__main__":
