@@ -93,7 +93,6 @@ class LLaVATrainer(Trainer):
         return MultimodalBalanceLengthSampler(
             img_lengths=self.train_dataset.dataset.get_slices(),
             text_lengths=self.train_dataset.dataset.get_lengths(),
-            balance_text=False,
             bucket_size=256,
         )
 
