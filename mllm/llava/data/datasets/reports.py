@@ -147,14 +147,15 @@ class _ReportDataset(NiftiCtVolumesFull):
         entries_dtype = [
             ("rowid", np.uint32),
             ("length", np.uint32),
+            ("slices", np.uint32),
         ]
         entries = []
         row_id_lengths = self.cursor.execute(
-            f"SELECT rowid, length FROM global"
+            f"SELECT rowid, length, num_slices FROM global"
         ).fetchall()
 
-        for rowid, length in row_id_lengths:
-            entries.append((rowid, length))
+        for rowid, length, slices in row_id_lengths:
+            entries.append((rowid, length, slices))
 
         entries_array = np.array(entries, dtype=entries_dtype)
 
@@ -165,11 +166,14 @@ class _ReportDataset(NiftiCtVolumesFull):
     def get_lengths(self):
         return self.entries["length"]
 
+    def get_slices(self):
+        return self.entries["slices"]
+
     def process_report(self, report_text):
         return report_text
 
     def get_image_data(self, index: int) -> torch.Tensor:
-        rowid, _ = self.entries[index]
+        rowid, _, _ = self.entries[index]
         self.cursor.execute(
             """
             SELECT dataset, axial_dim, nifti_path, text, slice_thickness FROM global WHERE rowid = ?
