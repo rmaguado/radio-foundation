@@ -30,7 +30,7 @@ class ImageProcessor:
         min_zspacing=1.5,
         channels=10,
         pad_value=-1000,
-        max_slices=500,
+        max_slices=300,
     ):
         self.img_size = img_size
         self.normalize = transforms.Normalize(mean=mean, std=std)
@@ -118,7 +118,7 @@ class _ReportDataset(NiftiCtVolumesFull):
         mean: float = 0.0,
         std: float = 1.0,
         min_zspacing=1.5,
-        max_slices=500,
+        max_slices=300,
     ):
         super().__init__(
             dataset_name=dataset_name,
