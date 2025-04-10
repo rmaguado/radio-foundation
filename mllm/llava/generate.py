@@ -95,9 +95,8 @@ def generate():
     labels = labels[labels == IGNORE_INDEX].unsqueeze(0)
 
     for i, input_id in enumerate(input_ids[0]):
-        is_input = input_id == labels[0][i]
         if input_id == IMAGE_TOKEN_INDEX:
-            logging.info(f"{input_id}: <image> {is_input} {attention_mask[0][i]}")
+            logging.info(f"{input_id}: <image> {attention_mask[0][i]}")
             continue
         decoded_text = tokenizer.decode(input_id, skip_special_tokens=True)
         logging.info(f"{input_id}: {decoded_text} {is_input} {attention_mask[0][i]}")
