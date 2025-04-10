@@ -24,7 +24,9 @@ class PerceiverResampler(nn.Module):
         self.key = nn.Linear(embed_dim, latent_dim)
         self.value = nn.Linear(embed_dim, latent_dim)
 
-        self.attn = nn.MultiheadAttention(latent_dim, num_heads, dropout=dropout)
+        self.attn = nn.MultiheadAttention(
+            latent_dim, num_heads, dropout=dropout, batch_first=False
+        )
 
     def forward(self, x, mask=None):
         """
@@ -37,13 +39,54 @@ class PerceiverResampler(nn.Module):
         """
         batch_size, seq_len, _ = x.size()
 
-        q = self.query.unsqueeze(1).repeat(1, batch_size, 1)
-        k = self.key(x).transpose(0, 1)
-        v = self.value(x).transpose(0, 1)
+        q = repeat(self.query, "q h -> q b h", b=batch_size)
+        k = rearrange(self.key(x), "b k h -> k b h")
+        v = rearrange(self.value(x), "b k h -> k b h")
 
-        attn_output, _ = self.attn(q, k, v, key_padding_mask=mask)
+        attn_output, attn_weights = self.attn(q, k, v, key_padding_mask=mask)
 
-        return attn_output.transpose(0, 1)
+        return rearrange(attn_output, "b k h -> k b h"), attn_weights
+
+
+class AttentionMapPatchPredictor(nn.Module):
+    def __init__(
+        self, embed_dim, hidden_dim, num_labels, patch_resample_dim=64, dropout=0.5
+    ):
+        super().__init__()
+
+        self.embed_dim = embed_dim
+        self.hidden_dim = hidden_dim
+        self.patch_resample_dim = patch_resample_dim
+        self.num_labels = num_labels
+
+        self.token_resampler = PerceiverResampler(
+            embed_dim=embed_dim, latent_dim=hidden_dim, num_queries=patch_resample_dim
+        )
+        self.axial_resampler = PerceiverResampler(
+            embed_dim=hidden_dim, latent_dim=hidden_dim, num_queries=1
+        )
+        self.norm = nn.LayerNorm(hidden_dim)
+        self.proj = nn.Linear(hidden_dim, num_labels)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None, need_attn=False):
+        batch_size, axial_dim, num_tokens, embed_dim = x.size()
+
+        x = rearrange(x, "b a t e -> (b a) t e")
+        x, attn_map = self.token_resampler(x)
+        x = rearrange(x, "(b a) p h -> b (a p) h", a=axial_dim)
+
+        mask = repeat(mask, "b a -> b p a", p=self.patch_resample_dim)
+        mask = rearrange(mask, "b p a -> b (p a)")
+
+        x, _ = self.axial_resampler(x, mask=mask)
+        x = rearrange(x, "b 1 h -> b h")
+
+        x = self.norm(x)
+        x = self.proj(x)
+        if need_attn:
+            return x, attn_map
+        return x
 
 
 class FullScanPatchPredictor(nn.Module):
@@ -67,36 +110,20 @@ class FullScanPatchPredictor(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, mask=None):
-        # x: (batch_size 8, axial_dim 20, num_tokens 1297, embed_dim 768)
-        # mask: (batch_size 8, axial_dim 20)
-
         batch_size, axial_dim, num_tokens, embed_dim = x.size()
 
-        x = x.view(batch_size * axial_dim, num_tokens, embed_dim)
+        x = rearrange(x, "b a t e -> (b a) t e")
+        x, _ = self.token_resampler(x)
+        x = rearrange(x, "(b a) p h -> b (a p) h", a=axial_dim)
 
-        # x: (batch_size * axial_dim 160, num_tokens 1297, embed_dim 768)
+        mask = repeat(mask, "b a -> b p a", p=self.patch_resample_dim)
+        mask = rearrange(mask, "b p a -> b (p a)")
 
-        x = self.token_resampler(x)
-
-        # x: (batch_size * axial_dim 160, patch_resample_dim 64, hidden_dim 768)
-
-        x = x.reshape(batch_size, axial_dim, self.patch_resample_dim, self.hidden_dim)
-
-        x = x.reshape(batch_size, axial_dim * self.patch_resample_dim, self.hidden_dim)
-
-        # x: (batch_size 8, axial_dim * patch_resample_dim 1280, hidden_dim 768)
-
-        mask = mask.unsqueeze(1).repeat(1, self.patch_resample_dim, 1)
-        mask = mask.view(batch_size, axial_dim * self.patch_resample_dim)
-
-        # mask: (batch_size 8, axial_dim * patch_resample_dim 1280)
-
-        x = self.axial_resampler(x, mask=mask)
+        x, _ = self.axial_resampler(x, mask=mask)
+        x = rearrange(x, "b 1 h -> b h")
         x = self.dropout(x)
 
-        x = self.mlp(x)
-
-        return x.view(batch_size, self.num_labels)
+        return self.mlp(x)
 
 
 class FullScanClassPredictor(nn.Module):
@@ -109,26 +136,15 @@ class FullScanClassPredictor(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, mask=None):
-        # x: (batch_size 8, axial_dim 20, num_tokens 1, embed_dim 768)
-        # mask: (batch_size 8, axial_dim 20)
         batch_size, axial_dim, num_tokens, embed_dim = x.size()
 
         x = x.view(batch_size, axial_dim, embed_dim)
-        # mask = mask.unsqueeze(2)
 
-        # x: (batch_size 8, axial_dim 20, embed_dim 768)
-        # mask: (batch_size 8, axial_dim 20)
-
-        x = self.axial_resampler(x, mask=mask)
+        x, _ = self.axial_resampler(x, mask=mask)
+        x = rearrange(x, "b 1 h -> b h")
         x = self.dropout(x)
 
-        # x: (batch_size 8, 1, hidden_dim 768)
-
-        x = x.view(batch_size, -1)
-
-        x = self.mlp(x)
-
-        return x.view(batch_size, -1)
+        return self.mlp(x)
 
 
 class FullScanClassPatchPredictor(nn.Module):
@@ -160,26 +176,20 @@ class FullScanClassPatchPredictor(nn.Module):
         cls_tokens = x[:, :, :1, :]
         patch_tokens = x[:, :, 1:, :]
 
-        patch_tokens = patch_tokens.view(
-            batch_size * axial_dim, num_tokens - 1, embed_dim
-        )
-        patch_tokens = self.token_resampler(patch_tokens)
-        patch_tokens = patch_tokens.reshape(
-            batch_size, axial_dim, self.patch_resample_dim, self.hidden_dim
-        )
-        patch_tokens = patch_tokens.reshape(
-            batch_size, axial_dim * self.patch_resample_dim, self.hidden_dim
-        )
+        patch_tokens = rearrange(patch_tokens, "b a t e -> (b a) t e")
+        patch_tokens, _ = self.token_resampler(patch_tokens)
+        patch_tokens = rearrange(patch_tokens, "(b a) t h -> b (a t) h", a=axial_dim)
 
-        patch_mask = mask.unsqueeze(1).repeat(1, self.patch_resample_dim, 1)
-        patch_mask = patch_mask.view(batch_size, axial_dim * self.patch_resample_dim)
+        patch_mask = repeat(mask, "b a -> b p a", p=self.patch_resample_dim)
+        patch_mask = rearrange(patch_mask, "b p a -> b (p a)")
 
-        patch_embed = self.axial_resampler(patch_tokens, mask=patch_mask)
+        patch_embed, _ = self.axial_resampler(patch_tokens, mask=patch_mask)
 
-        cls_tokens = cls_tokens.view(batch_size, axial_dim, embed_dim)
-        cls_embed = self.class_resampler(cls_tokens, mask=mask)
+        cls_tokens = rearrange(cls_tokens, "b a 1 e -> b a e")
+        cls_embed, _ = self.class_resampler(cls_tokens, mask=mask)
 
         cls_patch_embed = torch.cat([cls_embed, patch_embed], dim=2)
+        cls_patch_embed = rearrange(cls_patch_embed, "b 1 h -> b h")
         cls_patch_embed = self.dropout(cls_patch_embed)
 
-        return self.mlp(cls_patch_embed).view(batch_size, self.num_labels)
+        return self.mlp(cls_patch_embed)
