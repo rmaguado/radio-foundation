@@ -27,7 +27,7 @@ class Conversation:
                 chunks.append((message + "\n", role == "gpt"))
         return chunks
 
-    def parse_llama_3(self, messagse):
+    def parse_llama_3(self, messages):
         chunks = []
         chunks.append(
             (
