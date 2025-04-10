@@ -115,3 +115,41 @@ def train(
     all_labels = np.concatenate(all_labels)
 
     return compute_metrics(all_logits, all_labels), (all_logits, all_labels)
+
+
+def get_attention_maps(
+    classifier_model: torch.nn.Module,
+    val_loader: torch.utils.data.DataLoader,
+    device: torch.device,
+):
+    classifier_model.eval()
+    all_logits = []
+    all_labels = []
+
+    total_eval_iter = len(val_loader)
+
+    val_iter = iter(val_loader)
+    eval_iter_loop = range(total_eval_iter)
+
+    with torch.no_grad():
+
+        for idx in eval_iter_loop:
+            embeddings, mask, labels = next(val_iter)
+
+            embeddings = embeddings.to(device)
+            mask = mask.to(device)
+            logits, attention_map = classifier_model(
+                embeddings, mask=mask, need_attn=True
+            )
+
+            all_logits.append(logits.detach().cpu().flatten().numpy())
+            all_labels.append(labels.float().cpu().flatten().numpy())
+
+    all_logits = np.concatenate(all_logits)
+    all_labels = np.concatenate(all_labels)
+
+    return (
+        compute_metrics(all_logits, all_labels),
+        (all_logits, all_labels),
+        attention_map,
+    )
