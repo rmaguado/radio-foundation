@@ -1,6 +1,6 @@
 import dataclasses
 from enum import auto, Enum
-from typing import List
+from typing import List, Dict
 
 
 class SeparatorStyle(Enum):
@@ -15,7 +15,7 @@ class Conversation:
     """A class that keeps all conversation history."""
 
     system: str
-    roles: List[str]
+    roles: Dict[str, str]
     messages: List[List[str]]
     offset: int
     sep_style: SeparatorStyle
@@ -39,7 +39,7 @@ class Conversation:
             chunks.append(
                 (f"<|start_header_id|>{self.roles[role]}<|end_header_id|>", False)
             )
-            chunks.append((f"{message}<|eot_id|>", self.roles == "gpt"))
+            chunks.append((f"{message}<|eot_id|>", role == "gpt"))
         return chunks
 
     def get_prompt(self):
@@ -79,15 +79,15 @@ class Conversation:
 
 conv_llava_plain = Conversation(
     system="",
-    roles=("", ""),
+    roles={"human": "", "gpt": ""},
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.PLAIN,
 )
 
 conv_llama_3 = Conversation(
-    system="A chat between a curious user and an artificial intelligence assistant. The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language. The visual content will be provided with the following format: {DEFAULT_IM_START_TOKEN}visual content{DEFAULT_IM_END_TOKEN}.",
-    roles=("user", "assistant"),
+    system="A chat between a curious user and an artificial intelligence assistant. The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.",
+    roles={"human": "user", "gpt": "assistant"},
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.LLAMA_3,
@@ -95,7 +95,7 @@ conv_llama_3 = Conversation(
 
 report_llama_3 = Conversation(
     system="You are a radiology assistant specialized in interpreting chest CT scans and generating concise, accurate radiology reports. Using the provided visual tokens, identify relevant findings, describe them using standard radiological terminology, and produce a clear, well-structured report.",
-    roles=("user", "assistant"),
+    roles={"human": "user", "gpt": "assistant"},
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.LLAMA_3,
