@@ -1,27 +1,7 @@
 import torch
 import torch.nn as nn
 
-
-class LinearClassifier(nn.Module):
-    def __init__(self, embed_dim, hidden_dim, num_labels, dropout=0.5):
-        super().__init__()
-
-        self.mlp = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
-            nn.LeakyReLU(),
-            nn.Dropout(p=dropout),
-            nn.Linear(hidden_dim, num_labels),
-        )
-
-    def forward(self, x):
-        return self.mlp(x)
-
-    def _initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+from einops import rearrange, repeat
 
 
 class PerceiverResampler(nn.Module):
