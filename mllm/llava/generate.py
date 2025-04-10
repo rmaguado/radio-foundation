@@ -21,7 +21,7 @@ def generate():
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
         attn_implementation="flash_attention_2",
-        torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+        torch_dtype=(torch.bfloat16 if training_args.bf16 else torch.float16),
     )
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
@@ -38,10 +38,13 @@ def generate():
         fsdp=training_args.fsdp,
     )
 
-    configure_lora(
-        model,
-        model_args,
-    )
+    if training_args.bits == 16:
+        if training_args.bf16:
+            model.to(torch.bfloat16)
+        if training_args.fp16:
+            model.to(torch.float16)
+
+    configure_lora(model.get_model(), model_args)
 
     logging.info(f"Loading from checkpoint: {model_args.checkpoint_path}")
     pretrained_weights = torch.load(model_args.checkpoint_path, map_location="cpu")
@@ -80,7 +83,9 @@ def generate():
 
     input_ids = batch.pop("input_ids").to(training_args.device)
     attention_mask = batch.pop("attention_mask").to(training_args.device)
-    images = [x.to(training_args.device) for x in batch.pop("images")]
+    images = [
+        x.to(training_args.device, dtype=torch.bfloat16) for x in batch.pop("images")
+    ]
     labels = batch.pop("labels").to(training_args.device)
 
     assert input_ids.shape[0] == 1, "Needs batch size 1"
