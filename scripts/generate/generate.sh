@@ -3,14 +3,14 @@
 export DHOME="$HOME/projects/radio-foundation"
 export OUT="$DHOME/runs"
 
-# NAME NODE GPUS NWORKERS CONFIG
+# NAME NODE CONFIG CHECKPOINT 
 
 export NAME=$1
 export NODE=$2
 export CONFIG=$3
 export CHECKPOINT=$4
 export GPUS=1
-export WORKERS=4
+export WORKERS=8
 
 export MEMORY=$(($GPUS*96))GB
 
