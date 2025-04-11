@@ -2,6 +2,7 @@ import os
 import logging
 import torch
 import transformers
+from tqdm import tqdm
 
 from mllm.llava.model import *
 from mllm.llava.train.lora import configure_lora
@@ -74,45 +75,33 @@ def generate():
     os.makedirs(outdir, exist_ok=True)
     logging.info(f"Output directory: {outdir}")
 
-    batch = next(iter(dataloader))
+    for batch in tqdm(dataloader):
 
-    if "image" in batch:
-        batch["images"] = batch.pop("image")
+        mapid = batch.pop("rowids")[0]
+        input_ids = batch.pop("input_ids").to(training_args.device)
+        attention_mask = batch.pop("attention_mask").to(training_args.device)
+        images = [
+            x.to(training_args.device, dtype=torch.bfloat16)
+            for x in batch.pop("images")
+        ]
+        labels = batch.pop("labels").to(training_args.device)
 
-    logging.info(batch.keys())
+        assert input_ids.shape[0] == 1, "Needs batch size 1"
 
-    input_ids = batch.pop("input_ids").to(training_args.device)
-    attention_mask = batch.pop("attention_mask").to(training_args.device)
-    images = [
-        x.to(training_args.device, dtype=torch.bfloat16) for x in batch.pop("images")
-    ]
-    labels = batch.pop("labels").to(training_args.device)
+        input_ids = input_ids[labels == IGNORE_INDEX].unsqueeze(0)
+        attention_mask = attention_mask[labels == IGNORE_INDEX].unsqueeze(0)
 
-    assert input_ids.shape[0] == 1, "Needs batch size 1"
+        with torch.inference_mode():
+            output = model.generate(
+                input_ids,
+                attention_mask=attention_mask,
+                images=images,
+                max_length=training_args.model_max_length,
+                pad_token_id=tokenizer.pad_token_id,
+            )[0]
 
-    input_ids = input_ids[labels == IGNORE_INDEX].unsqueeze(0)
-    attention_mask = attention_mask[labels == IGNORE_INDEX].unsqueeze(0)
-    labels = labels[labels == IGNORE_INDEX].unsqueeze(0)
-
-    for i, input_id in enumerate(input_ids[0]):
-        if input_id == IMAGE_TOKEN_INDEX:
-            logging.info(f"{input_id}: <image> {attention_mask[0][i]}")
-            continue
-        decoded_text = tokenizer.decode(input_id, skip_special_tokens=True)
-        logging.info(f"{input_id}: {decoded_text} {is_input} {attention_mask[0][i]}")
-
-    with torch.inference_mode():
-        outputs = model.generate(
-            input_ids,
-            attention_mask=attention_mask,
-            images=images,
-            max_length=training_args.model_max_length,
-            pad_token_id=tokenizer.pad_token_id,
-        )
-
-    for i, output in enumerate(outputs):
         output = tokenizer.decode(output, skip_special_tokens=True)
-        with open(os.path.join(outdir, f"output_{i}.txt"), "w") as f:
+        with open(os.path.join(outdir, f"{mapid}.txt"), "w") as f:
             f.write(output)
 
 

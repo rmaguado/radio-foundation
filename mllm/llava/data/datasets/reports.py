@@ -191,15 +191,15 @@ class _ReportDataset(NiftiCtVolumesFull):
         volume_data = self.process_ct(volume_data)
         volume_data = self.image_processor(volume_data, slice_thickness)
 
-        return volume_data, report
+        return rowid, volume_data, report
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
-            image, report = self.get_image_data(index)
+            rowid, image, report = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image/report for sample {index}") from e
 
-        return image, report
+        return rowid, image, report
 
 
 def preprocess(
@@ -266,7 +266,7 @@ class RadiologyReportDataset(Dataset):
 
         data_dict = {}
 
-        image, text = self.dataset[i]
+        rowid, image, text = self.dataset[i]
         sources = [
             {
                 "from": "human",
@@ -285,4 +285,5 @@ class RadiologyReportDataset(Dataset):
             input_ids=data_dict["input_ids"],
             labels=data_dict["labels"],
             image=image,
+            rowid=rowid,
         )
