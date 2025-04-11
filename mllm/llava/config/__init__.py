@@ -107,7 +107,7 @@ def load_train_config():
 def load_generate_config():
     args = get_generate_args()
 
-    model_config_path = os.path.join(args.checkpoint_path, "config.json")
+    model_config_path = os.path.join(args.checkpoint_path, "config.yaml")
     model_checkpoint_path = os.path.join(args.checkpoint_path, "final/model.bin")
     generate_config_path = args.config_path
 
