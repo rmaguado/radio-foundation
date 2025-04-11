@@ -1,0 +1,4 @@
+data:
+  root_path: null # REQUIRED
+  db_name: "CT-RATE_valid_reports"
+  conv_template: "llama_3"
