@@ -123,5 +123,5 @@ Below is an example command for training without a Slurm system:
 **Generate**
 
 ```bash
-./scripts/generate/generate.sh test_generate compute-cuda-02 runs/test_finetune/config.yaml runs/test_finetune/final/model.bin
+./scripts/generate/generate.sh test_generate compute-cuda-02 mllm/configs/generate.yaml runs/test_finetune
 ```
