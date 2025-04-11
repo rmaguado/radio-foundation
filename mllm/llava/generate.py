@@ -77,7 +77,7 @@ def generate():
 
     for batch in tqdm(dataloader):
 
-        mapid = batch.pop("rowids")[0]
+        map_id = batch.pop("map_ids")[0]
         input_ids = batch.pop("input_ids").to(training_args.device)
         attention_mask = batch.pop("attention_mask").to(training_args.device)
         images = [
@@ -101,7 +101,7 @@ def generate():
             )[0]
 
         output = tokenizer.decode(output, skip_special_tokens=True)
-        with open(os.path.join(outdir, f"{mapid}.txt"), "w") as f:
+        with open(os.path.join(outdir, f"{map_id}.txt"), "w") as f:
             f.write(output)
 
 

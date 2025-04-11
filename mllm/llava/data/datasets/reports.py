@@ -146,16 +146,17 @@ class _ReportDataset(NiftiCtVolumesFull):
 
         entries_dtype = [
             ("rowid", np.uint32),
+            ("map_id", np.uint32),
             ("length", np.uint32),
             ("slices", np.uint32),
         ]
         entries = []
         row_id_lengths = self.cursor.execute(
-            f"SELECT rowid, length, num_slices FROM global"
+            f"SELECT rowid, map_id, length, num_slices FROM global"
         ).fetchall()
 
-        for rowid, length, slices in row_id_lengths:
-            entries.append((rowid, length, slices))
+        for rowid, map_id, length, slices in row_id_lengths:
+            entries.append((rowid, map_id, length, slices))
 
         entries_array = np.array(entries, dtype=entries_dtype)
 
@@ -173,7 +174,7 @@ class _ReportDataset(NiftiCtVolumesFull):
         return report_text
 
     def get_image_data(self, index: int) -> torch.Tensor:
-        rowid, _, _ = self.entries[index]
+        rowid, map_id, _, _ = self.entries[index]
         self.cursor.execute(
             """
             SELECT dataset, axial_dim, nifti_path, text, slice_thickness FROM global WHERE rowid = ?
@@ -191,15 +192,15 @@ class _ReportDataset(NiftiCtVolumesFull):
         volume_data = self.process_ct(volume_data)
         volume_data = self.image_processor(volume_data, slice_thickness)
 
-        return rowid, volume_data, report
+        return map_id, volume_data, report
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
-            rowid, image, report = self.get_image_data(index)
+            map_id, image, report = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image/report for sample {index}") from e
 
-        return rowid, image, report
+        return map_id, image, report
 
 
 def preprocess(
@@ -266,7 +267,7 @@ class RadiologyReportDataset(Dataset):
 
         data_dict = {}
 
-        rowid, image, text = self.dataset[i]
+        map_id, image, text = self.dataset[i]
         sources = [
             {
                 "from": "human",
@@ -285,5 +286,5 @@ class RadiologyReportDataset(Dataset):
             input_ids=data_dict["input_ids"],
             labels=data_dict["labels"],
             image=image,
-            rowid=rowid,
+            map_id=map_id,
         )
