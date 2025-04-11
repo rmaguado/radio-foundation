@@ -31,9 +31,10 @@ class DataCollatorForSupervisedDataset(object):
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
 
-        if "image" in instances[0]:  # check if multimodal
-            images = [instance["image"] for instance in instances]
-            batch["images"] = images
+        images = [instance["image"] for instance in instances]
+        rowids = [instance["rowid"] for instance in instances]
+        batch["images"] = images
+        batch["rowids"] = rowids
 
         return batch
 
