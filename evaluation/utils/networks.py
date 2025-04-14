@@ -48,47 +48,6 @@ class PerceiverResampler(nn.Module):
         return rearrange(attn_output, "b k h -> k b h"), attn_weights
 
 
-class AttentionMapPatchPredictor(nn.Module):
-    def __init__(
-        self, embed_dim, hidden_dim, num_labels, patch_resample_dim=64, dropout=0.5
-    ):
-        super().__init__()
-
-        self.embed_dim = embed_dim
-        self.hidden_dim = hidden_dim
-        self.patch_resample_dim = patch_resample_dim
-        self.num_labels = num_labels
-
-        self.token_resampler = PerceiverResampler(
-            embed_dim=embed_dim, latent_dim=hidden_dim, num_queries=patch_resample_dim
-        )
-        self.axial_resampler = PerceiverResampler(
-            embed_dim=hidden_dim, latent_dim=hidden_dim, num_queries=1
-        )
-        self.norm = nn.LayerNorm(hidden_dim)
-        self.proj = nn.Linear(hidden_dim, num_labels)
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x, mask=None, need_attn=False):
-        batch_size, axial_dim, num_tokens, embed_dim = x.size()
-
-        x = rearrange(x, "b a t e -> (b a) t e")
-        x, attn_map = self.token_resampler(x)
-        x = rearrange(x, "(b a) p h -> b (a p) h", a=axial_dim)
-
-        mask = repeat(mask, "b a -> b p a", p=self.patch_resample_dim)
-        mask = rearrange(mask, "b p a -> b (p a)")
-
-        x, _ = self.axial_resampler(x, mask=mask)
-        x = rearrange(x, "b 1 h -> b h")
-
-        x = self.norm(x)
-        x = self.proj(x)
-        if need_attn:
-            return x, attn_map
-        return x
-
-
 class FullScanPatchPredictor(nn.Module):
     def __init__(
         self, embed_dim, hidden_dim, num_labels, patch_resample_dim=64, dropout=0.5
