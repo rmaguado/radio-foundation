@@ -2,14 +2,14 @@
 
 ## GPUS GPUTYPE WORKERS
 
-#SBATCH --job-name=$cache
-#SBATCH --output=$OUT/cache-%j.out
+#SBATCH --job-name=$DATASET_NAME
+#SBATCH --output=$OUT/%j.out
 #SBATCH --nodes=1
-#SBATCH --nodelist=compute-cuda-02
+#SBATCH --nodelist=$NODE
 #SBATCH --cpus-per-task=$WORKERS
 
 #SBATCH --ntasks-per-node=$GPUS
-#SBATCH --gres=gpu:$GPUTYPE:$GPUS
+#SBATCH --gres=gpu:$GPUS
 
 #SBATCH --mem=96GB
 #SBATCH --partition=odap-gpu
@@ -21,13 +21,12 @@ conda activate radio
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
-srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS \
-    python3 ${PWD}/evaluation/cache_embeddings.py \
-            --root_path="${HOME}/data/niftis/CT-RATE" \
-            --dataset_name="CT-RATE_train_eval" \
-            --run_name="vitb_CT-RATE" \
-            --checkpoint_name="training_549999" \
-            --embed_patches \
-            --embed_cls \
-            --db_storage="nifti" \
-            --resample_slices=240
+python3 -m evaluation.cache_embeddings \
+    --root_path $ROOT_PATH \
+    --dataset_name $DATASET_NAME \
+    --run_name $RUN_NAME \
+    --checkpoint_name $CHECKPOINT_NAME \
+    --embed_patches \
+    --embed_cls \
+    --db_storage $DB_STORATE \
+    --resample_slices True

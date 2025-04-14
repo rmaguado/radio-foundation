@@ -1,41 +1,22 @@
 #!/bin/bash
 
 export DHOME="$HOME/projects/radio-foundation"
-export OUT="$DHOME/evaluation/temp"
+export OUT="$DHOME/runs/cache_embeddings"
 
-if [ ! -e $DHOME/sjob.template ]; then
-  echo "sjob.template not found"
-  exit 1
-fi
+export ROOT_PATH=$1
+export DATASET_NAME=$2
+export RUN_NAME=$3
+export CHECKPOINT_NAME=$4
+export DB_STORATE=$5
+export NODE=$6
+export GPUS=$7
+export WORKERS=$8
 
-# NODES GPUS WORKERS [W]
+mkdir -p $OUT/
 
-export GPUS=$1
-export GPUTYPE=${2:-L40S}
-export WORKERS=$3
+printf "\nJob  gpus-per_node: $GPUS GPUs   Workers per GPU: $WORKERS\n\n"
 
-if [ "$GPUTYPE" != "A40" -a "$GPUTYPE" != "L40S" ]; then
-  echo "$GPUTYPE not available"
-  exit 1
-fi
-
-if [[ "$GPUTYPE" == "A40" ]] && [[ "$GPUS" -gt "2" ]]; then
-  export GPUS=2
-  echo "max $GPUTYPE changed to 2"
-fi
-if [[ "$GPUTYPE" == "L40S" ]] && [[ "$GPUS" -gt "4" ]]; then
-  export GPUS=4
-  echo "max $GPUTYPE changed to 4"
-fi
-
-
-if [ ! -z $2 ]; then 
-  printf "\nJob  gpus-per_node: $GPUS $GPUTYPE GPUs   Workers per GPU: $WORKERS\n\n"
-  mkdir -p $OUT
-  envsubst '$GPUS $GPUTYPE $OUT $WORKERS' < $PWD/sjob.template > $OUT/cache.run
-  sbatch $OUT/cache.run
-
-else
-  printf "\nneed GPUS GPUTYPE WORKERS\n\n"
-
-fi
+envsubst '$OUT $ROOT_PATH $DATASET_NAME $RUN_NAME $CHECKPOINT_NAME $DB_STORATE $NODE $GPUS $WORKERS' \
+    < $PWD/scripts/cache_embeddings/sjob.template \
+    > $OUT/cache.run
+sbatch $OUT/cache.run
