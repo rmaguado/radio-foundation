@@ -37,7 +37,7 @@ class DeepRDTCrop(DicomFullVolumeEval):
         return transformed_image, map_id
 
 
-class ImageTransform:
+class CropImageTransform:
     def __init__(
         self, img_size, mean, std, enable_crop, crop_radius_xy, crop_radius_z, pad_value
     ):
@@ -150,7 +150,7 @@ def main():
     data_std = 461.3
     channels = config.student.channels
 
-    img_processor = ImageTransform(
+    img_processor = CropImageTransform(
         full_image_size,
         data_mean,
         data_std,
