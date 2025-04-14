@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger("DeepSpeed")
 
 
-def find_target_linear_names(model, lora_namespan_exclude=[]):
+def find_target_linear_names(model, lora_namespan_exclude=[], include_modules=None):
     linear_cls = torch.nn.modules.Linear
     embedding_cls = torch.nn.modules.Embedding
     lora_module_names = []
@@ -18,6 +18,9 @@ def find_target_linear_names(model, lora_namespan_exclude=[]):
     for name, module in model.named_modules():
         if any(ex_keyword in name for ex_keyword in lora_namespan_exclude):
             continue
+        if include_modules is not None:
+            if not any(inc_keyword in name for inc_keyword in include_modules):
+                continue
         if isinstance(module, (linear_cls, embedding_cls)):
             lora_module_names.append(name)
 
@@ -30,7 +33,9 @@ def _configure_lora_module(module, args):
     peft_config = LoraConfig(
         r=args.lora_r,
         lora_alpha=args.lora_alpha,
-        target_modules=find_target_linear_names(module),
+        target_modules=find_target_linear_names(
+            module, include_modules=args.include_modules
+        ),
         lora_dropout=args.lora_dropout,
         bias=args.lora_bias,
     )

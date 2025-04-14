@@ -6,12 +6,18 @@ model:
     lora_alpha: 16
     lora_dropout: 0.05
     lora_bias: "none"
+    include_modules:
+      - "qkv"
   lora_language:
     lora_enable: False
     lora_r: 64
     lora_alpha: 128
     lora_dropout: 0.05
     lora_bias: "none"
+    include_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
   vision_tower: null
   mm_vision_select_layer: -1
   checkpoint_path: null
