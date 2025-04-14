@@ -146,7 +146,7 @@ class _ReportDataset(NiftiCtVolumesFull):
 
         entries_dtype = [
             ("rowid", np.uint32),
-            ("map_id", np.uint32),
+            ("map_id", "U256"),
             ("length", np.uint32),
             ("slices", np.uint32),
         ]
