@@ -254,7 +254,7 @@ def train_and_evaluate_model(
             verbose=True,
         )
 
-        eval_dict = evaluate(classifier_model, val_loader, device)
+        eval_dict = evaluate(classifier_model, val_loader, device, verbose=True)
 
         save_metrics(eval_dict["metrics"], output_path, "summary")
 
