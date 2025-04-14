@@ -75,13 +75,18 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
         stack_rows = self.cursor.fetchall()
         stack_rows.sort(key=lambda x: x[0])
 
+        slice_thickness = self.cursor.execute(
+            f"SELECT slice_thickness FROM '{self.dataset}' WHERE series_id = ?",
+            (series_id,),
+        ).fetchone()[0]
+
         try:
             stack_data = self.create_stack_data(stack_rows)
         except Exception as e:
             logger.exception(f"Error processing stack (map_id: {map_id}) \n{e}")
             stack_data = torch.zeros((1, self.channels, 512, 512), dtype=torch.float32)
 
-        return stack_data, map_id
+        return stack_data, map_id, slice_thickness
 
     def create_stack_data(self, stack_rows):
         dicom_files = []
@@ -93,14 +98,14 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
 
         w, h = stack_data[0].shape
 
-        num_slices = len(stack_data)
-        num_stacks = num_slices // self.channels
+        # num_slices = len(stack_data)
+        # num_stacks = num_slices // self.channels
 
-        num_slices = num_stacks * self.channels
+        # num_slices = num_stacks * self.channels
 
         stack_data = torch.stack(stack_data)
 
-        stack_data = stack_data[:num_slices].view(num_stacks, self.channels, w, h)
+        # stack_data = stack_data[:num_slices].view(num_stacks, self.channels, w, h)
 
         return stack_data.type(torch.float32)
 
@@ -109,10 +114,10 @@ class DicomFullVolumeEval(DicomCTVolumesFull):
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
         try:
-            image, map_id = self.get_image_data(index)
+            image, map_id, slice_thickness = self.get_image_data(index)
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
 
-        transformed_image = self.transform(image)
+        transformed_image = self.transform(image, slice_thickness)
 
         return transformed_image, map_id

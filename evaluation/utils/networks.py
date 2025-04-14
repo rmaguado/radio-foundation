@@ -113,8 +113,9 @@ class FullScanPatchPredictor(nn.Module):
         batch_size, axial_dim, num_tokens, embed_dim = x.size()
 
         x = rearrange(x, "b a t e -> (b a) t e")
-        x, _ = self.token_resampler(x)
+        x, attn_map = self.token_resampler(x)
         x = rearrange(x, "(b a) p h -> b (a p) h", a=axial_dim)
+        attn_map = rearrange(attn_map, "(b a) h t -> b a h t", a=axial_dim)
 
         mask = repeat(mask, "b a -> b p a", p=self.patch_resample_dim)
         mask = rearrange(mask, "b p a -> b (p a)")
@@ -123,7 +124,7 @@ class FullScanPatchPredictor(nn.Module):
         x = rearrange(x, "b 1 h -> b h")
         x = self.dropout(x)
 
-        return self.mlp(x)
+        return self.mlp(x), attn_map
 
 
 class FullScanClassPredictor(nn.Module):
@@ -140,11 +141,13 @@ class FullScanClassPredictor(nn.Module):
 
         x = x.view(batch_size, axial_dim, embed_dim)
 
-        x, _ = self.axial_resampler(x, mask=mask)
+        x, attn_map = self.axial_resampler(x, mask=mask)
         x = rearrange(x, "b 1 h -> b h")
+        attn_map = rearrange(attn_map, "b 1 h -> b h")
+
         x = self.dropout(x)
 
-        return self.mlp(x)
+        return self.mlp(x), attn_map
 
 
 class FullScanClassPatchPredictor(nn.Module):
@@ -177,8 +180,9 @@ class FullScanClassPatchPredictor(nn.Module):
         patch_tokens = x[:, :, 1:, :]
 
         patch_tokens = rearrange(patch_tokens, "b a t e -> (b a) t e")
-        patch_tokens, _ = self.token_resampler(patch_tokens)
+        patch_tokens, attn_map = self.token_resampler(patch_tokens)
         patch_tokens = rearrange(patch_tokens, "(b a) t h -> b (a t) h", a=axial_dim)
+        attn_map = rearrange(attn_map, "(b a) h t -> b a h t", a=axial_dim)
 
         patch_mask = repeat(mask, "b a -> b p a", p=self.patch_resample_dim)
         patch_mask = rearrange(patch_mask, "b p a -> b (p a)")
@@ -192,4 +196,4 @@ class FullScanClassPatchPredictor(nn.Module):
         cls_patch_embed = rearrange(cls_patch_embed, "b 1 h -> b h")
         cls_patch_embed = self.dropout(cls_patch_embed)
 
-        return self.mlp(cls_patch_embed)
+        return self.mlp(cls_patch_embed), attn_map

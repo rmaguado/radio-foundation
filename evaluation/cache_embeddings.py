@@ -133,12 +133,12 @@ def main():
     data_std = 461.3
     channels = config.student.channels
 
-    if args.resample_slices == -1:
-        img_processor = ImageTransform(full_image_size, data_mean, data_std)
-    else:
+    if args.resample_slices:
         img_processor = ImageTransformResampleSlices(
-            full_image_size, data_mean, data_std, args.resample_slices, channels
+            full_image_size, data_mean, data_std, channels=channels
         )
+    else:
+        img_processor = ImageTransform(full_image_size, data_mean, data_std, channels)
 
     output_path = os.path.join(
         project_path,
@@ -218,9 +218,9 @@ def get_argpase():
     )
     parser.add_argument(
         "--resample_slices",
-        type=int,
-        default=-1,
-        help="A target number of slices to resample. ",
+        type=bool,
+        default=False,
+        help="Wether to resample slices that are too thin.",
     )
     return parser
 

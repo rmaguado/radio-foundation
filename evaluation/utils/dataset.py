@@ -153,7 +153,7 @@ class ScoreStratifiedBalancedSampler(Sampler):
         return sum(2 * n_samples for _, _, n_samples in self.binned_indices.values())
 
 def collate_sequences(batch):
-    embeddings, labels = zip(*batch)
+    map_ids, embeddings, labels = zip(*batch)
     batch_size = len(embeddings)
 
     _, num_tokens, embed_dim = embeddings[0].shape
@@ -161,13 +161,13 @@ def collate_sequences(batch):
     max_axial_dim = max([embedding.shape[0] for embedding in embeddings])
 
     padded_embeddings = torch.zeros(batch_size, max_axial_dim, num_tokens, embed_dim)
-    mask = torch.zeros(batch_size, max_axial_dim)
+    mask = torch.ones(batch_size, max_axial_dim, dtype=torch.bool)
 
     for i, embedding in enumerate(embeddings):
         padded_embeddings[i, : embedding.shape[0]] = embedding
-        mask[i, : embedding.shape[0]] = 1
+        mask[i, : embedding.shape[0]] = False
 
-    return padded_embeddings, mask, torch.tensor(labels)
+    return map_ids, padded_embeddings, mask, torch.tensor(labels)
 
 
 def collate_sequences_clip_len(batch):

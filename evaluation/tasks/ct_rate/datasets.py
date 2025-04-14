@@ -35,4 +35,4 @@ class CT_RATE:
         label = self.get_target(index)
         embeddings = self.embeddings_provider.get_embeddings(map_id)
 
-        return embeddings, label
+        return map_id, embeddings, label

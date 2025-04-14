@@ -11,13 +11,12 @@ def evaluate(
     val_loader: torch.utils.data.DataLoader,
     device: torch.device,
     max_eval_n: int = None,
-    verbose: bool = True,
+    verbose: bool = False,
 ):
     classifier_model.eval()
     all_logits = []
     all_labels = []
-
-    data_times = []
+    all_maps = {}
 
     if max_eval_n is None:
         total_eval_iter = len(val_loader)
@@ -30,27 +29,35 @@ def evaluate(
     else:
         eval_iter_loop = range(total_eval_iter)
 
-    with torch.no_grad():
+    for _ in eval_iter_loop:
+        t0_data = time.time()
+        map_ids, embeddings, mask, labels = next(val_iter)
 
-        for idx in eval_iter_loop:
-            t0_data = time.time()
-            embeddings, mask, labels = next(val_iter)
-            data_times.append(time.time() - t0_data)
+        embeddings = embeddings.to(device)
+        mask = mask.to(device)
+        with torch.no_grad():
+            logits, attention_map = classifier_model(embeddings, mask=mask)
 
-            embeddings = embeddings.to(device)
-            mask = mask.to(device)
-            logits = classifier_model(embeddings, mask=mask)
+        all_logits.append(logits.cpu().flatten().numpy())
+        all_labels.append(labels.float().cpu().flatten().numpy())
+        attention_maps_cpu = attention_map.cpu().numpy()
+        mask = mask.cpu().numpy()
 
-            all_logits.append(logits.detach().cpu().flatten().numpy())
-            all_labels.append(labels.float().cpu().flatten().numpy())
+        for i, map_id in enumerate(map_ids):
+            all_maps[map_id] = attention_maps_cpu[i][~mask[i]]
 
     all_logits = np.concatenate(all_logits)
     all_labels = np.concatenate(all_labels)
 
-    if verbose:
-        print(f"Mean data load time (eval): {np.mean(data_times):.4f}")
+    metrics = compute_metrics(all_logits, all_labels)
 
-    return compute_metrics(all_logits, all_labels), (all_logits, all_labels)
+    return dict(
+        map_ids=list(all_maps.keys()),
+        metrics=metrics,
+        logits=all_logits,
+        labels=all_labels,
+        attention_maps=all_maps,
+    )
 
 
 def train(
@@ -62,7 +69,7 @@ def train(
     accum_steps: int,
     device: torch.device,
     scheduler: torch.optim.lr_scheduler._LRScheduler = None,
-    verbose: bool = True,
+    verbose: bool = False,
 ) -> list:
     classifier_model.train()
     optimizer.zero_grad()
@@ -82,15 +89,15 @@ def train(
     for iteration in train_iter_loop:
         try:
             t0_data = time.time()
-            embeddings, mask, labels = next(train_iter)
+            map_ids, embeddings, mask, labels = next(train_iter)
             data_times.append(time.time() - t0_data)
 
         except StopIteration:
             del train_iter
             train_iter = iter(train_loader)
-            embeddings, mask, labels = next(train_iter)
+            map_ids, embeddings, mask, labels = next(train_iter)
 
-        logits = classifier_model(embeddings.to(device), mask=mask.to(device))
+        logits, _ = classifier_model(embeddings.to(device), mask=mask.to(device))
         loss = criterion(logits.flatten(), labels.float().to(device))
         loss.backward()
 
@@ -114,42 +121,10 @@ def train(
     all_logits = np.concatenate(all_logits)
     all_labels = np.concatenate(all_labels)
 
-    return compute_metrics(all_logits, all_labels), (all_logits, all_labels)
+    metrics = compute_metrics(all_logits, all_labels)
 
-
-def get_attention_maps(
-    classifier_model: torch.nn.Module,
-    val_loader: torch.utils.data.DataLoader,
-    device: torch.device,
-):
-    classifier_model.eval()
-    all_logits = []
-    all_labels = []
-
-    total_eval_iter = len(val_loader)
-
-    val_iter = iter(val_loader)
-    eval_iter_loop = range(total_eval_iter)
-
-    with torch.no_grad():
-
-        for idx in eval_iter_loop:
-            embeddings, mask, labels = next(val_iter)
-
-            embeddings = embeddings.to(device)
-            mask = mask.to(device)
-            logits, attention_map = classifier_model(
-                embeddings, mask=mask, need_attn=True
-            )
-
-            all_logits.append(logits.detach().cpu().flatten().numpy())
-            all_labels.append(labels.float().cpu().flatten().numpy())
-
-    all_logits = np.concatenate(all_logits)
-    all_labels = np.concatenate(all_labels)
-
-    return (
-        compute_metrics(all_logits, all_labels),
-        (all_logits, all_labels),
-        attention_map,
+    return dict(
+        metrics=metrics,
+        logits=all_logits,
+        labels=all_labels,
     )

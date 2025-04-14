@@ -5,59 +5,111 @@ import torch.nn as nn
 from functools import partial
 from omegaconf import OmegaConf
 from torchvision import transforms
+from einops import rearrange
 
 from dinov2.models import build_model_from_cfg
 from dinov2.utils.utils import load_pretrained_weights
 
 
 class ImageTransform:
-    def __init__(self, img_size, mean, std):
+    def __init__(self, img_size, mean, std, channels):
         self.img_size = img_size
-        self.resize = transforms.Resize((img_size, img_size))
-        self.normalize = transforms.Normalize(mean=mean, std=std)
-
-    def __call__(self, image):
-        resized = self.resize(image)
-        normalized = self.normalize(resized)
-        return normalized
-
-
-class ImageTransformResampleSlices:
-    def __init__(self, img_size, mean, std, target_slices=240, channels=10):
-        self.img_size = img_size
-        self.resize = transforms.Resize((img_size, img_size))
-        self.normalize = transforms.Normalize(mean=mean, std=std)
-
-        assert isinstance(target_slices, int), "target_slices must be an integer"
-
-        self.target_slices = target_slices
         self.channels = channels
+        self.resize = transforms.Resize((img_size, img_size))
+        self.normalize = transforms.Normalize(mean=mean, std=std)
 
-    def resample_z(self, image):
-        groups, channels, w, h = image.shape
-        image = image.view(1, 1, groups * channels, w, h)
-        image = torch.nn.functional.interpolate(
-            image, size=(self.target_slices, w, h), mode="trilinear"
-        )
-        return image.view(-1, self.channels, w, h)
-
-    def __call__(self, image):
+    def __call__(self, image, **kwargs):
+        slices, w, h = image.shape
+        groups = slices // self.channels
+        target_slices = groups * self.channels
+        image = rearrange(img[:target_slices], "(g c) w h -> g c w h", c=self.channels)
         image = self.resize(image)
-        image = self.resample_z(image)
         image = self.normalize(image)
         return image
 
 
-class ImageTargetTransform:
-    def __init__(self, img_size, mean, std):
+class ImageTransformResampleSlices:
+    def __init__(
+        self,
+        img_size,
+        mean,
+        std,
+        zspacing=1.5,
+        channels=10,
+        pad_value=-1000,
+        max_slices=300,
+    ):
         self.img_size = img_size
-        self.resize = transforms.Resize((img_size, img_size))
         self.normalize = transforms.Normalize(mean=mean, std=std)
 
-    def __call__(self, image, target):
-        image_resized = self.resize(image)
-        target_resized = self.resize(target)
-        return self.normalize(image_resized), target_resized
+        self.zspacing = zspacing
+        self.channels = channels
+        self.pad_value = pad_value
+        self.max_slices = max_slices
+
+        assert max_slices % channels == 0, "max_slices must be divisible by channels"
+
+    def pad_square(self, image):
+        s, w, h = image.shape
+
+        if w == h:
+            return image
+
+        if w > h:
+            pad_1 = (w - h) // 2
+            pad_2 = (w - h) - pad_1
+            image = torch.nn.functional.pad(
+                image, (pad_1, pad_2, 0, 0, 0, 0), value=self.pad_value
+            )
+        else:
+            pad_1 = (h - w) // 2
+            pad_2 = (h - w) - pad_1
+            image = torch.nn.functional.pad(
+                image, (0, 0, pad_1, pad_2, 0, 0), value=self.pad_value
+            )
+
+        return image
+
+    def clip_slices(self, image):
+        slices, w, h = image.shape
+
+        if slices > self.max_slices:
+            start = (slices - self.max_slices) // 2
+            end = start + self.max_slices
+
+            image = image[start:end]
+
+        return image
+
+    def resize(self, image, slice_thickness):
+        slices, w, h = image.shape
+
+        target_width = self.img_size if w >= h else self.img_size * w // h
+        target_height = self.img_size if h >= w else self.img_size * h // w
+
+        target_slices = int(slices * slice_thickness / self.zspacing)
+
+        groups = target_slices // self.channels
+        target_slices = groups * self.channels
+
+        image = image.unsqueeze(0).unsqueeze(0)
+        image = torch.nn.functional.interpolate(
+            image, size=(target_slices, target_width, target_height), mode="trilinear"
+        ).squeeze()
+        image = self.pad_square(image)
+        image = self.clip_slices(image)
+        return rearrange(
+            image,
+            "(g c) w h -> g c w h",
+            c=self.channels,
+            w=self.img_size,
+            h=self.img_size,
+        )
+
+    def __call__(self, image, slice_thickness):
+        image = self.resize(image, slice_thickness)
+        image = self.normalize(image)
+        return image
 
 
 class ModelWithIntermediateLayers(nn.Module):
@@ -155,3 +207,12 @@ def load_model(path_to_run, checkpoint_name, device, intermediate_layers=4):
     )
 
     return feature_model, config
+
+
+def save_classifier(path_to_save, model):
+    os.makedirs(path_to_save, exist_ok=True)
+    torch.save(model.state_dict(), os.path.join(path_to_save, "model.pth"))
+
+
+def load_classifier(path_to_save, model):
+    model.load_state_dict(torch.load(path_to_save))

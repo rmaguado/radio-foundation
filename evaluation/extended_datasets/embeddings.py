@@ -28,13 +28,10 @@ def get_model(project_path, run_name, checkpoint_name):
 
 
 class CachedEmbeddings:
-    def __init__(
-        self, embeddings_path: str, cls_only: bool = False, patch_only: bool = False
-    ):
-        assert not (cls_only and patch_only)
+    def __init__(self, embeddings_path: str, select_feature: str = "cls"):
+        assert select_feature in ["cls", "patch", "cls_patch"]
         self.embeddings_path = embeddings_path
-        self.cls_only = cls_only
-        self.patch_only = patch_only
+        self.select_feature = select_feature
 
         self.map_ids = [
             file.split(".npy")[0] for file in os.listdir(self.embeddings_path)
@@ -44,9 +41,9 @@ class CachedEmbeddings:
         embeddings = np.load(
             os.path.join(self.embeddings_path, f"{map_id}.npy"), mmap_mode="r"
         )
-        if self.cls_only:
+        if self.select_feature == "cls":
             return torch.from_numpy(embeddings[:, :1, :].copy()).float()
-        if self.patch_only:
+        if self.select_feature == "patch":
             return torch.from_numpy(embeddings[:, 1:, :].copy()).float()
         return torch.from_numpy(embeddings.copy()).float()
 
@@ -61,11 +58,10 @@ class EmbeddingsGenerator:
         dataset_name,
         db_storage,
         device,
-        embed_patches,
-        embed_cls,
+        select_feature,
         max_batch_size=64,
         max_workers=16,
-        resample_slices=None,
+        resample_slices=False,
     ):
         self.model, config = get_model(project_path, run_name, checkpoint_name)
         full_image_size = config.student.full_image_size  # 504
@@ -77,11 +73,13 @@ class EmbeddingsGenerator:
         self.max_workers = max_workers
         self.device = device
 
-        if resample_slices is None:
-            img_processor = ImageTransform(full_image_size, data_mean, data_std)
-        else:
+        if resample_slices:
             img_processor = ImageTransformResampleSlices(
-                full_image_size, data_mean, data_std, resample_slices, channels
+                full_image_size, data_mean, data_std, channels=channels
+            )
+        else:
+            img_processor = ImageTransform(
+                full_image_size, data_mean, data_std, channels
             )
 
         db_params = {
@@ -103,12 +101,14 @@ class EmbeddingsGenerator:
 
         self.map_ids = self.dataset.entries["map_id"]
 
-        if embed_patches and embed_cls:
+        if select_feature == "cls_patch":
             self.embed_fcn = extract_all_tokens
-        elif embed_patches:
+        elif select_feature == "patch":
             self.embed_fcn = extract_patch_tokens
-        elif embed_cls:
+        elif select_feature == "cls":
             self.embed_fcn = extract_class_tokens
+        else:
+            raise RuntimeError
 
     def get_embeddings(self, map_id: str) -> torch.Tensor:
         index = self.dataset.get_index_from_map_id(map_id)
