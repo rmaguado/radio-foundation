@@ -12,11 +12,12 @@ export WORKERS=$6
 export LABELS=$7
 export FEATURES=$8
 export CV=$9
+export EPOCHS=$10
 
 
 mkdir -p $OUT/$JOB_NAME
 
-envsubst '$JOB_NAME $RUN_NAME $CHECKPOINT_NAME $NODE $GPUS $WORKERS $OUT $LABELS $FEATURES $CV' \
+envsubst '$JOB_NAME $RUN_NAME $CHECKPOINT_NAME $NODE $GPUS $WORKERS $OUT $LABELS $FEATURES $CV $EPOCHS' \
     < $PWD/scripts/evaluate/ct_rate/cv.template \
     > $OUT/$JOB_NAME/$JOB_NAME.run
 

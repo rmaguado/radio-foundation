@@ -27,4 +27,5 @@ python3 $PWD/evaluation/tasks/ct_rate/test_cross_validation.py \
         --select_feature=$FEATURES \
         --save_final="True" \
         --labels="$LABELS" \
-        --cross_validation=$CV
+        --cross_validation=$CV \
+        --epochs=$EPOCHS
