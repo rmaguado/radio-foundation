@@ -127,10 +127,16 @@ class ScoreStratifiedBalancedSampler(Sampler):
         for bin_idx in range(len(self.bin_edges) - 1):
             bin_min = self.bin_edges[bin_idx]
             bin_max = self.bin_edges[bin_idx + 1]
-            bin_pos = [i for i, (label, score) in enumerate(zip(self.labels, self.scores))
-                       if label == 1 and bin_min <= score <= bin_max]
-            bin_neg = [i for i, (label, score) in enumerate(zip(self.labels, self.scores))
-                       if label == 0 and bin_min <= score <= bin_max]
+            bin_pos = [
+                i
+                for i, (label, score) in enumerate(zip(self.labels, self.scores))
+                if label == 1 and bin_min <= score <= bin_max
+            ]
+            bin_neg = [
+                i
+                for i, (label, score) in enumerate(zip(self.labels, self.scores))
+                if label == 0 and bin_min <= score <= bin_max
+            ]
             n_samples = min(len(bin_pos), len(bin_neg))
             if self.samples_per_bin:
                 n_samples = min(n_samples, self.samples_per_bin)
@@ -142,8 +148,12 @@ class ScoreStratifiedBalancedSampler(Sampler):
         for bin_idx, (pos_idx, neg_idx, n_samples) in self.binned_indices.items():
             if n_samples == 0:
                 continue
-            pos_sampled = np.random.choice(pos_idx, n_samples, replace=len(pos_idx) < n_samples)
-            neg_sampled = np.random.choice(neg_idx, n_samples, replace=len(neg_idx) < n_samples)
+            pos_sampled = np.random.choice(
+                pos_idx, n_samples, replace=len(pos_idx) < n_samples
+            )
+            neg_sampled = np.random.choice(
+                neg_idx, n_samples, replace=len(neg_idx) < n_samples
+            )
             sampled_indices.extend(pos_sampled)
             sampled_indices.extend(neg_sampled)
         np.random.shuffle(sampled_indices)
@@ -151,6 +161,7 @@ class ScoreStratifiedBalancedSampler(Sampler):
 
     def __len__(self):
         return sum(2 * n_samples for _, _, n_samples in self.binned_indices.values())
+
 
 def collate_sequences(batch):
     map_ids, embeddings, labels = zip(*batch)
