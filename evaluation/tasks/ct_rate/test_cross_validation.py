@@ -117,21 +117,21 @@ def get_args():
         help="What features to use. Options: cls, patch, or cls_patch",
     )
     parser.add_argument(
-        "--save_final",
-        type=bool,
-        default=False,
-        help="Whether to save the final checkpoint.",
-    )
-    parser.add_argument(
         "--labels",
         type=str,
         help="Comma separated string of labels.",
     )
     parser.add_argument(
+        "--save_final",
+        action="store_true",
+        default=False,
+        help="Whether to save the final checkpoint.",
+    )
+    parser.add_argument(
         "--cross_validation",
-        type=bool,
-        default=True,
-        help="Wether to perform cross validation in addition. ",
+        action="store_true",
+        default=False,
+        help="Whether to perform cross validation in addition. ",
     )
 
     return parser.parse_args()
