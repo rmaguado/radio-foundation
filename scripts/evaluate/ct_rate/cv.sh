@@ -14,6 +14,11 @@ export FEATURES=$8
 export CV=$9
 export EPOCHS=$10
 
+if [ "$#" -ne 10 ]; then
+    echo "Usage: $0 JOB_NAME RUN_NAME CHECKPOINT_NAME NODE GPUS WORKERS LABELS FEATURES CV EPOCHS"
+    exit 1
+fi
+
 
 mkdir -p $OUT/$JOB_NAME
 
