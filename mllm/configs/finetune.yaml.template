@@ -18,7 +18,7 @@ data:
   image_tokens: 128
   conv_template: "llama_3"
 train:
-  per_device_train_batch_size: 16 # aim for 128 total
+  per_device_train_batch_size: 1
   gradient_accumulation_steps: 1
   optim: "adamw_torch"
   learning_rate: 2e-5
