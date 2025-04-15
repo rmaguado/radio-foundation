@@ -87,11 +87,20 @@ def train(attn_implementation="flash_attention_2"):
 
     configure_lora(model.get_model(), model_args)
 
-    if model_args.checkpoint_path is not None:
-        pretrained_weights = torch.load(model_args.checkpoint_path, map_location="cpu")
+    resume_from_checkpoint = list(
+        pathlib.Path(training_args.output_dir).glob("checkpoint-*")
+    )
+
+    # don't need to load the pretrained weights if we will resume from a checkpoint
+    if model_args.pretrain_checkpoint_path is not None and not resume_from_checkpoint:
+        pretrained_weights = torch.load(
+            model_args.pretrain_checkpoint_path, map_location="cpu"
+        )
         model.load_state_dict(pretrained_weights, strict=False)
 
-        logger.info(f"Loaded weights from checkpoint: {model_args.checkpoint_path}")
+        logger.info(
+            f"Loaded weights from checkpoint: {model_args.pretrain_checkpoint_path}"
+        )
 
     model.config.tokenizer_model_max_length = tokenizer.model_max_length
 
@@ -109,7 +118,6 @@ def train(attn_implementation="flash_attention_2"):
                 has_gradients = any(p.requires_grad for p in module.parameters())
                 f.write(f"{name} {has_gradients}\n")
 
-    model.config.mm_projector_lr = training_args.mm_projector_lr
     model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
@@ -117,7 +125,10 @@ def train(attn_implementation="flash_attention_2"):
         model=model, processing_class=tokenizer, args=training_args, **data_module
     )
 
-    trainer.train()
+    if resume_from_checkpoint:
+        trainer.train(resume_from_checkpoint=True)
+    else:
+        trainer.train()
     trainer.save_state()
 
     model.config.use_cache = True

@@ -52,7 +52,7 @@ class LlavaMetaModel:
     def initialize_vision_modules(self, model_args, torch_dtype, fsdp=None):
         mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
-        checkpoint_path = model_args.checkpoint_path  # copy from here
+        checkpoint_path = model_args.pretrain_checkpoint_path
 
         self.config.mm_vision_tower = model_args.vision_tower
         self.config.image_tokens = model_args.image_tokens

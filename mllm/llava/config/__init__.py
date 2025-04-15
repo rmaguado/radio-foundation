@@ -14,7 +14,7 @@ class TrainingArguments(transformers.TrainingArguments):
     remove_unused_columns: bool = field(default=False)
     model_max_length: int = field(default=1024)
     bits: int = field(default=16, metadata={"help": "How many bits to use."})
-    mm_projector_lr: Optional[float] = None
+    min_lr: Optional[float] = 1e-6
     group_by_modality_length: bool = field(default=False)
 
 
@@ -128,7 +128,7 @@ def load_generate_config():
 
     training_args = TrainingArguments(**cfg["train"], output_dir=output_dir)
 
-    model_args.checkpoint_path = model_checkpoint_path
+    model_args.pretrain_checkpoint_path = model_checkpoint_path
     model_args.image_tokens = data_args.image_tokens
 
     return model_args, data_args, training_args, output_dir

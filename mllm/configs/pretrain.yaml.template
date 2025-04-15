@@ -6,7 +6,7 @@ model:
     lora_enable: False
   vision_tower: "dino-vit-base-patch14-10"
   mm_vision_select_layer: -1
-  checkpoint_path: null
+  pretrain_checkpoint_path: null
   mm_vision_config_path: null # REQUIRED
   mm_vision_checkpoint_path: null # REQUIRED
 data:
@@ -22,7 +22,7 @@ train:
   gradient_accumulation_steps: 1
   optim: "adamw_torch"
   learning_rate: 1e-3
-  mm_projector_lr: 1e-4
+  min_lr: 1e-5
   dataloader_num_workers: 4
   save_steps: 0.1
   save_total_limit: null

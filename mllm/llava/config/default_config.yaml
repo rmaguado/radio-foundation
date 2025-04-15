@@ -24,7 +24,7 @@ model:
       - "v_proj"
   vision_tower: null
   mm_vision_select_layer: -1
-  checkpoint_path: null
+  pretrain_checkpoint_path: null
   mm_projector_type: "attn_pool"
   mm_vision_select_feature: "cls_patch"
   mm_vision_config_path: null
@@ -42,8 +42,9 @@ train:
   cache_dir: "mllm/cache"
   optim: "adamw_torch"
   bits: 16
-  learning_rate: 1e-3
-  mm_projector_lr: 1e-4
+  warmup_ratio: 0.03
+  learning_rate: 1e-4
+  min_lr: 1e-6
   group_by_modality_length: False
   report_to: "none"
   num_train_epochs: 1
@@ -54,8 +55,6 @@ train:
   save_steps: 1
   save_total_limit: null
   weight_decay: 0.0
-  warmup_ratio: 0.03
-  lr_scheduler_type: "cosine"
   logging_steps: 1
   bf16: True
   tf32: True

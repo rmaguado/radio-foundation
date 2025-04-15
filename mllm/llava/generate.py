@@ -47,8 +47,10 @@ def generate():
 
     configure_lora(model.get_model(), model_args)
 
-    logging.info(f"Loading from checkpoint: {model_args.checkpoint_path}")
-    pretrained_weights = torch.load(model_args.checkpoint_path, map_location="cpu")
+    logging.info(f"Loading from checkpoint: {model_args.pretrain_checkpoint_path}")
+    pretrained_weights = torch.load(
+        model_args.pretrain_checkpoint_path, map_location="cpu"
+    )
     model.load_state_dict(pretrained_weights, strict=False)
 
     logging.info(f"Loaded weights")
