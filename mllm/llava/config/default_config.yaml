@@ -10,11 +10,15 @@ model:
       - "qkv"
   lora_language:
     lora_enable: False
-    lora_r: 64
-    lora_alpha: 128
+    lora_r: 128
+    lora_alpha: 256
     lora_dropout: 0.05
     lora_bias: "none"
     include_modules:
+      - "down_proj"
+      - "up_proj"
+      - "q_proj"
+      - "gate_proj"
       - "q_proj"
       - "k_proj"
       - "v_proj"
