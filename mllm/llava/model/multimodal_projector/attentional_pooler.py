@@ -72,12 +72,11 @@ class AttentionalPoolProjector(nn.Module):
             num_queries=axial_resample_tokens,
         )
         self.norm = nn.LayerNorm(hidden_dim)
-        self.proj = nn.Linear(hidden_dim, hidden_dim)
-        # self.proj = nn.Sequential(
-        #    nn.Linear(hidden_dim, hidden_dim),
-        #    nn.GELU(),
-        #    nn.Linear(hidden_dim, hidden_dim),
-        # )
+        self.proj = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, hidden_dim),
+        )
 
     def forward(self, embeddings, mask=None):
 
