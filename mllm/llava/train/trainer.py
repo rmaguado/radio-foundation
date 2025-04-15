@@ -200,9 +200,6 @@ class LLaVATrainer(Trainer):
         return self.optimizer
 
     def _save_checkpoint(self, model, trial, metrics=None):
-
-        logger.info("called _save_checkpoint")
-
         from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
@@ -217,5 +214,4 @@ class LLaVATrainer(Trainer):
         self.state.save_to_json(os.path.join(output_dir, "trainer_state.json"))
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
-        logger.info("called _save")
         save_model(self.args, self.model, output_dir)
