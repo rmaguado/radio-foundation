@@ -163,3 +163,14 @@ class LLaVATrainer(Trainer):
             return lr / base_lr
 
         return LambdaLR(optimizer, lr_lambda)
+
+    def _save_checkpoint(self, model, trial):
+        save_folder = f"save-{self.state.global_step}"
+
+        run_dir = self._get_output_dir(trial=trial)
+        output_dir = os.path.join(run_dir, save_folder)
+        os.makedirs(output_dir, exist_ok=True)
+
+        save_model(self.args, self.model, output_dir)
+
+        super()._save_checkpoint(model, trial)
