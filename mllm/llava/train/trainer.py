@@ -6,6 +6,7 @@ import math
 import random
 
 from torch.utils.data import Sampler
+from torch.optim.lr_scheduler import LambdaLR
 
 from transformers import Trainer
 from transformers.trainer import (
