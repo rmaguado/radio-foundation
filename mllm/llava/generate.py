@@ -100,6 +100,7 @@ def generate():
                 images=images,
                 max_length=training_args.model_max_length,
                 pad_token_id=tokenizer.pad_token_id,
+                temperature=0.0,
             )[0]
 
         output = tokenizer.decode(output, skip_special_tokens=True)
