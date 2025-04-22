@@ -237,6 +237,8 @@ class RadiologyReportDataset(Dataset):
 
         self.tokenizer = tokenizer
 
+        self.debug_mode = data_args.debug_mode
+
         self.dataset = _ReportDataset(
             root_path=data_args.root_path,
             dataset_name=data_args.db_name,
@@ -257,11 +259,9 @@ class RadiologyReportDataset(Dataset):
             )
 
     def __len__(self):
+        if self.debug_mode:
+            return min(8, len(self.dataset))
         return len(self.dataset)
-
-    @property
-    def modality_lengths(self):
-        raise NotImplementedError
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
 

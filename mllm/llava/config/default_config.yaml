@@ -38,6 +38,7 @@ data:
   is_multimodal: True
   image_tokens: 128
   conv_template: "plain"
+  debug_mode: False
 train:
   cache_dir: "mllm/cache"
   optim: "adamw_torch"
