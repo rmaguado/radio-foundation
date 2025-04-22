@@ -51,16 +51,16 @@ def generate():
     pretrained_weights = torch.load(
         model_args.pretrain_checkpoint_path, map_location="cpu"
     )
-    model.load_state_dict(pretrained_weights, strict=False)
-
-    logging.info(f"Loaded weights")
-    logging.info(pretrained_weights.keys())
+    missing_keys, unexpected_keys = model.load_state_dict(
+        pretrained_weights, strict=False
+    )
 
     model.config.tokenizer_model_max_length = tokenizer.model_max_length
     model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
 
     model.requires_grad_(False)
     model.to(training_args.device)
+    model.eval()
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     dataloader = torch.utils.data.DataLoader(
@@ -100,7 +100,9 @@ def generate():
                 images=images,
                 max_length=training_args.model_max_length,
                 pad_token_id=tokenizer.pad_token_id,
-                temperature=0.0,
+                temperature=0.1,
+                top_p=0.3,
+                use_cache=True,
             )[0]
 
         output = tokenizer.decode(output, skip_special_tokens=True)
