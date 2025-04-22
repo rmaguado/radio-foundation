@@ -57,10 +57,16 @@ def get_generate_args():
         help="Root path to the .yaml file.",
     )
     parser.add_argument(
-        "--checkpoint_path",
+        "--path_to_run",
         type=str,
         required=True,
-        help="Path to the checkpoint to load from. Should contain a /fina/model.bin.",
+        help="Path to the run to load from. Should contain a checkpoints and config.yaml",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        required=True,
+        help="Path from the run to the checkpoint. Example: final/model.bin.",
     )
     parser.add_argument(
         "--output_path",
@@ -107,8 +113,8 @@ def load_train_config():
 def load_generate_config():
     args = get_generate_args()
 
-    model_config_path = os.path.join(args.checkpoint_path, "config.yaml")
-    model_checkpoint_path = os.path.join(args.checkpoint_path, "final/model.bin")
+    model_config_path = os.path.join(args.path_to_run, "config.yaml")
+    model_checkpoint_path = os.path.join(args.path_to_run, args.checkpoint)
     generate_config_path = args.config_path
 
     default_cfg = OmegaConf.create(
