@@ -135,7 +135,11 @@ def main():
 
     if args.resample_slices:
         img_processor = ImageTransformResampleSlices(
-            full_image_size, data_mean, data_std, channels=channels
+            full_image_size,
+            data_mean,
+            data_std,
+            channels=channels,
+            max_slices=args.max_slices,
         )
     else:
         img_processor = ImageTransform(full_image_size, data_mean, data_std, channels)
@@ -221,6 +225,12 @@ def get_argpase():
         type=bool,
         default=False,
         help="Wether to resample slices that are too thin.",
+    )
+    parser.add_argument(
+        "--max_slices",
+        type=int,
+        default=300,
+        help="The maximum number of slices to take.",
     )
     return parser
 
