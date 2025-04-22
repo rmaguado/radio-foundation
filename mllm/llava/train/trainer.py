@@ -88,13 +88,13 @@ class MultimodalBalanceLengthSampler(Sampler):
 class LLaVATrainer(Trainer):
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
-        # return super()._get_train_sampler()
+        return super()._get_train_sampler()
         # return LongestFirstSampler(self.train_dataset.dataset.get_lengths())
-        return MultimodalBalanceLengthSampler(
-            img_lengths=self.train_dataset.dataset.get_slices(),
-            text_lengths=self.train_dataset.dataset.get_lengths(),
-            bucket_size=256,
-        )
+        # return MultimodalBalanceLengthSampler(
+        #    img_lengths=self.train_dataset.dataset.get_slices(),
+        #    text_lengths=self.train_dataset.dataset.get_lengths(),
+        #    bucket_size=64,
+        # )
 
     def create_optimizer(self):
         """
@@ -164,7 +164,10 @@ class LLaVATrainer(Trainer):
         return LambdaLR(optimizer, lr_lambda)
 
     def _test_generation(self, outdir):
-        for batch in self.train_dataset:
+        self.model.eval()
+        train_dataloader = self.get_train_dataloader()
+
+        for batch in train_dataloader:
 
             map_id = batch.pop("map_ids")[0]
             input_ids = batch.pop("input_ids").to(self.args.device)
@@ -186,14 +189,14 @@ class LLaVATrainer(Trainer):
                     attention_mask=attention_mask,
                     images=images,
                     max_length=self.args.model_max_length,
-                    pad_token_id=self.tokenizer.pad_token_id,
-                    temperature=0.0,
-                    do_sample=False,
-                )[0]
-
-            output = self.tokenizer.decode(output, skip_special_tokens=True)
+                    pad_token_id=self.processing_class.pad_token_id,
+                    synced_gpus=False,
+                    use_cache=True,
+                )[0].cpu()
+            output = self.processing_class.decode(output, skip_special_tokens=True)
             with open(os.path.join(outdir, f"{map_id}.txt"), "w") as f:
                 f.write(output)
+        self.model.train()
 
     def _save_checkpoint(self, model, trial):
         checkpoint_folder = f"checkpoint-{self.state.global_step}"
@@ -204,7 +207,8 @@ class LLaVATrainer(Trainer):
         os.makedirs(generation_output_dir, exist_ok=True)
         os.makedirs(save_output_dir, exist_ok=True)
 
-        self._test_generation(generation_output_dir)
         save_model(self.args, self.model, save_output_dir)
 
         super()._save_checkpoint(model, trial)
+
+        # self._test_generation(generation_output_dir)
