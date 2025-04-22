@@ -15,9 +15,14 @@ Output Requirements:
 4. Maintain original measurements and units (e.g., "2.3 cm")
 5. Normalize plurality to: "single", "multiple", or null
 6. Do not infer information not explicitly stated
-7. If no abnormalities are found, return an empty list
+7. Extract all findings that deviate from normal anatomy or function, including:
+  - Descriptive terms implying pathology (e.g., 'densities', 'opacities', 'thickening')
+  - Quantitative deviations from normal ranges
+  - Any explicitly noted observations beyond normal variants
+8. Your response MUST begin with <output> and end with </output>
 
 Example Output:
+<output>
 [
   {
     "abnormality": "pulmonary nodule",
@@ -34,6 +39,7 @@ Example Output:
     "plurality": null
   }
 ]
+</output>
 
 Important:
 - Do not include any interpretation, commentary, or analysis
