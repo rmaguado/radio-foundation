@@ -12,13 +12,12 @@ from transformers import Trainer
 from transformers.trainer import (
     is_sagemaker_mp_enabled,
     get_parameter_names,
-    has_length,
     ALL_LAYERNORM_LAYERS,
 )
-from typing import List, Optional
+from typing import Optional
 
 from mllm.llava.train.save import save_model
-
+from mllm.llava.constants import IGNORE_INDEX
 
 logger = logging.getLogger("DeepSpeed")
 
@@ -164,13 +163,48 @@ class LLaVATrainer(Trainer):
 
         return LambdaLR(optimizer, lr_lambda)
 
+    def _test_generation(self, outdir):
+        for batch in self.train_dataset:
+
+            map_id = batch.pop("map_ids")[0]
+            input_ids = batch.pop("input_ids").to(self.args.device)
+            attention_mask = batch.pop("attention_mask").to(self.args.device)
+            images = [
+                x.to(self.args.device, dtype=torch.bfloat16)
+                for x in batch.pop("images")
+            ]
+            labels = batch.pop("labels").to(self.args.device)
+
+            assert input_ids.shape[0] == 1, "Needs batch size 1"
+
+            input_ids = input_ids[labels == IGNORE_INDEX].unsqueeze(0)
+            attention_mask = attention_mask[labels == IGNORE_INDEX].unsqueeze(0)
+
+            with torch.inference_mode():
+                output = self.model.generate(
+                    input_ids,
+                    attention_mask=attention_mask,
+                    images=images,
+                    max_length=self.args.model_max_length,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    temperature=0.0,
+                    do_sample=False,
+                )[0]
+
+            output = self.tokenizer.decode(output, skip_special_tokens=True)
+            with open(os.path.join(outdir, f"{map_id}.txt"), "w") as f:
+                f.write(output)
+
     def _save_checkpoint(self, model, trial):
-        save_folder = f"save-{self.state.global_step}"
+        checkpoint_folder = f"checkpoint-{self.state.global_step}"
 
         run_dir = self._get_output_dir(trial=trial)
-        output_dir = os.path.join(run_dir, save_folder)
-        os.makedirs(output_dir, exist_ok=True)
+        save_output_dir = os.path.join(run_dir, checkpoint_folder, "save")
+        generation_output_dir = os.path.join(run_dir, checkpoint_folder, "generate")
+        os.makedirs(generation_output_dir, exist_ok=True)
+        os.makedirs(save_output_dir, exist_ok=True)
 
-        save_model(self.args, self.model, output_dir)
+        self._test_generation(generation_output_dir)
+        save_model(self.args, self.model, save_output_dir)
 
         super()._save_checkpoint(model, trial)
