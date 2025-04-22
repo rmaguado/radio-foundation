@@ -49,7 +49,7 @@ class LlavaMetaModel:
             mm_projector = mm_projector[0]
         return mm_projector
 
-    def initialize_vision_modules(self, model_args, torch_dtype, fsdp=None):
+    def initialize_vision_modules(self, model_args, torch_dtype):
         mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
         checkpoint_path = model_args.pretrain_checkpoint_path
@@ -60,10 +60,7 @@ class LlavaMetaModel:
         vision_tower = build_vision_tower(model_args, torch_dtype=torch_dtype)
         vision_tower.requires_grad_(False)
 
-        if fsdp is not None and len(fsdp) > 0:
-            self.vision_tower = [vision_tower]
-        else:
-            self.vision_tower = vision_tower
+        self.vision_tower = vision_tower
 
         self.config.use_mm_proj = True
         self.config.mm_projector_type = getattr(

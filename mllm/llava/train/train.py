@@ -76,7 +76,6 @@ def train(attn_implementation="flash_attention_2"):
     model.get_model().initialize_vision_modules(
         model_args=model_args,
         torch_dtype=torch.bfloat16 if training_args.bf16 else torch.float16,
-        fsdp=training_args.fsdp,
     )
 
     if training_args.bits == 16:
