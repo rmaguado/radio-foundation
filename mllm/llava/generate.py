@@ -100,8 +100,9 @@ def generate():
                 images=images,
                 max_length=training_args.model_max_length,
                 pad_token_id=tokenizer.pad_token_id,
-                temperature=0.1,
-                top_p=0.3,
+                # num_beams=2,
+                # temperature=0.1,
+                # top_p=0.3,
                 use_cache=True,
             )[0]
 
