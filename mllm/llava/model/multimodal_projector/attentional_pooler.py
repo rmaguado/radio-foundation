@@ -46,11 +46,12 @@ class PerceiverResampler(nn.Module):
         return attn_output.transpose(0, 1)
 
 
-class AttentionalPoolProjector(nn.Module):
+class PatchAttentionalPoolProjector(nn.Module):
     def __init__(
         self,
         embed_dim,
         hidden_dim,
+        output_dim,
         patch_resample_tokens=16,
         axial_resample_tokens=128,
     ):
@@ -75,7 +76,7 @@ class AttentionalPoolProjector(nn.Module):
         self.proj = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(hidden_dim, output_dim),
         )
 
     def forward(self, embeddings, mask=None):
@@ -89,6 +90,52 @@ class AttentionalPoolProjector(nn.Module):
             x = self.token_resampler(x)
             x = rearrange(x, "a t d -> 1 (a t) d")
             x = self.axial_resampler(x)
+            x = rearrange(x, "1 t d -> t d")
+            x = self.norm(x)
+            x = self.proj(x)
+
+            projected_embeddings.append(x.squeeze())
+
+        return projected_embeddings
+
+
+class ClsAttentionalPoolProjector(nn.Module):
+    def __init__(
+        self,
+        embed_dim,
+        hidden_dim,
+        output_dim,
+        resample_tokens=128,
+    ):
+        super().__init__()
+
+        self.embed_dim = embed_dim
+        self.hidden_dim = hidden_dim
+        self.resample_tokens = resample_tokens
+
+        self.token_resampler = PerceiverResampler(
+            embed_dim=embed_dim,
+            latent_dim=hidden_dim,
+            num_queries=resample_tokens,
+        )
+
+        self.norm = nn.LayerNorm(hidden_dim)
+        self.proj = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, output_dim),
+        )
+
+    def forward(self, embeddings, mask=None):
+
+        projected_embeddings = []
+
+        for x in embeddings:
+
+            axial_dim, _, embed_dim = x.size()
+
+            x = rearrange(x, "a 1 d -> 1 a d")
+            x = self.token_resampler(x)
             x = rearrange(x, "1 t d -> t d")
             x = self.norm(x)
             x = self.proj(x)

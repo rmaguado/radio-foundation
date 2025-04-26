@@ -9,7 +9,7 @@ import os
 
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
-    cache_dir: Optional[str] = field(default=None)
+    transformers_cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
     remove_unused_columns: bool = field(default=False)
     model_max_length: int = field(default=1024)
@@ -97,12 +97,17 @@ def load_train_config():
         training_args.logging_dir, datetime.now().strftime("%Y%m%d_%H%M%S")
     )
     training_args = TrainingArguments(
-        **cfg["train"], deepspeed=args.deepspeed, output_dir=output_dir
+        **cfg["train"],
+        deepspeed=args.deepspeed,
+        output_dir=output_dir,
+        label_names=["labels"],
     )
 
     model_args.image_tokens = data_args.image_tokens
-    training_args.lora_bias = model_args.lora_backbone.lora_bias
-    assert model_args.lora_backbone.lora_bias == model_args.lora_language.lora_bias
+    assert (
+        model_args.use_vision_tower != data_args.cache_embed
+    ), "Must disable use_vision_tower if using cached_embed"
+    # training_args.lora_bias = model_args.lora.lora_bias
 
     with open(os.path.join(args.output_path, "config.yaml"), "w") as f:
         OmegaConf.save(config=cfg, f=f)
@@ -132,7 +137,9 @@ def load_generate_config():
     data_args = cfg["data"]
     training_args = cfg["train"]
 
-    training_args = TrainingArguments(**cfg["train"], output_dir=output_dir)
+    training_args = TrainingArguments(
+        **cfg["train"], output_dir=output_dir, label_names=["labels"]
+    )
 
     model_args.pretrain_checkpoint_path = model_checkpoint_path
     model_args.image_tokens = data_args.image_tokens

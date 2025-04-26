@@ -108,7 +108,7 @@ class ImageProcessor:
         return image
 
 
-class _ReportDataset(NiftiCtVolumesFull):
+class ImageReportDataset(NiftiCtVolumesFull):
     def __init__(
         self,
         root_path: str,
@@ -203,6 +203,67 @@ class _ReportDataset(NiftiCtVolumesFull):
         return map_id, image, report
 
 
+class CachedEmbedReportDataset(NiftiCtVolumesFull):
+    def __init__(
+        self, root_path: str, dataset_name: str, channels: int, embed_path: str
+    ):
+        super().__init__(
+            dataset_name=dataset_name,
+            root_path=root_path,
+            channels=channels,
+            transform=None,
+        )
+
+        self.embed_path = embed_path
+
+    def create_entries(self) -> np.ndarray:
+        entries_dtype = [
+            ("rowid", np.uint32),
+            ("map_id", "U256"),
+            ("length", np.uint32),
+            ("slices", np.uint32),
+        ]
+        entries = []
+        row_id_lengths = self.cursor.execute(
+            f"SELECT rowid, map_id, length, num_slices FROM global"
+        ).fetchall()
+
+        for rowid, map_id, length, slices in row_id_lengths:
+            entries.append((rowid, map_id, length, slices))
+
+        entries_array = np.array(entries, dtype=entries_dtype)
+
+        entries_dir = self.get_entries_dir()
+        np.save(entries_dir, entries_array)
+        return np.load(entries_dir, mmap_mode="r")
+
+    def get_image_embed(self, index: int) -> torch.Tensor:
+        rowid, map_id, _, _ = self.entries[index]
+        self.cursor.execute(
+            """
+            SELECT text FROM global WHERE rowid = ?
+            """,
+            (int(rowid),),
+        )
+        report = self.cursor.fetchone()[0]
+
+        abs_path_to_embed = os.path.join(self.embed_path, f"{map_id}.npy")
+
+        embed_memmap = np.load(abs_path_to_embed, mmap_mode="r")
+
+        return map_id, embed_memmap, report
+
+    def __getitem__(self, index: int):
+        try:
+            map_id, embed_memmap, report = self.get_image_embed(index)
+        except Exception as e:
+            raise RuntimeError(
+                f"can not read embedding/report for sample {index}"
+            ) from e
+
+        return map_id, embed_memmap, report
+
+
 def preprocess(
     sources: Sequence[str],
     tokenizer: PreTrainedTokenizer,
@@ -238,14 +299,23 @@ class RadiologyReportDataset(Dataset):
         self.tokenizer = tokenizer
 
         self.debug_mode = data_args.debug_mode
+        self.cache_embed = data_args.cache_embed
 
-        self.dataset = _ReportDataset(
-            root_path=data_args.root_path,
-            dataset_name=data_args.db_name,
-            channels=data_args.channels,
-            mean=data_args.data_mean,
-            std=data_args.data_std,
-        )
+        if data_args.cache_embed:
+            self.dataset = CachedEmbedReportDataset(
+                root_path=data_args.root_path,
+                dataset_name=data_args.db_name,
+                channels=data_args.channels,
+                embed_path=data_args.cache_path,
+            )
+        else:
+            self.dataset = ImageReportDataset(
+                root_path=data_args.root_path,
+                dataset_name=data_args.db_name,
+                channels=data_args.channels,
+                mean=data_args.data_mean,
+                std=data_args.data_std,
+            )
         self.data_args = data_args
         self.image_tokens = self.data_args.image_tokens
 
@@ -258,6 +328,11 @@ class RadiologyReportDataset(Dataset):
                 f"Unknown conversation template: {data_args.conv_template}"
             )
 
+        if self.debug_mode:
+            for i in range(len(self)):
+                map_id, _, _ = self.dataset[i]
+                print(map_id)
+
     def __len__(self):
         if self.debug_mode:
             return min(8, len(self.dataset))
@@ -267,7 +342,11 @@ class RadiologyReportDataset(Dataset):
 
         data_dict = {}
 
-        map_id, image, text = self.dataset[i]
+        map_id, image_data, text = self.dataset[i]
+
+        image_features = image_data if self.cache_embed else None
+        image = image_data if not self.cache_embed else None
+
         sources = [
             {
                 "from": "human",
@@ -286,5 +365,6 @@ class RadiologyReportDataset(Dataset):
             input_ids=data_dict["input_ids"],
             labels=data_dict["labels"],
             image=image,
+            image_features=image_features,
             map_id=map_id,
         )

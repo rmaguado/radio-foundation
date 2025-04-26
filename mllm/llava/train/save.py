@@ -1,77 +1,28 @@
+import deepspeed
 import torch
 import os
-import logging
 
-
-logger = logging.getLogger("DeepSpeed")
-
-
-def maybe_zero_3(param, ignore_status=False, name=None):
-    from deepspeed import zero
-    from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
-
-    if hasattr(param, "ds_id"):
-        if param.ds_status == ZeroParamStatus.NOT_AVAILABLE:
-            if not ignore_status:
-                logger.warning(
-                    f"{name}: param.ds_status != ZeroParamStatus.NOT_AVAILABLE: {param.ds_status}"
-                )
-        with zero.GatheredParameters([param]):
-            param = param.data.detach().cpu().clone()
-    else:
-        param = param.detach().cpu().clone()
-    return param
-
-
-# Borrowed from peft.utils.get_peft_model_state_dict
-def get_peft_state_maybe_zero_3(named_params, bias):
-    if bias == "none":
-        to_return = {k: t for k, t in named_params if "lora_" in k}
-    elif bias == "all":
-        to_return = {k: t for k, t in named_params if "lora_" in k or "bias" in k}
-    elif bias == "lora_only":
-        to_return = {}
-        maybe_lora_bias = {}
-        lora_bias_names = set()
-        for k, t in named_params:
-            if "lora_" in k:
-                to_return[k] = t
-                bias_name = k.split("lora_")[0] + "bias"
-                lora_bias_names.add(bias_name)
-            elif "bias" in k:
-                maybe_lora_bias[k] = t
-        for k, t in maybe_lora_bias:
-            if bias_name in lora_bias_names:
-                to_return[bias_name] = t
-    else:
-        raise NotImplementedError
-    to_return = {k: maybe_zero_3(v, ignore_status=True) for k, v in to_return.items()}
-    return to_return
-
-
-def get_peft_state_non_lora_maybe_zero_3(named_params, require_grad_only=True):
-    to_return = {k: t for k, t in named_params if "lora_" not in k}
-    if require_grad_only:
-        to_return = {k: t for k, t in to_return.items() if t.requires_grad}
-    to_return = {
-        k: maybe_zero_3(v, ignore_status=True).cpu() for k, v in to_return.items()
-    }
-    return to_return
+from peft import PeftModel
 
 
 def save_model(training_args, model, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
 
-    state_dict = get_peft_state_non_lora_maybe_zero_3(
-        model.named_parameters(), require_grad_only=True
-    )
+    with deepspeed.zero.GatheredParameters(list(model.parameters())):
 
-    lora_state_dict = get_peft_state_maybe_zero_3(
-        model.named_parameters(), training_args.lora_bias
-    )
-    state_dict.update(lora_state_dict)
+        if deepspeed.comm.get_rank() == 0:
 
-    if training_args.local_rank < 1:
-        torch.save(
-            state_dict,
-            os.path.join(output_dir, "model.bin"),
-        )
+            if isinstance(model, PeftModel):
+                lora_dir = os.path.join(output_dir, "lora_adapters_dir")
+                os.makedirs(lora_dir, exist_ok=True)
+
+                model.save_pretrained(lora_dir)
+
+            torch.save(
+                model.get_model().mm_projector.state_dict(),
+                os.path.join(output_dir, "mm_projector.pth"),
+            )
+
+            config_dir = os.path.join(output_dir, "base_config_dir")
+            os.makedirs(config_dir, exist_ok=True)
+            model.config.save_pretrained(config_dir)

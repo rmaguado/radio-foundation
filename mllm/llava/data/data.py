@@ -32,8 +32,10 @@ class DataCollatorForSupervisedDataset(object):
         )
 
         images = [instance["image"] for instance in instances]
+        image_features = [instance["image_features"] for instance in instances]
         map_ids = [instance["map_id"] for instance in instances]
         batch["images"] = images
+        batch["image_features"] = image_features
         batch["map_ids"] = map_ids
 
         return batch

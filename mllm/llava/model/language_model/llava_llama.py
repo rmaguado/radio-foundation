@@ -51,14 +51,12 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         self.model = LlavaLlamaModel(config)
         self.pretraining_tp = config.pretraining_tp
         self.vocab_size = config.vocab_size
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-        # Initialize weights and apply final processing
         self.post_init()
 
-    def freeze_language(self):
-        self.model.requires_grad_(False)
-        self.lm_head.requires_grad_(False)
+    # def freeze_language(self):
+    #    self.model.requires_grad_(False)
+    #    self.lm_head.requires_grad_(False)
 
     def get_model(self):
         return self.model
@@ -75,7 +73,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         images: Optional[torch.FloatTensor] = None,
-        image_sizes: Optional[List[List[int]]] = None,
+        image_features: Optional[torch.FloatTensor] = None,
         return_dict: Optional[bool] = None,
         **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
@@ -95,7 +93,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
                 past_key_values,
                 labels,
                 images,
-                image_sizes,
+                image_features,
             )
 
         return super().forward(
@@ -116,13 +114,11 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         self,
         inputs: Optional[torch.Tensor] = None,
         images: Optional[torch.Tensor] = None,
-        image_sizes: Optional[torch.Tensor] = None,
+        image_features: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> Union[GenerateOutput, torch.LongTensor]:
         position_ids = kwargs.pop("position_ids", None)
         attention_mask = kwargs.pop("attention_mask", None)
-        if "inputs_embeds" in kwargs:
-            raise NotImplementedError("`inputs_embeds` is not supported")
 
         (inputs, position_ids, attention_mask, _, inputs_embeds, _) = (
             self.prepare_inputs_labels_for_multimodal(
@@ -132,7 +128,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
                 None,
                 None,
                 images,
-                image_sizes=image_sizes,
+                image_features=image_features,
             )
         )
 
@@ -142,6 +138,24 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
             inputs_embeds=inputs_embeds,
             **kwargs,
         )
+
+    def prepare_inputs_for_generation(
+        self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs
+    ):
+        images = kwargs.pop("images", None)
+        attention_mask = kwargs.pop("attention_mask", None)
+
+        inputs = super().prepare_inputs_for_generation(
+            input_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            **kwargs,
+        )
+
+        if images is not None:
+            inputs["images"] = images
+        return inputs
 
 
 AutoConfig.register("llava_llama", LlavaConfig)

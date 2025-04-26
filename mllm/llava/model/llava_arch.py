@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 
 import torch
 import logging
+import torch.nn.functional as F  # for optional inspection
 
 from .multimodal_encoder.builder import build_vision_tower
 from .multimodal_projector.builder import build_vision_projector
@@ -50,6 +51,8 @@ class LlavaMetaModel:
         return mm_projector
 
     def initialize_vision_modules(self, model_args, torch_dtype):
+        mm_vision_hidden_size = model_args.mm_vision_hidden_size
+        mm_projector_hidden_size = model_args.mm_projector_hidden_size
         mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
         checkpoint_path = model_args.pretrain_checkpoint_path
@@ -57,17 +60,17 @@ class LlavaMetaModel:
         self.config.mm_vision_tower = model_args.vision_tower
         self.config.image_tokens = model_args.image_tokens
 
-        vision_tower = build_vision_tower(model_args, torch_dtype=torch_dtype)
-        vision_tower.requires_grad_(False)
-
-        self.vision_tower = vision_tower
+        if model_args.use_vision_tower:
+            vision_tower = build_vision_tower(model_args, torch_dtype=torch_dtype)
+            vision_tower.requires_grad_(False)
+            self.vision_tower = vision_tower
 
         self.config.use_mm_proj = True
         self.config.mm_projector_type = getattr(
             model_args, "mm_projector_type", "attn_pool"
         )
-        self.config.mm_hidden_size = vision_tower.hidden_size
-        self.config.mm_vision_select_layer = mm_vision_select_layer
+        self.config.mm_vision_hidden_size = mm_vision_hidden_size
+        self.config.mm_projector_hidden_size = mm_projector_hidden_size
         self.config.mm_vision_select_feature = mm_vision_select_feature
 
         self.mm_projector = build_vision_projector(self.config)
@@ -85,10 +88,16 @@ class LlavaMetaForCausalLM(ABC):
     def get_mm_projector(self):
         return self.get_model().get_mm_projector()
 
-    def encode_images(self, images):
-        image_features = self.get_model().get_vision_tower()(images)
-        image_features = self.get_model().mm_projector(image_features)
-        return image_features
+    def select_embed_features(self, embed_memmap, dtype):
+        select_feature = self.config.mm_vision_select_feature
+
+        if select_feature == "cls":
+            features = [torch.from_numpy(x[:, :1, :]) for x in embed_memmap]
+        elif select_feature == "patch":
+            features = [torch.from_numpy(x[:, 1:, :]) for x in embed_memmap]
+        else:
+            features = [torch.from_numpy(x[:, :, :]) for x in embed_memmap]
+        return [f.to(device=self.device, dtype=dtype) for f in features]
 
     def prepare_inputs_labels_for_multimodal(
         self,
@@ -97,10 +106,11 @@ class LlavaMetaForCausalLM(ABC):
         attention_mask,
         past_key_values,
         labels,
-        images,
-        image_sizes=None,
+        images=None,
+        image_features=None,
     ):
-        if images is None:
+
+        if images is None and image_features is None:
             return (
                 input_ids,
                 position_ids,
@@ -110,7 +120,18 @@ class LlavaMetaForCausalLM(ABC):
                 labels,
             )
 
-        image_features = self.encode_images(images)
+        if image_features[0] is None:
+            image_features = self.get_model().get_vision_tower()(images)
+        else:
+            image_features = self.select_embed_features(
+                image_features, dtype=torch.bfloat16
+            )
+
+        image_features = self.get_model().mm_projector(image_features)
+
+        _labels = labels
+        _position_ids = position_ids
+        _attention_mask = attention_mask
 
         if attention_mask is None:
             attention_mask = torch.ones_like(input_ids, dtype=torch.bool)
@@ -139,16 +160,14 @@ class LlavaMetaForCausalLM(ABC):
 
             assert (
                 num_images == 1
-            ), f"Only one image token is allowed per input. {cur_input_ids}"
+            ), f"[ERROR] Only one image token is allowed per input: {cur_input_ids}"
 
             image_token_index = torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[
                 0
             ].item()
 
-            # Split around the image token
             before_ids = cur_input_ids[:image_token_index]
             after_ids = cur_input_ids[image_token_index + 1 :]
-
             before_labels = cur_labels[:image_token_index]
             after_labels = cur_labels[image_token_index + 1 :]
 
@@ -195,10 +214,8 @@ class LlavaMetaForCausalLM(ABC):
             dtype=new_labels[0].dtype,
             device=new_labels[0].device,
         )
-        attention_mask = torch.zeros(
-            (batch_size, max_len),
-            dtype=attention_mask.dtype,
-            device=self.device,
+        attention_mask_out = torch.zeros(
+            (batch_size, max_len), dtype=attention_mask.dtype, device=self.device
         )
         position_ids = torch.zeros(
             (batch_size, max_len), dtype=torch.long, device=self.device
@@ -208,48 +225,61 @@ class LlavaMetaForCausalLM(ABC):
             zip(new_input_embeds, new_labels)
         ):
             cur_len = cur_new_embed.shape[0]
+            assert cur_len > 0, f"[ERROR] Got empty embed sequence at index {i}"
+
             if getattr(self.config, "tokenizer_padding_side", "right") == "left":
                 new_input_embeds_padded.append(
                     torch.cat(
-                        (
+                        [
                             torch.zeros(
                                 (max_len - cur_len, cur_new_embed.shape[1]),
                                 dtype=cur_new_embed.dtype,
                                 device=cur_new_embed.device,
                             ),
                             cur_new_embed,
-                        ),
+                        ],
                         dim=0,
                     )
                 )
-                if cur_len > 0:
-                    new_labels_padded[i, -cur_len:] = cur_new_labels
-                    attention_mask[i, -cur_len:] = True
-                    position_ids[i, -cur_len:] = torch.arange(
-                        0, cur_len, dtype=position_ids.dtype, device=self.device
-                    )
+                new_labels_padded[i, -cur_len:] = cur_new_labels
+                attention_mask_out[i, -cur_len:] = True
+                position_ids[i, -cur_len:] = torch.arange(
+                    0, cur_len, dtype=position_ids.dtype, device=self.device
+                )
             else:
                 new_input_embeds_padded.append(
                     torch.cat(
-                        (
+                        [
                             cur_new_embed,
                             torch.zeros(
                                 (max_len - cur_len, cur_new_embed.shape[1]),
                                 dtype=cur_new_embed.dtype,
                                 device=cur_new_embed.device,
                             ),
-                        ),
+                        ],
                         dim=0,
                     )
                 )
-                if cur_len > 0:
-                    new_labels_padded[i, :cur_len] = cur_new_labels
-                    attention_mask[i, :cur_len] = True
-                    position_ids[i, :cur_len] = torch.arange(
-                        0, cur_len, dtype=position_ids.dtype, device=self.device
-                    )
+                new_labels_padded[i, :cur_len] = cur_new_labels
+                attention_mask_out[i, :cur_len] = True
+                position_ids[i, :cur_len] = torch.arange(
+                    0, cur_len, dtype=position_ids.dtype, device=self.device
+                )
 
         new_input_embeds = torch.stack(new_input_embeds_padded, dim=0).to(self.device)
+
+        if _labels is None:
+            new_labels = None
+        else:
+            new_labels = new_labels_padded
+
+        if _attention_mask is None:
+            attention_mask = None
+        else:
+            attention_mask = attention_mask_out
+
+        if _position_ids is None:
+            position_ids = None
 
         return (
             None,
@@ -257,7 +287,7 @@ class LlavaMetaForCausalLM(ABC):
             attention_mask,
             past_key_values,
             new_input_embeds,
-            new_labels_padded,
+            new_labels,
         )
 
     def initialize_vision_tokenizer(self, model_args, tokenizer):

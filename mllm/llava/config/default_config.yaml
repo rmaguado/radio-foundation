@@ -1,6 +1,6 @@
 model:
   model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
-  lora_backbone:
+  lora_vision:
     lora_enable: False
     lora_r: 8
     lora_alpha: 16
@@ -8,6 +8,9 @@ model:
     lora_bias: "none"
     include_modules:
       - "qkv"
+    exclude_modules:
+      - "mm_projector"
+      - "lm_head"
   lora_language:
     lora_enable: False
     lora_r: 128
@@ -22,16 +25,25 @@ model:
       - "q_proj"
       - "k_proj"
       - "v_proj"
+    exclude_modules:
+      - "mm_projector"
+      - "lm_head"
+      - "vision_tower"
   vision_tower: null
-  mm_vision_select_layer: -1
+  use_vision_tower: True
   pretrain_checkpoint_path: null
-  mm_projector_type: "attn_pool"
+  mm_vision_select_layer: -1
+  mm_projector_type: "patch_attn_pool"
+  mm_vision_hidden_size: 768
+  mm_projector_hidden_size: 2048
   mm_vision_select_feature: "cls_patch"
   mm_vision_config_path: null
   mm_vision_checkpoint_path: null
 data:
   root_path: null
   db_name: "CT-RATE_train_reports"
+  cache_embed: False
+  cache_path: null
   channels: 10
   data_mean: 0.0
   data_std: 1.0
@@ -40,7 +52,7 @@ data:
   conv_template: "plain"
   debug_mode: False
 train:
-  cache_dir: "mllm/cache"
+  transformers_cache_dir: "mllm/cache"
   optim: "adamw_torch"
   bits: 16
   warmup_ratio: 0.03

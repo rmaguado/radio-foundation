@@ -22,10 +22,18 @@ class DINOVisionTower(nn.Module):
         self.select_layer = args.mm_vision_select_layer
         self.select_feature = getattr(args, "mm_vision_select_feature", "patch")
 
-        self.use_cls = self.select_feature == "cls_patch"
-        self.extract_fnc = (
-            self.extract_cls_patch if self.use_cls else self.extract_patch
-        )
+        self.use_cls = self.select_feature in ["cls", "cls_patch"]
+        if self.select_feature == "cls":
+            self.extract_fnc = self.extract_cls
+        elif self.select_feature == "cls_patch":
+            self.extract_fnc = self.extract_cls_patch
+        elif self.select_feature == "patch":
+            self.extract_fnc = self.extract_patch
+        else:
+            raise ValueError(
+                f"Feature to extract from vision tower '{self.select_feature}' not recognized"
+            )
+
         self.path_to_checkpoint = args.mm_vision_checkpoint_path
 
         if not delay_load:
@@ -75,6 +83,12 @@ class DINOVisionTower(nn.Module):
             dim=-1,
         )
 
+    def extract_cls(self, img_features):
+        return torch.cat(
+            [class_token for _, class_token in img_features],
+            dim=-1,
+        ).unsqueeze(1)
+
     def forward(self, images: list):
         features = []
 
@@ -83,7 +97,7 @@ class DINOVisionTower(nn.Module):
             img_features = []
 
             x_tokens = self.vision_tower.get_intermediate_layers(
-                img, [self.select_layer], return_class_token=self.use_cls
+                img, [self.select_layer], return_class_token=True
             )
             feat = self.extract_fnc(x_tokens)
             features.append(feat)

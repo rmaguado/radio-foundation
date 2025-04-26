@@ -47,12 +47,17 @@ def train(attn_implementation="flash_attention_2"):
 
     model = LlavaLlamaForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        cache_dir=training_args.cache_dir,
+        cache_dir=training_args.transformers_cache_dir,
         attn_implementation=attn_implementation,
         torch_dtype=(torch.bfloat16 if training_args.bf16 else torch.float16),
     )
-
+    model.requires_grad_(False)
     model.config.use_cache = False
+
+    model.get_model().initialize_vision_modules(
+        model_args=model_args,
+        torch_dtype=torch.bfloat16 if training_args.bf16 else torch.float16,
+    )
 
     if training_args.gradient_checkpointing:
         if hasattr(model, "enable_input_require_grads"):
@@ -66,17 +71,30 @@ def train(attn_implementation="flash_attention_2"):
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
-        cache_dir=training_args.cache_dir,
+        cache_dir=training_args.transformers_cache_dir,
         model_max_length=training_args.model_max_length,
         padding_side="right",
         use_fast=False,
     )
-    model.freeze_language()
 
-    model.get_model().initialize_vision_modules(
-        model_args=model_args,
-        torch_dtype=torch.bfloat16 if training_args.bf16 else torch.float16,
-    )
+    pretrain_checkpoint_path = model_args.pretrain_checkpoint_path
+
+    if pretrain_checkpoint_path is not None:
+        logging.info("Loading pretrained checkpoint:")
+        adapters_path = os.path.join(
+            model_args.pretrain_checkpoint_path, "lora_adapters_dir"
+        )
+        if os.path.exists(adapters_path):
+            logging.info("Loading peft adapters.")
+            model = PeftModel.from_pretrained(model, adapters_path)
+
+        mm_projector_weights = torch.load(
+            os.path.join(model_args.pretrain_checkpoint_path, "mm_projector.pth"),
+            map_location="cpu",
+        )
+        model.get_model().mm_projector.load_state_dict(
+            mm_projector_weights, strict=True
+        )
 
     if training_args.bits == 16:
         if training_args.bf16:
@@ -84,22 +102,11 @@ def train(attn_implementation="flash_attention_2"):
         if training_args.fp16:
             model.to(torch.float16)
 
-    configure_lora(model.get_model(), model_args)
+    model = configure_lora(model, model_args)
 
     resume_from_checkpoint = list(
         pathlib.Path(training_args.output_dir).glob("checkpoint-*")
     )
-
-    # don't need to load the pretrained weights if we will resume from a checkpoint
-    if model_args.pretrain_checkpoint_path is not None and not resume_from_checkpoint:
-        pretrained_weights = torch.load(
-            model_args.pretrain_checkpoint_path, map_location="cpu"
-        )
-        model.load_state_dict(pretrained_weights, strict=False)
-
-        logger.info(
-            f"Loaded weights from checkpoint: {model_args.pretrain_checkpoint_path}"
-        )
 
     model.config.tokenizer_model_max_length = tokenizer.model_max_length
 
