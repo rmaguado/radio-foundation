@@ -13,7 +13,15 @@
     "zero_optimization": {
         "stage": 3,
         "contiguous_gradients": true,
-        "overlap_comm": true,
+        "overlap_comm": false,
+        "offload_param": {
+            "device": "cpu",
+            "pin_memory": true
+        },
+        "offload_optimizer": {
+            "device": "cpu",
+            "pin_memory": true
+        },
         "gather_16bit_weights_on_model_save": true
     },
 
