@@ -33,7 +33,7 @@ def configure_lora(model, model_args):
     language_args = model_args.lora_language
     pretrain_checkpoint_path = model_args.pretrain_checkpoint_path
 
-    is_peft_model = isinstance(model, PeftModel)
+    is_peft_model = hasattr(model, "peft_config")
 
     adapters_config = {}
     if vision_args.lora_enable:
@@ -78,14 +78,21 @@ def configure_lora(model, model_args):
         for adapter_name, config in adapters_config.items():
             if adapter_name not in current_adapters:
                 logger.info(f"Adding new lora adapter: {adapter_name}")
-                model.add_adapter(adapter_name, config)
+                model.add_adapter(adapter_name=adapter_name, peft_config=config)
     else:
         if adapters_config:
             first_adapter = list(adapters_config.keys())[0]
-            model = get_peft_model(model, adapters_config[first_adapter])
+            model = get_peft_model(
+                model,
+                adapters_config[first_adapter],
+                adapter_name=first_adapter,
+                mixed=True,
+            )
 
             for adapter_name, config in list(adapters_config.items())[1:]:
                 logger.info(f"Adding new lora adapter: {adapter_name}")
-                model.add_adapter(adapter_name, config)
+                model.add_adapter(adapter_name=adapter_name, peft_config=config)
+
+    model.set_adapter(list(adapters_config.keys()))
 
     return model
