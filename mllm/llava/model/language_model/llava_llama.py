@@ -58,6 +58,9 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
     #    self.model.requires_grad_(False)
     #    self.lm_head.requires_grad_(False)
 
+    def get_base_model(self):
+        return self.model
+
     def get_model(self):
         return self.model
 
