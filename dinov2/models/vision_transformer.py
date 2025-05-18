@@ -92,6 +92,12 @@ class BlockChunk(nn.Module):
             x = b(x)
         return x
 
+    def __len__(self):
+        return len(self.blocks)
+
+    def __getitem__(self, idx):
+        return self.blocks[idx]
+
 
 class DinoVisionTransformer(nn.Module):
     def __init__(
