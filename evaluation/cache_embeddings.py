@@ -139,6 +139,7 @@ def main():
             data_mean,
             data_std,
             channels=channels,
+            zspacing=args.zspacing,
             max_slices=args.max_slices,
         )
     else:
@@ -222,9 +223,14 @@ def get_argpase():
     )
     parser.add_argument(
         "--resample_slices",
-        type=bool,
-        default=False,
+        action="store_true",
         help="Wether to resample slices that are too thin.",
+    )
+    parser.add_argument(
+        "--zspacing",
+        type=float,
+        default=1.5,
+        help="Size to resample the axial dimension.",
     )
     parser.add_argument(
         "--max_slices",
