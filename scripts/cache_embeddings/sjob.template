@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=$WORKERS
 
 #SBATCH --ntasks-per-node=$GPUS
-#SBATCH --gres=gpu:$GPUS
+#SBATCH --gres=gpu:A40:$GPUS
 
 #SBATCH --mem=96GB
 #SBATCH --partition=odap-gpu
@@ -26,7 +26,6 @@ python3 -m evaluation.cache_embeddings \
     --dataset_name $DATASET_NAME \
     --run_name $RUN_NAME \
     --checkpoint_name $CHECKPOINT_NAME \
-    --embed_patches \
     --embed_cls \
     --db_storage $DB_STORATE \
-    --resample_slices True
+    --resample_slices
