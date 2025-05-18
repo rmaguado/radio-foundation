@@ -44,7 +44,8 @@ class BaseDataset:
         self.entries = None
 
     def get_entries_dir(self) -> str:
-        return os.path.join(self.entries_path, f"{self.channels}_channels.npy")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return os.path.join(self.entries_path, f"{timestamp}.npy")
 
     def get_entries(self) -> np.ndarray:
         """
@@ -59,8 +60,7 @@ class BaseDataset:
         entries_dir = self.get_entries_dir()
 
         if is_main_process():
-            if not os.path.exists(entries_dir):
-                self.create_entries()
+            self.create_entries()
 
         if is_enabled():
             dist.barrier()

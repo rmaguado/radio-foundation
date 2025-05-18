@@ -182,9 +182,6 @@ class NiftiCtVolumesFull(NiftiCtDataset):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def get_entries_dir(self) -> str:
-        return os.path.join(self.entries_path, f"{self.channels}_channels_full.npy")
-
     def get_image_data(self, index: int) -> torch.Tensor:
         rowid = self.entries[index]
         self.cursor.execute(

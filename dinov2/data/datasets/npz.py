@@ -37,9 +37,7 @@ class NpzVolumes(BaseDataset):
 
         slice_stack_num = self.channels
 
-        volumes = self.cursor.execute(
-            "SELECT rowid, num_slices FROM global"
-        ).fetchall()
+        volumes = self.cursor.execute("SELECT rowid, num_slices FROM global").fetchall()
 
         logger.info(f"Total number of series: {len(volumes)}.")
 
@@ -131,13 +129,17 @@ class NpzCtDataset(NpzVolumes):
         volume = npz_file["image_data"]
 
         try:
-            slice_data = volume[slice_index:slice_index + self.channels, :,:].astype(np.float32)
+            slice_data = volume[slice_index : slice_index + self.channels, :, :].astype(
+                np.float32
+            )
             slice_shape = slice_data.shape
             assert len(slice_shape) == 3, f"Slice shape is {slice_shape}."
 
             return self.process_ct(torch.tensor(slice_data, dtype=torch.float32))
         except Exception as e:
-            logger.exception(f"Error in loading slice {slice_index} from {volume_path}.")
+            logger.exception(
+                f"Error in loading slice {slice_index} from {volume_path}."
+            )
 
             return torch.zeros((self.channels, 512, 512), dtype=torch.float32)
 
@@ -159,9 +161,6 @@ class NpzCtVolumesFull(NpzCtDataset):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def get_entries_dir(self) -> str:
-        return os.path.join(self.entries_path, f"{self.channels}_channels_full.npy")
-
     def get_image_data(self, index: int) -> torch.Tensor:
         rowid = self.entries[index]
         self.cursor.execute(
@@ -171,7 +170,6 @@ class NpzCtVolumesFull(NpzCtDataset):
             (int(rowid),),
         )
         dataset, volume_path = self.cursor.fetchone()
-
 
         abs_path_to_nifti = os.path.join(self.root_path, dataset, volume_path)
         npz_file = np.load(abs_path_to_nifti)

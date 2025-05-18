@@ -4,6 +4,7 @@ import os
 import torch
 import pydicom
 import numpy as np
+from datetime import datetime
 
 from .base import BaseDataset
 
@@ -196,9 +197,6 @@ class DicomCtDataset(DicomVolumes):
 class DicomCTVolumesFull(DicomCtDataset):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
-    def get_entries_dir(self) -> np.ndarray:
-        return os.path.join(self.entries_path, f"{self.channels}_channels_full.npy")
 
     def create_entries(self) -> np.ndarray:
         """
