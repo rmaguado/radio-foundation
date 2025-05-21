@@ -43,10 +43,14 @@ class BaseDataset:
         self.cursor = None
 
         self.entries = None
+        self.entries_dir = None
 
     def get_entries_dir(self) -> str:
+        if self.entries_dir is not None:
+            return self.entries_dir
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return os.path.join(self.entries_path, f"{timestamp}.npy")
+        self.entries_dir = os.path.join(self.entries_path, f"{timestamp}.npy")
+        return self.entries_dir
 
     def get_entries(self) -> np.ndarray:
         """
