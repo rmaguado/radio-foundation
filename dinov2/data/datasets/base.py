@@ -8,6 +8,7 @@ import torch
 import numpy as np
 import os
 import sqlite3
+from datetime import datetime
 
 import torch.distributed as dist
 from dinov2.distributed import is_main_process, is_enabled
