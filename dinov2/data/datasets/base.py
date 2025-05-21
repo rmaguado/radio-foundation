@@ -90,6 +90,10 @@ class BaseDataset:
         """
         if isinstance(self.conn, sqlite3.Connection):
             self.conn.close()
+        try:
+            os.remove(self.get_entries_dir())
+        except FileNotFoundError:
+            pass
 
     def create_entries(self) -> np.ndarray:
         """
