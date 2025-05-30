@@ -48,8 +48,18 @@ class BaseDataset:
     def get_entries_dir(self) -> str:
         if self.entries_dir is not None:
             return self.entries_dir
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.entries_dir = os.path.join(self.entries_path, f"{timestamp}.npy")
+        if is_main_process():
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.entries_dir = os.path.join(self.entries_path, f"{timestamp}.npy")
+        if is_enabled():
+            dist.barrier()
+
+        entries_dir_list = [self.entries_dir] if is_main_process() else [None]
+        dist.broadcast_object_list(entries_dir_list, src=0)
+        self.entries_dir = entries_dir_list[0]
+
+        dist.barrier()
+
         return self.entries_dir
 
     def get_entries(self) -> np.ndarray:
