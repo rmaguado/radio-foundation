@@ -80,12 +80,12 @@ def train(attn_implementation="flash_attention_2"):
     pretrain_checkpoint_path = model_args.pretrain_checkpoint_path
 
     if pretrain_checkpoint_path is not None:
-        logging.info("Loading pretrained checkpoint:")
+        logger.info("Loading pretrained checkpoint:")
         adapters_path = os.path.join(
             model_args.pretrain_checkpoint_path, "lora_adapters_dir"
         )
         if os.path.exists(adapters_path):
-            logging.info("Loading peft adapters.")
+            logger.info("Loading peft adapters.")
             model = PeftModel.from_pretrained(model, adapters_path)
 
         mm_projector_weights = torch.load(
