@@ -67,7 +67,7 @@ def generate():
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     dataloader = torch.utils.data.DataLoader(
-        data_module["train_dataset"],
+        data_module["eval_dataset"],
         batch_size=training_args.per_device_train_batch_size,
         collate_fn=data_module["data_collator"],
         num_workers=training_args.dataloader_num_workers,

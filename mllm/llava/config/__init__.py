@@ -51,12 +51,6 @@ def get_train_args():
 def get_generate_args():
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument(
-        "--config_path",
-        type=str,
-        required=True,
-        help="Root path to the .yaml file.",
-    )
-    parser.add_argument(
         "--path_to_run",
         type=str,
         required=True,
@@ -120,15 +114,15 @@ def load_generate_config():
 
     model_config_path = os.path.join(args.path_to_run, "config.yaml")
     model_checkpoint_path = os.path.join(args.path_to_run, args.checkpoint)
-    generate_config_path = args.config_path
+    # generate_config_path = args.config_path
 
     default_cfg = OmegaConf.create(
         OmegaConf.load("mllm/llava/config/default_config.yaml")
     )
     model_cfg = OmegaConf.load(model_config_path)
-    generate_cfg = OmegaConf.load(generate_config_path)
+    # generate_cfg = OmegaConf.load(generate_config_path)
     cfg = OmegaConf.merge(default_cfg, model_cfg)
-    cfg = OmegaConf.merge(cfg, generate_cfg)
+    # cfg = OmegaConf.merge(cfg, generate_cfg)
 
     output_dir = args.output_path
     os.makedirs(output_dir, exist_ok=True)
