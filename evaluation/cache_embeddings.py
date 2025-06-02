@@ -235,7 +235,7 @@ def get_argpase():
     parser.add_argument(
         "--max_slices",
         type=int,
-        default=300,
+        default=240,
         help="The maximum number of slices to take.",
     )
     return parser
