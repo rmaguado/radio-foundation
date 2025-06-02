@@ -54,11 +54,11 @@ class BaseDataset:
         if is_enabled():
             dist.barrier()
 
-        entries_dir_list = [self.entries_dir] if is_main_process() else [None]
-        dist.broadcast_object_list(entries_dir_list, src=0)
-        self.entries_dir = entries_dir_list[0]
+            entries_dir_list = [self.entries_dir] if is_main_process() else [None]
+            dist.broadcast_object_list(entries_dir_list, src=0)
+            self.entries_dir = entries_dir_list[0]
 
-        dist.barrier()
+            dist.barrier()
 
         return self.entries_dir
 
