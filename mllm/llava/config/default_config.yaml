@@ -1,23 +1,17 @@
 model:
   model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
-  lora_vision:
-    lora_enable: False
-    lora_r: 8
-    lora_alpha: 16
-    lora_dropout: 0.05
-    lora_bias: "none"
-    include_modules:
+  lora:
+    lora_enable: True
+    lora_vision: False
+    lora_language: True
+    lora_vision_rank: 8
+    lora_vision_alpha: 16
+    lora_vision_pattern: "vision_tower"
+    lora_vision_modules:
       - "qkv"
-    exclude_modules:
-      - "mm_projector"
-      - "lm_head"
-  lora_language:
-    lora_enable: False
-    lora_r: 128
-    lora_alpha: 256
-    lora_dropout: 0.05
-    lora_bias: "none"
-    include_modules:
+    lora_language_rank: 128
+    lora_language_alpha: 256
+    lora_language_modules:
       - "down_proj"
       - "up_proj"
       - "q_proj"
@@ -25,10 +19,11 @@ model:
       - "q_proj"
       - "k_proj"
       - "v_proj"
+    lora_dropout: 0.05
+    lora_bias: "none"
     exclude_modules:
       - "mm_projector"
       - "lm_head"
-      - "vision_tower"
   vision_tower: null
   use_vision_tower: True
   pretrain_checkpoint_path: null
