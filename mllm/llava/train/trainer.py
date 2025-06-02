@@ -163,52 +163,13 @@ class LLaVATrainer(Trainer):
 
         return LambdaLR(optimizer, lr_lambda)
 
-    def _test_generation(self, outdir):
-        self.model.eval()
-        train_dataloader = self.get_train_dataloader()
-
-        for batch in train_dataloader:
-
-            map_id = batch.pop("map_ids")[0]
-            input_ids = batch.pop("input_ids").to(self.args.device)
-            attention_mask = batch.pop("attention_mask").to(self.args.device)
-            images = [
-                x.to(self.args.device, dtype=torch.bfloat16)
-                for x in batch.pop("images")
-            ]
-            labels = batch.pop("labels").to(self.args.device)
-
-            assert input_ids.shape[0] == 1, "Needs batch size 1"
-
-            input_ids = input_ids[labels == IGNORE_INDEX].unsqueeze(0)
-            attention_mask = attention_mask[labels == IGNORE_INDEX].unsqueeze(0)
-
-            with torch.inference_mode():
-                output = self.model.generate(
-                    input_ids,
-                    attention_mask=attention_mask,
-                    images=images,
-                    max_length=self.args.model_max_length,
-                    pad_token_id=self.processing_class.pad_token_id,
-                    synced_gpus=False,
-                    use_cache=True,
-                )[0].cpu()
-            output = self.processing_class.decode(output, skip_special_tokens=True)
-            with open(os.path.join(outdir, f"{map_id}.txt"), "w") as f:
-                f.write(output)
-        self.model.train()
-
     def _save_checkpoint(self, model, trial):
         checkpoint_folder = f"checkpoint-{self.state.global_step}"
 
         run_dir = self._get_output_dir(trial=trial)
         save_output_dir = os.path.join(run_dir, checkpoint_folder, "save")
-        generation_output_dir = os.path.join(run_dir, checkpoint_folder, "generate")
-        os.makedirs(generation_output_dir, exist_ok=True)
         os.makedirs(save_output_dir, exist_ok=True)
 
         save_model(self.args, self.model, save_output_dir)
 
         super()._save_checkpoint(model, trial)
-
-        # self._test_generation(generation_output_dir)
