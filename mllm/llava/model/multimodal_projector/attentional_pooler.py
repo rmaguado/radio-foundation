@@ -46,7 +46,7 @@ class PerceiverResampler(nn.Module):
         return attn_output.transpose(0, 1)
 
 
-class PatchAttentionalPoolProjector(nn.Module):
+class TwoStepAttentionalPoolProjector(nn.Module):
     def __init__(
         self,
         embed_dim,
@@ -99,7 +99,7 @@ class PatchAttentionalPoolProjector(nn.Module):
         return projected_embeddings
 
 
-class ClsAttentionalPoolProjector(nn.Module):
+class OneStepAttentionalPoolProjector(nn.Module):
     def __init__(
         self,
         embed_dim,
@@ -134,7 +134,7 @@ class ClsAttentionalPoolProjector(nn.Module):
 
             axial_dim, _, embed_dim = x.size()
 
-            x = rearrange(x, "a 1 d -> 1 a d")
+            x = rearrange(x, "a p d -> 1 (a p) d")
             x = self.token_resampler(x)
             x = rearrange(x, "1 t d -> t d")
             x = self.norm(x)

@@ -1,16 +1,16 @@
 import torch.nn as nn
 
 from .attentional_pooler import (
-    ClsAttentionalPoolProjector,
-    PatchAttentionalPoolProjector,
+    OneStepAttentionalPoolProjector,
+    TwoStepAttentionalPoolProjector,
 )
 
 
 def build_vision_projector(config, **kwargs):
     projector_type = getattr(config, "mm_projector_type", "linear")
 
-    if projector_type == "cls_attn_pool":
-        mm_projector = ClsAttentionalPoolProjector(
+    if projector_type == "one_step_attn":
+        mm_projector = OneStepAttentionalPoolProjector(
             embed_dim=config.mm_vision_hidden_size,
             hidden_dim=config.mm_projector_hidden_size,
             output_dim=config.hidden_size,
@@ -18,8 +18,8 @@ def build_vision_projector(config, **kwargs):
         )
         return mm_projector
 
-    if projector_type == "patch_attn_pool":
-        mm_projector = PatchAttentionalPoolProjector(
+    if projector_type == "two_step_attn":
+        mm_projector = TwoStepAttentionalPoolProjector(
             embed_dim=config.mm_vision_hidden_size,
             hidden_dim=config.mm_projector_hidden_size,
             output_dim=config.hidden_size,
