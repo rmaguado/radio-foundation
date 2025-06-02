@@ -11,13 +11,18 @@ from peft import LoraConfig, PeftModel, get_peft_model
 logger = logging.getLogger("DeepSpeed")
 
 
-def find_target_linear_names(model, lora_namespan_exclude=[], include_modules=None):
+def find_target_linear_names(
+    model, exclude_modules=None, include_modules=None, must_have_keywords=None
+):
     linear_cls = torch.nn.modules.Linear
     embedding_cls = torch.nn.modules.Embedding
     lora_module_names = []
 
     for name, module in model.named_modules():
-        if any(ex_keyword in name for ex_keyword in lora_namespan_exclude):
+        if must_have_keywords is not None:
+            if not all(inc_keyword in name for inc_keyword in must_have_keywords):
+                continue
+        if any(ex_keyword in name for ex_keyword in exclude_modules):
             continue
         if include_modules is not None:
             if not any(inc_keyword in name for inc_keyword in include_modules):
@@ -29,70 +34,62 @@ def find_target_linear_names(model, lora_namespan_exclude=[], include_modules=No
 
 
 def configure_lora(model, model_args):
-    vision_args = model_args.lora_vision
-    language_args = model_args.lora_language
-    pretrain_checkpoint_path = model_args.pretrain_checkpoint_path
-
+    lora_args = model_args.lora
     is_peft_model = hasattr(model, "peft_config")
+    if is_peft_model:
+        return model
 
-    adapters_config = {}
-    if vision_args.lora_enable:
+    target_modules = []
+    rank_pattern = {}
+    alpha_pattern = {}
+
+    if lora_args.lora_vision:
         vision_target_modules = find_target_linear_names(
             model.get_model().vision_tower,
-            lora_namespan_exclude=vision_args.exclude_modules,
-            include_modules=vision_args.include_modules,
+            exclude_modules=lora_args.exclude_modules,
+            include_modules=lora_args.lora_vision_modules,
+            must_have_keywords=[lora_args.lora_vision_pattern],
         )
+        vision_rank_pattern = {
+            k: lora_args.lora_vision_rank for k in vision_target_modules
+        }
+        vision_alpha_pattern = {
+            k: lora_args.lora_vision_alpha for k in vision_target_modules
+        }
+        target_modules += vision_target_modules
+        rank_pattern.update(vision_rank_pattern)
+        alpha_pattern.update(vision_alpha_pattern)
 
-        vision_config = LoraConfig(
-            r=vision_args.lora_r,
-            lora_alpha=vision_args.lora_alpha,
-            target_modules=vision_target_modules,
-            lora_dropout=vision_args.lora_dropout,
-            bias=vision_args.lora_bias,
-            init_lora_weights=True if pretrain_checkpoint_path is None else False,
-        )
-        adapters_config["vision_adapter"] = vision_config
-
-    if language_args.lora_enable:
+    if lora_args.lora_language:
+        language_exclude_modules = lora_args.exclude_modules + [
+            lora_args.lora_vision_pattern
+        ]
         language_target_modules = find_target_linear_names(
             model,
-            lora_namespan_exclude=language_args.exclude_modules,
-            include_modules=language_args.include_modules,
+            exclude_modules=language_exclude_modules,
+            include_modules=lora_args.lora_language_modules,
         )
+        language_rank_pattern = {
+            k: lora_args.lora_language_rank for k in language_target_modules
+        }
+        language_alpha_pattern = {
+            k: lora_args.lora_language_alpha for k in language_target_modules
+        }
+        target_modules += language_target_modules
+        rank_pattern.update(language_rank_pattern)
+        alpha_pattern.update(language_alpha_pattern)
 
-        language_config = LoraConfig(
-            r=language_args.lora_r,
-            lora_alpha=language_args.lora_alpha,
-            target_modules=language_target_modules,
-            lora_dropout=language_args.lora_dropout,
-            bias=language_args.lora_bias,
-            task_type="CAUSAL_LM",
-            init_lora_weights=True if pretrain_checkpoint_path is None else False,
-        )
-        adapters_config["language_adapter"] = language_config
+    config = LoraConfig(
+        target_modules=target_modules,
+        lora_dropout=lora_args.lora_dropout,
+        bias=lora_args.lora_bias,
+        init_lora_weights=True,
+        task_type="CAUSAL_LM",
+        rank_pattern=rank_pattern,
+        alpha_pattern=alpha_pattern,
+        
+    )
 
-    if is_peft_model:
-        current_adapters = set(model.peft_config.keys())
-        logger.info(f"Found existing lora adapters: {current_adapters}")
-
-        for adapter_name, config in adapters_config.items():
-            if adapter_name not in current_adapters:
-                logger.info(f"Adding new lora adapter: {adapter_name}")
-                model.add_adapter(adapter_name=adapter_name, peft_config=config)
-    else:
-        if adapters_config:
-            first_adapter = list(adapters_config.keys())[0]
-            model = get_peft_model(
-                model,
-                adapters_config[first_adapter],
-                adapter_name=first_adapter,
-                mixed=True,
-            )
-
-            for adapter_name, config in list(adapters_config.items())[1:]:
-                logger.info(f"Adding new lora adapter: {adapter_name}")
-                model.add_adapter(adapter_name=adapter_name, peft_config=config)
-
-    model.set_adapter(list(adapters_config.keys()))
+    model = get_peft_model(model, config)
 
     return model

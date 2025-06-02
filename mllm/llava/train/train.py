@@ -102,7 +102,8 @@ def train(attn_implementation="flash_attention_2"):
         if training_args.fp16:
             model.to(torch.float16)
 
-    model = configure_lora(model, model_args)
+    if model_args.lora.lora_enable:
+        model = configure_lora(model, model_args)
 
     resume_from_checkpoint = list(
         pathlib.Path(training_args.output_dir).glob("checkpoint-*")
