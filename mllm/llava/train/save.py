@@ -12,7 +12,7 @@ def save_model(training_args, model, output_dir):
 
         if deepspeed.comm.get_rank() == 0:
 
-            if hasattr(model, "save_pretrained"):
+            if hasattr(model, "peft_config"):
                 lora_dir = os.path.join(output_dir, "lora_adapters_dir")
                 os.makedirs(lora_dir, exist_ok=True)
 
