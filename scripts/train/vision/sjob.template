@@ -1,27 +1,26 @@
 #!/bin/bash
 
-## CONF GPUS GPUTYPE
-
-#SBATCH --job-name=$CONF
-#SBATCH --output=$OUT/$CONF/$CONF-%j.out
+#SBATCH --job-name=$NAME
+#SBATCH --output=$OUT/$NAME-%j.log
 #SBATCH --nodes=1
-#SBATCH --nodelist=compute-cuda-02
+#SBATCH --nodelist=$NODE
 #SBATCH --cpus-per-task=$WORKERS
 
 #SBATCH --ntasks-per-node=$GPUS
 #SBATCH --gres=gpu:$GPUTYPE:$GPUS
-
-#SBATCH --mem=96GB
+#SBATCH --mem=$MEM
 #SBATCH --partition=odap-gpu
 #SBATCH --signal=USR2@120
-#SBATCH --time=14400
+#SBATCH --time=15-00:00:00
 
 source $HOME/.conda_rc
 conda activate radio
 cd $HOME/projects/radio-foundation
+
 export PYTHONPATH=$PWD
 
 srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS \
-    python3 ${PWD}/dinov2/train/train.py \
-            --config-file="${PWD}/configs/$CONF.yaml" \
-            --output-dir="${PWD}/runs/$CONF"
+    python3 ${PYTHONPATH}/dinov2/train/train.py \
+            --config-file="$CONF" \
+            --output-dir="$OUT"
+
