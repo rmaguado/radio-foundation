@@ -25,5 +25,4 @@ export PYTHONPATH=$PWD
 python mllm/llava/generate.py \
     --path_to_run $PATH_TO_RUN \
     --checkpoint $CHECKPOINT \
-    --config_path $CONFIG \
     --output_path $OUT/$NAME
