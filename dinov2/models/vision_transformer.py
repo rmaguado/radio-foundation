@@ -485,3 +485,20 @@ def vit_giant2(patch_size=16, num_register_tokens=0, **kwargs):
         **kwargs,
     )
     return model
+
+
+def vit_rate(patch_size=20, num_register_tokens=0, **kwargs):
+    """
+    Similar to CT-CLIP from https://arxiv.org/abs/2403.17834
+    """
+    model = DinoVisionTransformer(
+        patch_size=patch_size,
+        embed_dim=512,
+        depth=8,
+        num_heads=8,
+        mlp_ratio=4,
+        block_fn=partial(Block, attn_class=MemEffAttention),
+        num_register_tokens=num_register_tokens,
+        **kwargs,
+    )
+    return model

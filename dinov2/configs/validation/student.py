@@ -13,7 +13,13 @@ logger = logging.getLogger("dinov2")
 
 
 def test_architecture(student_config: DictConfig) -> bool:
-    valid_architectures = ["vit_small", "vit_base", "vit_large", "vit_giant2"]
+    valid_architectures = [
+        "vit_small",
+        "vit_base",
+        "vit_large",
+        "vit_giant2",
+        "vit_rate",
+    ]
     if student_config.arch not in valid_architectures:
         logger.error(
             Errors.INVALID_VALUE.format(
