@@ -36,9 +36,11 @@ model:
   mm_vision_checkpoint_path: null
 data:
   root_path: null
-  db_name: "CT-RATE_train_reports"
+  train_dataset: "CT-RATE_train_reports"
+  eval_dataset: "CT-RATE_valid_reports"
   cache_embed: False
-  cache_path: null
+  cache_path_train: null
+  cache_path_eval: null
   channels: 10
   data_mean: 0.0
   data_std: 1.0

@@ -43,8 +43,21 @@ class DataCollatorForSupervisedDataset(object):
 
 def make_supervised_data_module(tokenizer: PreTrainedTokenizer, data_args) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
-    train_dataset = RadiologyReportDataset(tokenizer=tokenizer, data_args=data_args)
+    train_dataset = RadiologyReportDataset(
+        tokenizer=tokenizer,
+        data_args=data_args,
+        dataset_name=data_args.train_dataset,
+        cache_path=data_args.cache_path_train,
+    )
+    eval_dataset = RadiologyReportDataset(
+        tokenizer=tokenizer,
+        data_args=data_args,
+        dataset_name=data_args.eval_dataset,
+        cache_path=data_args.cache_path_eval,
+    )
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     return dict(
-        train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        data_collator=data_collator,
     )

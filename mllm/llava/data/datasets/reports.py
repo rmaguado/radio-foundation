@@ -293,7 +293,9 @@ def preprocess(
 class RadiologyReportDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
-    def __init__(self, tokenizer: PreTrainedTokenizer, data_args):
+    def __init__(
+        self, tokenizer: PreTrainedTokenizer, data_args, dataset_name, cache_path=None
+    ):
         super().__init__()
 
         self.tokenizer = tokenizer
@@ -304,14 +306,14 @@ class RadiologyReportDataset(Dataset):
         if data_args.cache_embed:
             self.dataset = CachedEmbedReportDataset(
                 root_path=data_args.root_path,
-                dataset_name=data_args.db_name,
+                dataset_name=dataset_name,
                 channels=data_args.channels,
-                embed_path=data_args.cache_path,
+                embed_path=cache_path,
             )
         else:
             self.dataset = ImageReportDataset(
                 root_path=data_args.root_path,
-                dataset_name=data_args.db_name,
+                dataset_name=dataset_name,
                 channels=data_args.channels,
                 mean=data_args.data_mean,
                 std=data_args.data_std,
