@@ -11,7 +11,6 @@ model:
   mm_vision_checkpoint_path: null # REQUIRED
 data:
   root_path: null # REQUIRED
-  db_name: "CT-RATE_train_reports"
   channels: 10
   data_mean: -573.8
   data_std: 461.3
