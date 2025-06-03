@@ -25,7 +25,7 @@ def process_report(row, system_prompt, output_file, client):
         response = get_response(system_prompt, query, client)
         start_tag, end_tag = "<report>", "</report>"
         structured_report = (
-            response.split(start_tag)[1].split(end_tag)[0].strip()
+            response.split(start_tag)[-1].split(end_tag)[0].strip()
             if start_tag in response and end_tag in response
             else response
         )
