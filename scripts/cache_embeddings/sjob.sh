@@ -10,13 +10,14 @@ export CHECKPOINT_NAME=$4
 export DB_STORATE=$5
 export NODE=$6
 export GPUS=$7
-export WORKERS=$8
+export GPUTYPE=$8
+export WORKERS=$9
 
 mkdir -p $OUT/
 
 printf "\nJob  gpus-per_node: $GPUS GPUs   Workers per GPU: $WORKERS\n\n"
 
-envsubst '$OUT $ROOT_PATH $DATASET_NAME $RUN_NAME $CHECKPOINT_NAME $DB_STORATE $NODE $GPUS $WORKERS' \
+envsubst '$OUT $ROOT_PATH $DATASET_NAME $RUN_NAME $CHECKPOINT_NAME $DB_STORATE $NODE $GPUS $GPUTYPE $WORKERS' \
     < $PWD/scripts/cache_embeddings/sjob.template \
     > $OUT/cache.run
 sbatch $OUT/cache.run
