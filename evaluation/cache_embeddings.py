@@ -88,6 +88,8 @@ def generate_embeddings(
             t_batch = time.time() - t0
             logging.info(f"Batch processed in {t_batch:.2f}s")
 
+        if len(embeddings) == 0:
+            continue
         embeddings = np.concatenate(embeddings, axis=0)
 
         logging.info(f"Embeddings shape: {embeddings.shape}")
@@ -224,6 +226,7 @@ def get_argpase():
     parser.add_argument(
         "--resample_slices",
         action="store_true",
+        default=False,
         help="Wether to resample slices that are too thin.",
     )
     parser.add_argument(
