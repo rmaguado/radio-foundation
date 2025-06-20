@@ -144,6 +144,7 @@ def do_train(cfg, model, resume=False):
         start_iter=iteration,
         max_iter=max_iter,
     )
+    do_test(cfg, model, f"training_{iteration}")
     logger.info("Finished training on full-size images")
 
 
