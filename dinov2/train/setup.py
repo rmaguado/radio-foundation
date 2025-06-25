@@ -159,7 +159,7 @@ def setup_training_components(cfg, model, resume):
 
     checkpointer = FlexiblePeriodicCheckpointer(
         checkpointer,
-        period=cfg.train.saveckp_iterations,
+        period=cfg.checkpoints.save_checkpoint_iterations,
         max_iter=max_iter,
         max_to_keep=3,
     )

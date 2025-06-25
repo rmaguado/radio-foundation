@@ -38,8 +38,8 @@ def should_apply_training_step(cfg, grad_accum_counter, accum_steps):
 
 def should_eval_model(cfg, iteration):
     return (
-        cfg.evaluation.eval_period_iterations > 0
-        and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0
+        cfg.checkpoints.save_teacher_iterations > 0
+        and (iteration + 1) % cfg.checkpoints.save_teacher_iterations == 0
     )
 
 
@@ -66,7 +66,7 @@ def train(
         raise ValueError
 
     for data in metric_logger.log_every(
-        cfg.train.print_freq,
+        cfg.checkpoints.print_iterations,
         "Training",
         max_iter,
         start_iter,
@@ -150,10 +150,10 @@ def do_train(cfg, model, resume=False):
 
 def main(args):
     cfg = setup(args)
-    is_validated = validate_config(cfg) if not args.skip_validation else True
-    if not is_validated:
-        logger.error("Config validation failed. Exiting.")
-        return
+
+    if not args.skip_validation:
+        logger.info("Validating config.")
+        validate_config(cfg)
 
     model = SSLMetaArch(cfg).to(torch.device("cuda"))
     model.prepare_for_distributed_training()
