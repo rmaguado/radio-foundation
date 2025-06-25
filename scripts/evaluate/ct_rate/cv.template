@@ -28,4 +28,6 @@ python3 $PWD/evaluation/tasks/ct_rate/test_cross_validation.py \
         --labels="$LABELS" \
         --epochs=$EPOCHS \
         --save_final \
-        --cross_validation
+        --embed_dim=$EMBED_DIM
+
+# --cross_validation \
