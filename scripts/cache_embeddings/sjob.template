@@ -27,5 +27,6 @@ python3 -m evaluation.cache_embeddings \
     --run_name $RUN_NAME \
     --checkpoint_name $CHECKPOINT_NAME \
     --embed_cls \
-    --db_storage $DB_STORATE \
-    --resample_slices
+    --embed_patch \
+    --resample_slices \
+    --db_storage $DB_STORATE
