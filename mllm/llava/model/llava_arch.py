@@ -19,6 +19,8 @@ import torch
 import logging
 import torch.nn.functional as F  # for optional inspection
 
+from einops import rearrange
+
 from .multimodal_encoder.builder import build_vision_tower
 from .multimodal_projector.builder import build_vision_projector
 
@@ -95,6 +97,16 @@ class LlavaMetaForCausalLM(ABC):
             features = [torch.from_numpy(x[:, :1, :]) for x in embed_memmap]
         elif select_feature == "patch":
             features = [torch.from_numpy(x[:, 1:, :]) for x in embed_memmap]
+        elif select_feature == "ct_clip":
+            features = [
+                rearrange(torch.from_numpy(x), "1 h w d e -> 1 (h w d) e")
+                for x in embed_memmap
+            ]
+        elif select_feature == "ct_fm":
+            features = [
+                rearrange(torch.from_numpy(x), "h w d e -> 1 (h w d) e")
+                for x in embed_memmap
+            ]
         else:
             features = [torch.from_numpy(x[:, :, :]) for x in embed_memmap]
         return [f.to(device=self.device, dtype=dtype) for f in features]
@@ -120,7 +132,7 @@ class LlavaMetaForCausalLM(ABC):
                 labels,
             )
 
-        if image_features[0] is None:
+        if not image_features or image_features[0] is None:
             image_features = self.get_model().get_vision_tower()(images)
         else:
             image_features = self.select_embed_features(
