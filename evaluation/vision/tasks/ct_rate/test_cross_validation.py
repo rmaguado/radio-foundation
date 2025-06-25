@@ -9,31 +9,26 @@ import time
 import logging
 import json
 
-from evaluation.utils.networks import (
-    FullScanClassPredictor,
-    FullScanPatchPredictor,
-    FullScanClassPatchPredictor,
-)
-from evaluation.extended_datasets import CachedEmbeddings
-from evaluation.tasks.ct_rate.datasets import CT_RATE
+from dinov2.inference.networks import AttnPoolPredictor
+from dinov2.inference.extended_datasets import CachedEmbeddings
 
+from evaluation.tasks.ct_rate.datasets import CT_RATE
 from evaluation.utils.dataset import (
     BalancedSampler,
     cross_validation_split,
     collate_sequences,
 )
-from evaluation.utils.train import train, evaluate
+from evaluation.utils.train import train, evaluate, save_classifier
 from evaluation.utils.metrics import save_metrics, save_predictions
-from evaluation.utils.finetune import save_classifier
 
 ALL_LABELS = [
-    "Medical material",
+    # "Medical material",
     "Arterial wall calcification",
     "Cardiomegaly",
     "Pericardial effusion",
     "Coronary artery wall calcification",
-    "Hiatal hernia",
-    "Lymphadenopathy",
+    # "Hiatal hernia",
+    # "Lymphadenopathy",
     "Emphysema",
     "Atelectasis",
     "Lung nodule",
@@ -183,26 +178,8 @@ def get_datasets(args, label):
 
 
 def get_model(args, device):
-    if args.select_feature == "cls":
-        classifier_model = FullScanClassPredictor(
-            args.embed_dim, args.hidden_dim, num_labels=1
-        )
-    elif args.select_feature == "patch":
-        classifier_model = FullScanPatchPredictor(
-            args.embed_dim,
-            args.hidden_dim,
-            num_labels=1,
-            patch_resample_dim=args.patch_resample_dim,
-        )
-    elif args.select_feature == "cls_patch":
-        classifier_model = FullScanClassPatchPredictor(
-            args.embed_dim,
-            args.hidden_dim,
-            num_labels=1,
-            patch_resample_dim=args.patch_resample_dim,
-        )
-    else:
-        raise RuntimeError(f"Unsupported feature selection mode: {args.select_feature}")
+    classifier_model = AttnPoolPredictor(args.embed_dim, args.hidden_dim)
+
     classifier_model = torch.nn.DataParallel(classifier_model)
     classifier_model.to(device)
 
@@ -228,6 +205,7 @@ def train_and_evaluate_model(
         sampler=BalancedSampler(train_dataset),
         num_workers=8,
         persistent_workers=True,
+        pin_memory=True,
     )
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
@@ -236,6 +214,7 @@ def train_and_evaluate_model(
         collate_fn=collate_sequences,
         num_workers=8,
         persistent_workers=True,
+        pin_memory=True,
     )
 
     epoch_iterations = len(train_loader)
@@ -339,7 +318,10 @@ def main():
     with open(os.path.join(args.output_dir, "args.json"), "w", encoding="utf-8") as f:
         json.dump(vars(args), f, indent=4)
 
-    labels = args.labels.split(",")
+    if args.labels == "default":
+        labels = ALL_LABELS
+    else:
+        labels = args.labels.split(",")
     logging.info(f"Labels: {labels}")
 
     for label in labels:

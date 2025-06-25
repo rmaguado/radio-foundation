@@ -2,6 +2,7 @@ import os
 import torch
 import numpy as np
 from dotenv import load_dotenv
+from einops import rearrange
 
 from evaluation.utils.finetune import (
     load_model,
@@ -29,12 +30,14 @@ def get_model(project_path, run_name, checkpoint_name):
 
 class CachedEmbeddings:
     def __init__(self, embeddings_path: str, select_feature: str = "cls"):
-        assert select_feature in ["cls", "patch", "cls_patch"]
+        assert select_feature in ["cls", "patch", "cls_patch", "3d_patch"]
         self.embeddings_path = embeddings_path
         self.select_feature = select_feature
 
         self.map_ids = [
-            file.split(".npy")[0] for file in os.listdir(self.embeddings_path)
+            file.split(".npy")[0]
+            for file in os.listdir(self.embeddings_path)
+            if ".npy" in file
         ]
 
     def get_embeddings(self, map_id: str) -> torch.Tensor:
@@ -45,6 +48,10 @@ class CachedEmbeddings:
             return torch.from_numpy(embeddings[:, :1, :].copy()).float()
         if self.select_feature == "patch":
             return torch.from_numpy(embeddings[:, 1:, :].copy()).float()
+        if self.select_feature == "3d_patch":
+            features = torch.from_numpy(embeddings[:, 1:, :].copy()).float().squeeze(0)
+            features = rearrange(features, "a w h e -> a (w h) 1 e")
+            return torch.mean(features, dim=1)
         return torch.from_numpy(embeddings.copy()).float()
 
 
@@ -101,7 +108,7 @@ class EmbeddingsGenerator:
 
         self.map_ids = self.dataset.entries["map_id"]
 
-        if select_feature == "cls_patch":
+        if select_feature == "all":
             self.embed_fcn = extract_all_tokens
         elif select_feature == "patch":
             self.embed_fcn = extract_patch_tokens

@@ -14,6 +14,23 @@ def split_dataset(dataset, split_ratio):
     return train_dataset, val_dataset
 
 
+def split_dataset(dataset, split_ratio):
+    n = len(dataset)
+    positive_indices = [i for i in range(n) if dataset.get_target(i)]
+    negative_indices = [i for i in range(n) if not i in positive_indices]
+
+    np.random.shuffle(positive_indices)
+    np.random.shuffle(negative_indices)
+
+    n_positives = int(len(positive_indices) * split_ratio)
+    n_negative = int(len(negative_indices) * split_ratio)
+
+    split_1 = positive_indices[:n_positives] + negative_indices[:n_negative]
+    split_2 = positive_indices[n_positives:] + negative_indices[n_negative:]
+
+    return DatasetSplit(dataset, split_1), DatasetSplit(dataset, split_2)
+
+
 def cross_validation_split(dataset, n_splits):
     n = len(dataset)
     positive_indices = [i for i in range(n) if dataset.get_target(i)]

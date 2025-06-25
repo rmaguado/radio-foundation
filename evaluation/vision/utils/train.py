@@ -128,3 +128,8 @@ def train(
         logits=all_logits,
         labels=all_labels,
     )
+
+
+def save_classifier(path_to_save, model):
+    os.makedirs(path_to_save, exist_ok=True)
+    torch.save(model.state_dict(), os.path.join(path_to_save, "model.pth"))

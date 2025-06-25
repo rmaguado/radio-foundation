@@ -9,12 +9,8 @@ import time
 import logging
 import json
 
-from evaluation.utils.networks import (
-    FullScanClassPredictor,
-    FullScanPatchPredictor,
-    FullScanClassPatchPredictor,
-)
-from evaluation.extended_datasets import CachedEmbeddings
+from dinov2.inference.networks import AttnPoolPredictor
+from dinov2.inference.extended_datasets import CachedEmbeddings
 from evaluation.tasks.fibrosis.datasets import FibrosisDataset
 
 from evaluation.utils.dataset import (
@@ -23,9 +19,8 @@ from evaluation.utils.dataset import (
     cross_validation_split,
     collate_sequences,
 )
-from evaluation.utils.train import train, evaluate
+from evaluation.utils.train import train, evaluate, save_classifier
 from evaluation.utils.metrics import save_metrics, save_predictions
-from evaluation.utils.finetune import save_classifier
 
 
 def get_args():
@@ -160,9 +155,7 @@ def get_datasets(args, label):
 
 
 def get_model(args, device):
-    classifier_model = FullScanClassPredictor(
-        args.embed_dim, args.hidden_dim, num_labels=1
-    )
+    classifier_model = AttnPoolPredictor(args.embed_dim, args.hidden_dim)
 
     classifier_model = torch.nn.DataParallel(classifier_model)
     classifier_model.to(device)

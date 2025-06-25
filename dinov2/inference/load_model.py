@@ -12,42 +12,29 @@ from dinov2.utils.utils import load_pretrained_weights
 
 
 class ImageTransform:
-    def __init__(self, img_size, mean, std, channels):
-        self.img_size = img_size
-        self.channels = channels
-        self.resize = transforms.Resize((img_size, img_size))
-        self.normalize = transforms.Normalize(mean=mean, std=std)
-
-    def __call__(self, image, **kwargs):
-        slices, w, h = image.shape
-        groups = slices // self.channels
-        target_slices = groups * self.channels
-        image = rearrange(img[:target_slices], "(g c) w h -> g c w h", c=self.channels)
-        image = self.resize(image)
-        image = self.normalize(image)
-        return image
-
-
-class ImageTransformResampleSlices:
     def __init__(
         self,
         img_size,
         mean,
         std,
-        zspacing=1.5,
-        channels=10,
+        channels,
+        zspacing=None,
+        max_slices=None,
         pad_value=-1000,
-        max_slices=300,
     ):
         self.img_size = img_size
         self.normalize = transforms.Normalize(mean=mean, std=std)
 
-        self.zspacing = zspacing
         self.channels = channels
         self.pad_value = pad_value
+
+        self.zspacing = zspacing
         self.max_slices = max_slices
 
-        assert max_slices % channels == 0, "max_slices must be divisible by channels"
+        if max_slices is not None:
+            assert (
+                max_slices % channels == 0
+            ), "max_slices must be divisible by channels"
 
     def pad_square(self, image):
         s, w, h = image.shape
@@ -81,13 +68,16 @@ class ImageTransformResampleSlices:
 
         return image
 
-    def resize(self, image, slice_thickness):
+    def resize(self, image, slice_thickness=None):
         slices, w, h = image.shape
 
         target_width = self.img_size if w >= h else self.img_size * w // h
         target_height = self.img_size if h >= w else self.img_size * h // w
 
-        target_slices = int(slices * slice_thickness / self.zspacing)
+        if slice_thickness is None:
+            target_slices = slices
+        else:
+            target_slices = int(slices * slice_thickness / self.zspacing)
 
         groups = target_slices // self.channels
         target_slices = groups * self.channels
@@ -106,7 +96,7 @@ class ImageTransformResampleSlices:
             h=self.img_size,
         )
 
-    def __call__(self, image, slice_thickness):
+    def __call__(self, image, slice_thickness=None):
         image = self.resize(image, slice_thickness)
         image = self.normalize(image)
         return image
@@ -118,22 +108,20 @@ class ModelWithIntermediateLayers(nn.Module):
 
     This source code is licensed under the Apache License, Version 2.0
     found in the LICENSE file in the root directory of this source tree.
-
-    taken from from dinov2.eval.utils.py
     """
 
-    def __init__(self, feature_model, n_last_blocks, autocast_ctx):
+    def __init__(self, feature_model, select_layers: int | List[int], autocast_ctx):
         super().__init__()
         self.feature_model = feature_model
         self.feature_model.eval()
-        self.n_last_blocks = n_last_blocks
+        self.select_layers = select_layers
         self.autocast_ctx = autocast_ctx
 
     def forward(self, images):
         with torch.inference_mode():
             with self.autocast_ctx():
                 features = self.feature_model.get_intermediate_layers(
-                    images, self.n_last_blocks, return_class_token=True
+                    images, self.select_layers, return_class_token=True
                 )
         return features
 
@@ -186,13 +174,7 @@ def get_autocast_dtype(cfg):
         return torch.float
 
 
-def load_model(path_to_run, checkpoint_name, device, intermediate_layers=4):
-    path_to_checkpoint = os.path.join(
-        path_to_run, "eval", checkpoint_name, "teacher_checkpoint.pth"
-    )
-
-    config = get_config(path_to_run)
-
+def load_model_eval(path_to_checkpoint, config, device, select_layers):
     model, _ = build_model_from_cfg(config, only_teacher=True)
     load_pretrained_weights(model, path_to_checkpoint, "teacher")
     model.eval()
@@ -202,17 +184,17 @@ def load_model(path_to_run, checkpoint_name, device, intermediate_layers=4):
     autocast_ctx = partial(
         torch.autocast, enabled=True, dtype=autocast_dtype, device_type="cuda"
     )
-    feature_model = ModelWithIntermediateLayers(
-        model, intermediate_layers, autocast_ctx
+    feature_model = ModelWithIntermediateLayers(model, select_layers, autocast_ctx)
+
+    return feature_model
+
+
+if __name__ == "__main__":
+    path_to_run = "runs/test"
+    path_to_checkpoint = os.path.join(
+        path_to_run, "eval", checkpoint_name, "teacher_checkpoint.pth"
     )
+    config = get_config(path_to_run)
+    device = torch.device("cuda")
 
-    return feature_model, config
-
-
-def save_classifier(path_to_save, model):
-    os.makedirs(path_to_save, exist_ok=True)
-    torch.save(model.state_dict(), os.path.join(path_to_save, "model.pth"))
-
-
-def load_classifier(path_to_save, model):
-    model.load_state_dict(torch.load(path_to_save))
+    model = load_model_eval(path_to_checkpoint, config, device, select_layers=[11])

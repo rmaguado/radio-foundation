@@ -9,7 +9,7 @@ import logging
 import concurrent.futures
 import queue
 
-from evaluation.utils.finetune import (
+from dinov2.evaluation.utils.finetune import (
     load_model,
     ImageTransform,
     ImageTransformResampleSlices,
@@ -17,7 +17,7 @@ from evaluation.utils.finetune import (
     extract_patch_tokens,
     extract_all_tokens,
 )
-from evaluation.extended_datasets import (
+from dinov2.evaluation.extended_datasets import (
     DicomFullVolumeEval,
     NiftiFullVolumeEval,
     NpzFullVolumeEval,
