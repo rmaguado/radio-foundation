@@ -59,22 +59,26 @@ ibot:
   head_nlayers: 3
   head_hidden_dim: 2048
 train:
-  grad_accum_steps: 1
-  batch_size_per_gpu: 64
   output_dir: .
-  saveckp_iterations: 5000
-  print_freq: 100
   seed: 0
   num_workers: 10
   OFFICIAL_EPOCH_LENGTH: 1000
   cache_dataset: true
   centering: "centering" # or "sinkhorn_knopp"
-  full_image:
+  stage1:
+    epochs: 90
+    batch_size_total: 2048
+    batch_size_per_gpu: 64
+    grad_accum_steps: 1
+  stage2:
     epochs: 10
+    batch_size_total: 2048
     batch_size_per_gpu: 16
     grad_accum_steps: 4
-evaluation:
-  eval_period_iterations: 10000
+checkpoints:
+  print_iterations: 10
+  save_checkpoint_iterations: 1000
+  save_teacher_iterations: 10000
 student:
   arch: vit_large
   patch_size: 14
@@ -89,8 +93,6 @@ student:
   qkv_bias: true
   proj_bias: true
   ffn_bias: true
-  embed_layer: "patch"
-  conv_channels: 0
   num_register_tokens: 4
   interpolate_antialias: true
   interpolate_offset: 0.0
@@ -101,7 +103,6 @@ teacher:
   teacher_temp: 0.07
   warmup_teacher_temp_epochs: 30
 optim:
-  epochs: 100
   weight_decay: 0.04
   weight_decay_end: 0.2
   base_lr: 3.5e-4
@@ -122,8 +123,12 @@ crops:
   local_crops_scale:
   - 0.05
   - 0.32
-  global_crops_size: 224
-  local_crops_size: 98
+  stage1:
+    global_crops_size: 224
+    local_crops_size: 98
+  stage2:
+    global_crops_size: 448
+    local_crops_size: 196
 datasets:
   - name: radiomics_datasets
     weight: 1.0
