@@ -85,20 +85,28 @@ class MetricLogger(object):
             "eta": eta,
             "meters": meters,
             "time": iter_time,
-            "data": data_time
+            "data": data_time,
         }
         if torch.cuda.is_available():
             msg_values["memory"] = torch.cuda.max_memory_allocated() / MB
 
         logger.info(self.log_msg.format(**msg_values))
 
-    def log_every(self, print_freq, header=None, n_iterations=None, start_iteration=0):
+    def log_every(
+        self,
+        print_freq,
+        header=None,
+        n_iterations=None,
+        start_iteration=0,
+        grad_accum_steps=1,
+    ):
         iterable = self.dataloader
         i = start_iteration
         if not header:
             header = ""
         start_time = time.time()
-        end = time.time()
+        data_end = time.time()
+        iter_end = time.time()
         iter_time = Metric()
         data_time = Metric()
 
@@ -106,19 +114,23 @@ class MetricLogger(object):
             n_iterations = len(iterable)
         self.log_msg = self.build_log_msg(header, n_iterations)
 
+        grad_accum_counter = 0
         for obj in iterable:
-            data_time.update(time.time() - end)
+            data_time.update(time.time() - data_end)
             yield obj
-            iter_time.update(time.time() - end)
-            if i % print_freq == 0 or i == n_iterations - 1:
-                self.dump_in_output_file(i, iter_time.avg(), data_time.avg())
-                eta_seconds = iter_time.avg() * (n_iterations - i)
-                eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
-                self.log_iteration(
-                    i, n_iterations, eta_string, iter_time.avg(), data_time.avg()
-                )
-            i += 1
-            end = time.time()
+            if (grad_accum_counter + 1) % grad_accum_steps == 0:
+                iter_time.update(time.time() - iter_end)
+                if i % print_freq == 0 or i == n_iterations - 1:
+                    self.dump_in_output_file(i, iter_time.avg(), data_time.avg())
+                    eta_seconds = iter_time.avg() * (n_iterations - i)
+                    eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
+                    self.log_iteration(
+                        i, n_iterations, eta_string, iter_time.avg(), data_time.avg()
+                    )
+                i += 1
+                iter_end = time.time()
+            grad_accum_counter += 1
+            data_end = time.time()
             if i >= n_iterations:
                 break
         total_time = time.time() - start_time

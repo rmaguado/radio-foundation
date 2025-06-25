@@ -34,4 +34,9 @@ For python-based LazyConfig, use "path.key=value".
         action="store_true",
         help="Skip config validation",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Set logging level to DEBUG.",
+    )
     return parser

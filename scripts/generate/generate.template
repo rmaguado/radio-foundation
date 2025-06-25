@@ -1,0 +1,28 @@
+#!/bin/bash
+
+## NAME NODE GPUS NWORKERS CONFIG
+
+#SBATCH --job-name=$NAME
+#SBATCH --output=$OUT/$NAME/%j.out
+#SBATCH --nodes=1
+#SBATCH --nodelist=$NODE
+#SBATCH --cpus-per-task=$WORKERS
+
+#SBATCH --ntasks-per-node=$GPUS
+#SBATCH --gres=gpu:$GPUS
+
+#SBATCH --mem=$MEMORY
+#SBATCH --partition=odap-gpu
+#SBATCH --signal=USR2@120
+#SBATCH --time=14400
+
+source $HOME/.conda_rc
+conda activate radio
+cd $HOME/projects/radio-foundation
+export PYTHONPATH=$PWD
+
+
+python mllm/llava/generate.py \
+    --path_to_run $PATH_TO_RUN \
+    --checkpoint $CHECKPOINT \
+    --output_path $OUT/$NAME

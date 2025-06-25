@@ -4,6 +4,7 @@ import os
 import torch
 import pydicom
 import numpy as np
+from datetime import datetime
 
 from .base import BaseDataset
 
@@ -197,9 +198,6 @@ class DicomCTVolumesFull(DicomCtDataset):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def get_entries_dir(self) -> np.ndarray:
-        return os.path.join(self.entries_path, "full.npy")
-
     def create_entries(self) -> np.ndarray:
         """
         Generates a numpy memmap object pointing to the sqlite database rows of dicom paths.
@@ -254,7 +252,7 @@ class DicomCTVolumesFull(DicomCtDataset):
             stack_data = self.create_stack_data(stack_rows)
         except Exception as e:
             logger.exception(f"Error processing stack. Seriesid: {series_id} \n{e}")
-            stack_data = torch.zeros((10, 512, 512))
+            stack_data = torch.zeros((self.channels, 512, 512))
 
         return stack_data
 

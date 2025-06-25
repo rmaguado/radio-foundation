@@ -5,3 +5,7 @@
 /datasets*
 *.tmp
 .env
+.bck
+**/*.log
+/models*
+tensorboard

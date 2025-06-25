@@ -107,7 +107,7 @@ optim:
   base_lr: 3.5e-4
   lr: 0.
   warmup_epochs: 10
-  min_lr: 1.0e-06
+  min_lr: 1.0e-05
   clip_grad: 3.0
   freeze_last_layer_epochs: 1
   patch_embed_lr_mult: 0.2

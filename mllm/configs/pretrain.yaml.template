@@ -1,0 +1,29 @@
+model:
+  model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
+  lora_backbone:
+    lora_enable: False
+  lora_language:
+    lora_enable: False
+  vision_tower: "dino-vit-base-patch14-10"
+  mm_vision_select_layer: -1
+  pretrain_checkpoint_path: null
+  mm_vision_config_path: null # REQUIRED
+  mm_vision_checkpoint_path: null # REQUIRED
+data:
+  root_path: null # REQUIRED
+  channels: 10
+  data_mean: -573.8
+  data_std: 461.3
+  image_tokens: 128
+  conv_template: "plain"
+train:
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  optim: "adamw_torch"
+  learning_rate: 1e-3
+  min_lr: 1e-5
+  dataloader_num_workers: 4
+  save_steps: 0.1
+  save_total_limit: null
+  report_to: "tensorboard"
+  logging_dir: "tensorboard/runs"

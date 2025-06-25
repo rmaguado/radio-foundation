@@ -20,6 +20,7 @@ from torch.nn.init import trunc_normal_
 from dinov2.layers import (
     Mlp,
     PatchEmbed,
+    PatchEmbed3D,
     CnnEmbed,
     SwiGLUFFNFused,
     MemEffAttention,
@@ -59,6 +60,14 @@ def get_embedding_layer(
             in_chans=in_chans,
             embed_dim=embed_dim,
         )
+    elif embed_layer == "patch3d":
+        return PatchEmbed3D(
+            img_size=img_size,
+            patch_size=patch_size,
+            in_chans=in_chans,
+            embed_dim=embed_dim,
+            img_depth=240,
+        )
     elif embed_layer == "conv":
         return CnnEmbed(
             img_size=img_size,
@@ -73,11 +82,21 @@ def get_embedding_layer(
         )
 
 
-class BlockChunk(nn.ModuleList):
+class BlockChunk(nn.Module):
+    def __init__(self, blocks):
+        super().__init__()
+        self.blocks = nn.ModuleList(blocks)
+
     def forward(self, x):
-        for b in self:
+        for b in self.blocks:
             x = b(x)
         return x
+
+    def __len__(self):
+        return len(self.blocks)
+
+    def __getitem__(self, idx):
+        return self.blocks[idx]
 
 
 class DinoVisionTransformer(nn.Module):
@@ -96,7 +115,7 @@ class DinoVisionTransformer(nn.Module):
         drop_path_rate=0.0,
         drop_path_uniform=False,
         init_values=None,  # for layerscale: None or 0 => no layerscale
-        embed_layer="patch",  # 'patch' or 'conv'
+        embed_layer="patch",  # 'patch', 'patch3d', or 'conv'
         conv_channels=0,
         act_layer=nn.GELU,
         block_fn=Block,
@@ -460,6 +479,23 @@ def vit_giant2(patch_size=16, num_register_tokens=0, **kwargs):
         embed_dim=1536,
         depth=40,
         num_heads=24,
+        mlp_ratio=4,
+        block_fn=partial(Block, attn_class=MemEffAttention),
+        num_register_tokens=num_register_tokens,
+        **kwargs,
+    )
+    return model
+
+
+def vit_rate(patch_size=20, num_register_tokens=0, **kwargs):
+    """
+    Similar to CT-CLIP from https://arxiv.org/abs/2403.17834
+    """
+    model = DinoVisionTransformer(
+        patch_size=patch_size,
+        embed_dim=512,
+        depth=8,
+        num_heads=8,
         mlp_ratio=4,
         block_fn=partial(Block, attn_class=MemEffAttention),
         num_register_tokens=num_register_tokens,

@@ -1,0 +1,32 @@
+#!/bin/bash
+
+## GPUS GPUTYPE WORKERS
+
+#SBATCH --job-name=$DATASET_NAME
+#SBATCH --output=$OUT/%j.out
+#SBATCH --nodes=1
+#SBATCH --nodelist=$NODE
+#SBATCH --cpus-per-task=$WORKERS
+
+#SBATCH --ntasks-per-node=$GPUS
+#SBATCH --gres=gpu:$GPUTYPE:$GPUS
+
+#SBATCH --mem=96GB
+#SBATCH --partition=odap-gpu
+#SBATCH --signal=USR2@120
+#SBATCH --time=14400
+
+source $HOME/.conda_rc
+conda activate radio
+cd $HOME/projects/radio-foundation
+export PYTHONPATH=$PWD
+
+python3 -m evaluation.cache_embeddings \
+    --root_path $ROOT_PATH \
+    --dataset_name $DATASET_NAME \
+    --run_name $RUN_NAME \
+    --checkpoint_name $CHECKPOINT_NAME \
+    --embed_cls \
+    --embed_patch \
+    --resample_slices \
+    --db_storage $DB_STORATE

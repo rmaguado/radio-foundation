@@ -6,6 +6,7 @@
 from .dino_head import DINOHead
 from .mlp import Mlp
 from .patch_embed import PatchEmbed
+from .patch_embed_3d import PatchEmbed3D
 from .cnn_embed import CnnEmbed
 from .swiglu_ffn import SwiGLUFFN, SwiGLUFFNFused
 from .block import NestedTensorBlock

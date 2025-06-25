@@ -8,11 +8,19 @@ from typing import List, Tuple
 import os
 from tqdm import tqdm
 import pydicom
+import nibabel as nib
 import argparse
 import logging
 
 from data.utils import set_logging
-from data.dataprep import DicomProcessor, DicomDatabase
+from data.dataprep import (
+    DicomProcessor,
+    DicomDatabase,
+    NiftiProcessor,
+    NiftiDatabase,
+    NpzProcessor,
+    NpzDatabase,
+)
 
 
 logger = logging.getLogger("dataprep")
@@ -70,7 +78,7 @@ class DicomProcessorBase(DicomProcessor):
 
         self.database = database
 
-        log_path = f"data/log/eval/{self.dataset_name}.log"
+        log_path = f"data/log/{self.dataset_name}_eval.log"
         set_logging(log_path)
 
     def process_series(
@@ -115,6 +123,7 @@ class DicomProcessorBase(DicomProcessor):
     def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
         """
         Get paths to dicom files and their corresponding mapids.
+        Mapids are taken from the folder in the first level of the dataset.
         """
         paths_ids = []
 
@@ -125,12 +134,24 @@ class DicomProcessorBase(DicomProcessor):
         ]
 
         for mapid in mapids:
-            scan_path = os.path.join(self.absolute_dataset_path, mapid, "pCT")
+            for scan_path, dirs, files in os.walk(
+                os.path.join(self.absolute_dataset_path, mapid)
+            ):
 
-            if os.path.isdir(scan_path):
-                paths_ids.append((scan_path, mapid))
+                if len(files) > 0:
+                    if files[0].endswith(".dcm"):
+                        paths_ids.append((scan_path, mapid))
+                        break
 
         return paths_ids
+
+    def get_dcm_paths(self, scan_path: str) -> List[str]:
+        dcm_paths = [
+            os.path.join(scan_path, f)
+            for f in os.listdir(scan_path)
+            if f.endswith(".dcm")
+        ]
+        return dcm_paths
 
     def prepare_dataset(self) -> None:
         """
@@ -142,11 +163,7 @@ class DicomProcessorBase(DicomProcessor):
         paths_ids = self.get_paths_and_mapids()
 
         for scan_path, mapid in tqdm(paths_ids):
-            dcm_paths = [
-                os.path.join(scan_path, f)
-                for f in os.listdir(scan_path)
-                if f.endswith(".dcm")
-            ]
+            dcm_paths = self.get_dcm_paths(scan_path)
             if not dcm_paths:
                 logger.warning(f"No dicom files found in {scan_path}. Skipping.")
                 continue
@@ -174,6 +191,231 @@ class DicomProcessorBase(DicomProcessor):
 
         logger.info(
             f"Finished processing {self.dataset_name}. {len(included_series_ids)} series included."
+        )
+
+
+class NiftiEvalBase(NiftiDatabase):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def create_global_table(self) -> None:
+        """
+        Creates a global table in the database for NIfTI files.
+        """
+        self.cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS global (
+                dataset TEXT,
+                map_id TEXT,
+                num_slices INTEGER,
+                slice_thickness REAL,
+                spacing_x REAL,
+                spacing_y REAL,
+                axial_dim INTEGER,
+                nifti_path TEXT
+            )
+            """
+        )
+
+    def insert_global_data(
+        self, dataset_name: str, metadata: dict, nifti_path: str
+    ) -> None:
+        self.cursor.execute(
+            """
+            INSERT INTO "global" (dataset, map_id, num_slices, slice_thickness, spacing_x, spacing_y, axial_dim, nifti_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dataset_name,
+                metadata["map_id"],
+                metadata["num_slices"],
+                metadata["slice_thickness"],
+                metadata["spacing_x"],
+                metadata["spacing_y"],
+                metadata["axial_dim"],
+                nifti_path,
+            ),
+        )
+
+
+class NiftiProcessorBase(NiftiProcessor):
+    def __init__(self, config: dict, database):
+        self.dataset_name = config["dataset_name"]
+        self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
+
+        self.database = database
+
+        log_path = f"data/log/{self.dataset_name}_eval.log"
+        set_logging(log_path)
+
+    def process_volume(self, nifti_path: str, map_id: str) -> None:
+        """
+        Process a NIfTI volume, extract metadata, and store it in the database.
+
+        Args:
+            nifti_path (str): Path to the NIfTI file.
+            map_id (str): ID to link the scan to its metadata.
+        """
+
+        nifti_file = nib.load(nifti_path)
+        try:
+            metadata = self.get_metadata(nifti_file)
+            metadata["map_id"] = map_id
+        except Exception as e:
+            logger.exception(
+                f"Metadata extraction failed for {nifti_path} (mad_id: {map_id}): {e}"
+            )
+            return
+
+        rel_nifti_path = os.path.relpath(nifti_path, self.absolute_dataset_path)
+        self.database.insert_global_data(self.dataset_name, metadata, rel_nifti_path)
+
+        logger.info(f"Processed nifti: {nifti_path} (map_id: {map_id}).")
+
+    def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
+        """
+        Get paths to nifti files and their corresponding mapids.
+        Mapids are taken from the name of the nifti file.
+        """
+        paths_ids = []
+
+        for data_folder, dirs, files in os.walk(self.absolute_dataset_path):
+            nii_paths = [
+                os.path.join(data_folder, f)
+                for f in files
+                if f.endswith(".nii.gz") or f.endswith(".nii")
+            ]
+
+            if not nii_paths:
+                continue
+
+            for nii_path in nii_paths:
+                map_id = os.path.basename(nii_path).split(".")[0]
+                paths_ids.append((nii_path, map_id))
+
+        return paths_ids
+
+    def prepare_dataset(self) -> None:
+        """
+        Prepares the dataset by scanning the directories and processing NIfTI files.
+        """
+
+        logger.info(f"Processing dataset: {self.dataset_name}")
+
+        paths_ids = self.get_paths_and_mapids()
+        total_niftis = len(paths_ids)
+        logger.info(f"Total NIfTI files: {total_niftis}")
+
+        volume_counts = 0
+
+        for nii_path, map_id in tqdm(paths_ids):
+            try:
+                self.process_volume(nii_path, map_id)
+                volume_counts += 1
+            except Exception as e:
+                logger.exception(
+                    f"Error processing nifti {nii_path} (map_id: {map_id}): {e}"
+                )
+
+        logger.info(
+            f"Finished processing {self.dataset_name}. Added {volume_counts} volumes."
+        )
+
+
+class NpzEvalBase(NpzDatabase):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def create_global_table(self) -> None:
+        """
+        Creates a global table in the database for NIfTI files.
+        """
+        self.cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS global (
+                dataset TEXT,
+                map_id TEXT,
+                volume_path TEXT
+            )
+            """
+        )
+
+    def insert_global_data(
+        self, dataset_name: str, map_id: str, volume_path: str
+    ) -> None:
+        self.cursor.execute(
+            """
+            INSERT INTO "global" (dataset, map_id, volume_path)
+            VALUES (?, ?, ?)
+            """,
+            (dataset_name, map_id, volume_path),
+        )
+
+
+class NpzProcessorBase(NpzProcessor):
+    def __init__(self, config: dict, database):
+        self.dataset_name = config["dataset_name"]
+        self.absolute_dataset_path = os.path.abspath(config["dataset_path"])
+
+        self.database = database
+
+        log_path = f"data/log/{self.dataset_name}_eval.log"
+        set_logging(log_path)
+
+    def process_volume(self, volume_path: str, map_id: str) -> None:
+        """
+        Process a Npz volume, extract metadata, and store it in the database.
+
+        Args:
+            volume_path (str): Path to the Npz file.
+            map_id (str): ID to link the scan to its metadata.
+        """
+        rel_nifti_path = os.path.relpath(volume_path, self.absolute_dataset_path)
+        self.database.insert_global_data(self.dataset_name, map_id, rel_nifti_path)
+
+        logger.info(f"Processed npz volume: {volume_path} (map_id: {map_id}).")
+
+    def get_paths_and_mapids(self) -> List[Tuple[str, str]]:
+        """
+        Get paths to files and their corresponding mapids.
+        Mapids are taken from the name of the file.
+        """
+        paths_ids = []
+
+        for data_folder, dirs, files in os.walk(self.absolute_dataset_path):
+            paths = [os.path.join(data_folder, f) for f in files if f.endswith(".npz")]
+
+            if not paths:
+                continue
+
+            for path in paths:
+                map_id = os.path.basename(path).split(".")[0]
+                paths_ids.append((path, map_id))
+
+        return paths_ids
+
+    def prepare_dataset(self) -> None:
+        """
+        Prepares the dataset by scanning the directories and processing files.
+        """
+
+        logger.info(f"Processing dataset: {self.dataset_name}")
+
+        paths_ids = self.get_paths_and_mapids()
+        total_files = len(paths_ids)
+        logger.info(f"Total files: {total_files}")
+
+        volume_counts = 0
+
+        for path, map_id in tqdm(paths_ids):
+            try:
+                self.process_volume(path, map_id)
+                volume_counts += 1
+            except Exception as e:
+                logger.exception(f"Error processing {path} (map_id: {map_id}): {e}")
+
+        logger.info(
+            f"Finished processing {self.dataset_name}. Added {volume_counts} volumes."
         )
 
 

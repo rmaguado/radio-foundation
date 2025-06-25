@@ -1,0 +1,33 @@
+#!/bin/bash
+
+#SBATCH --job-name=$JOB_NAME
+#SBATCH --output=$OUT/$JOB_NAME/%j.out
+#SBATCH --nodes=1
+#SBATCH --nodelist=$NODE
+#SBATCH --cpus-per-task=$WORKERS
+
+#SBATCH --ntasks-per-node=$GPUS
+#SBATCH --gres=gpu:$GPUS
+
+#SBATCH --mem=96GB
+#SBATCH --partition=odap-gpu
+#SBATCH --signal=USR2@120
+#SBATCH --time=14400
+
+source $HOME/.conda_rc
+conda activate radio
+cd $HOME/projects/radio-foundation
+export PYTHONPATH=$PWD
+
+python3 $PWD/evaluation/tasks/ct_rate/test_cross_validation.py \
+        --experiment_name=$JOB_NAME \
+        --run_name=$RUN_NAME \
+        --checkpoint_name=$CHECKPOINT_NAME \
+        --output_dir=$OUT/$JOB_NAME \
+        --select_feature=$FEATURES \
+        --labels="$LABELS" \
+        --epochs=$EPOCHS \
+        --save_final \
+        --embed_dim=$EMBED_DIM
+
+# --cross_validation \

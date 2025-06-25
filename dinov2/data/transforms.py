@@ -40,6 +40,7 @@ class ImageTransforms:
             "noise": self._noise,
             "gamma_correction": self._gamma_correction,
             "window": self._window,
+            "zresample_artefacts": self._zresample_artefacts,
         }
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
@@ -159,7 +160,7 @@ class ImageTransforms:
         img: torch.Tensor,
     ) -> torch.Tensor:
         angle = 180.0 * random.uniform(-1, 1)
-        return transforms.functional.rotate(img, angle)
+        return transforms.functional.rotate(img, angle, fill=self.lower_bound)
 
     def _flip(self, img: torch.Tensor) -> torch.Tensor:
         return transforms.functional.hflip(img)
@@ -217,5 +218,18 @@ class ImageTransforms:
         img = (img - height) / width * (
             self.upper_bound - self.lower_bound
         ) + self.lower_bound
+
+        return img
+
+    def _zresample_artefacts(self, img: torch.Tensor) -> torch.Tensor:
+        original_shape = img.shape
+        factor = random.uniform(1, 3)
+        img = torch.nn.functional.interpolate(
+            img.unsqueeze(0), scale_factor=(1, 1, factor), mode="trilinear"
+        ).squeeze(0)
+
+        img = torch.nn.functional.interpolate(
+            img.unsqueeze(0), size=original_shape[1:], mode="trilinear"
+        ).squeeze(0)
 
         return img

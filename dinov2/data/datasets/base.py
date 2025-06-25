@@ -8,6 +8,7 @@ import torch
 import numpy as np
 import os
 import sqlite3
+from datetime import datetime
 
 import torch.distributed as dist
 from dinov2.distributed import is_main_process, is_enabled
@@ -42,9 +43,24 @@ class BaseDataset:
         self.cursor = None
 
         self.entries = None
+        self.entries_dir = None
 
     def get_entries_dir(self) -> str:
-        return os.path.join(self.entries_path, f"{self.channels}_channels.npy")
+        if self.entries_dir is not None:
+            return self.entries_dir
+        if is_main_process():
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.entries_dir = os.path.join(self.entries_path, f"{timestamp}.npy")
+        if is_enabled():
+            dist.barrier()
+
+            entries_dir_list = [self.entries_dir] if is_main_process() else [None]
+            dist.broadcast_object_list(entries_dir_list, src=0)
+            self.entries_dir = entries_dir_list[0]
+
+            dist.barrier()
+
+        return self.entries_dir
 
     def get_entries(self) -> np.ndarray:
         """
@@ -59,8 +75,7 @@ class BaseDataset:
         entries_dir = self.get_entries_dir()
 
         if is_main_process():
-            if not os.path.exists(entries_dir):
-                self.create_entries()
+            self.create_entries()
 
         if is_enabled():
             dist.barrier()
@@ -85,6 +100,10 @@ class BaseDataset:
         """
         if isinstance(self.conn, sqlite3.Connection):
             self.conn.close()
+        try:
+            os.remove(self.get_entries_dir())
+        except FileNotFoundError:
+            pass
 
     def create_entries(self) -> np.ndarray:
         """

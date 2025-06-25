@@ -1,0 +1,73 @@
+model:
+  model_name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
+  lora:
+    lora_enable: True
+    lora_vision: False
+    lora_language: True
+    lora_vision_rank: 8
+    lora_vision_alpha: 16
+    lora_vision_pattern: "vision_tower"
+    lora_vision_modules:
+      - "qkv"
+    lora_language_rank: 128
+    lora_language_alpha: 256
+    lora_language_modules:
+      - "down_proj"
+      - "up_proj"
+      - "q_proj"
+      - "gate_proj"
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+    lora_dropout: 0.05
+    lora_bias: "none"
+    exclude_modules:
+      - "mm_projector"
+      - "lm_head"
+  vision_tower: null
+  use_vision_tower: True
+  pretrain_checkpoint_path: null
+  mm_vision_select_layer: -1
+  mm_projector_type: "patch_attn_pool"
+  mm_vision_hidden_size: 768
+  mm_projector_hidden_size: 2048
+  mm_vision_select_feature: "cls_patch"
+  mm_vision_config_path: null
+  mm_vision_checkpoint_path: null
+data:
+  root_path: null
+  train_dataset: "CT-RATE_train_reports"
+  eval_dataset: "CT-RATE_valid_reports"
+  cache_embed: False
+  cache_path_train: null
+  cache_path_eval: null
+  channels: 10
+  data_mean: 0.0
+  data_std: 1.0
+  is_multimodal: True
+  image_tokens: 128
+  conv_template: "plain"
+  debug_mode: False
+train:
+  transformers_cache_dir: "mllm/cache"
+  optim: "adamw_torch"
+  bits: 16
+  warmup_ratio: 0.03
+  learning_rate: 1e-4
+  min_lr: 1e-6
+  group_by_modality_length: False
+  report_to: "none"
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  eval_strategy: "no"
+  save_strategy: "steps"
+  save_steps: 1
+  save_total_limit: null
+  weight_decay: 0.0
+  logging_steps: 1
+  bf16: True
+  tf32: True
+  model_max_length: 1024
+  gradient_checkpointing: True
+  dataloader_num_workers: 4

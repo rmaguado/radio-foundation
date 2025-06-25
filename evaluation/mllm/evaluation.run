@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#SBATCH --job-name=report_evaluation
+#SBATCH --output=logs/%j.out
+#SBATCH --nodes=1
+#SBATCH --nodelist=compute-cuda-02
+#SBATCH --cpus-per-task=8
+
+#SBATCH --mem=100GB
+#SBATCH --partition=odap-gpu
+#SBATCH --signal=USR2@120
+#SBATCH --time=14400
+
+source $HOME/.conda_rc
+conda activate nlp_eval
+cd $HOME/projects/radio-foundation
+export PYTHONPATH=$PWD
+
+python3 $PWD/mllm/evaluation/test_evaluation.py --run_name cls_frozen_onestep_large_gen

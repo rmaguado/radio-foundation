@@ -9,8 +9,8 @@ import os
 import sys
 from typing import Optional
 
-import dinov2.distributed as distributed
 from .helpers import MetricLogger
+import dinov2.distributed as distributed
 
 
 # So that calling _configure_logger multiple times won't add many handlers
