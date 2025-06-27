@@ -1,6 +1,7 @@
 import logging
 import torch
 from functools import partial
+from typing import Dict, Tuple
 
 from dinov2.fsdp import (
     FSDPCheckpointer,
@@ -125,7 +126,14 @@ def get_cropped_iter(cfg):
     return cropped_epochs * epoch_len
 
 
-def setup_training_components(cfg, model, resume):
+def setup_training_components(cfg, model, resume) -> Tuple[
+    torch.optim.Optimizer,
+    Dict[str, CosineScheduler],
+    FlexiblePeriodicCheckpointer,
+    int,
+    int,
+    int,
+]:
     logger = logging.getLogger("dinov2")
 
     optimizer = build_optimizer(cfg, model.get_params_groups())

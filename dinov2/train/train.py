@@ -79,11 +79,11 @@ def train(
             mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
             optimizer.zero_grad(set_to_none=True)
 
-        loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
+        loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)  # type: ignore
 
         if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
             apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps)
-            model.update_teacher(mom)
+            model.update_teacher(mom)  # type: ignore
 
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
 
@@ -134,14 +134,14 @@ def do_train(cfg, model, resume=False):
         )
 
         logger.info(f"Finished training on resize-crop images.")
-    logger.info(f"Resuming with full-size images for {max_iter - iteration} steps")
+    logger.info(f"Resuming with full-size images for {max_iter - iteration} steps")  # type: ignore
 
     data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=True)
     metric_logger.set_dataloader(data_loader)
     train(
         *train_components,
         img_mode="full",
-        start_iter=iteration,
+        start_iter=iteration,  # type: ignore
         max_iter=max_iter,
     )
     do_test(cfg, model, f"training_{iteration}")

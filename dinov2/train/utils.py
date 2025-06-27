@@ -2,6 +2,7 @@ import os
 import math
 import torch
 import logging
+from typing import Tuple
 
 import dinov2.distributed as distributed
 
@@ -18,7 +19,7 @@ def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
         param_group["lr"] = (last_layer_lr if is_last_layer else lr) * lr_multiplier
 
 
-def update_schedules(optimizer, schedulers, iteration):
+def update_schedules(optimizer, schedulers, iteration) -> Tuple[float, float]:
     lr = schedulers["lr"][iteration]
     wd = schedulers["wd"][iteration]
     momentum = schedulers["momentum"][iteration]

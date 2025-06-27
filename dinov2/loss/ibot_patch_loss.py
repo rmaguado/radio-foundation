@@ -15,9 +15,9 @@ logger = logging.getLogger("dinov2")
 
 
 try:
-    from xformers.ops import cross_entropy
+    from xformers.ops import cross_entropy  # type: ignore
 
-    def lossfunc(t, s, temp):
+    def lossfunc(t, s, temp):  # type: ignore
         s = s.float()
         t = t.float()
         if s.ndim == 2:
@@ -154,7 +154,7 @@ class iBOTPatchLoss(nn.Module):
 
             if self.reduce_handle is not None:
                 self.reduce_handle.wait()
-            _t = self.async_batch_center / (self.len_teacher_patch_tokens * world_size)
+            _t = self.async_batch_center / (self.len_teacher_patch_tokens * world_size)  # type: ignore
 
             self.center = self.center * self.center_momentum + _t * (
                 1 - self.center_momentum

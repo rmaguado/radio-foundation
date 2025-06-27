@@ -213,7 +213,7 @@ class WeightedShardedInfiniteSampler(Sampler):
     def __init__(
         self,
         *,
-        dataset_names: List[int],
+        dataset_names: List[str],
         sizes: List[int],
         weights: List[float],
         seed: int = 0,

@@ -41,7 +41,7 @@ def build_model(args, only_teacher, img_size):
     return student, teacher, embed_dim
 
 
-def build_model_from_cfg(cfg, only_teacher=False):
+def build_model_from_cfg(cfg, only_teacher=False) -> tuple:
     return build_model(
         cfg.student, only_teacher=only_teacher, img_size=cfg.student.full_image_size
     )

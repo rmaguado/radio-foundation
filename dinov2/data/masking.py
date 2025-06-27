@@ -12,10 +12,10 @@ from typing import Optional
 class MaskingGenerator:
     def __init__(
         self,
-        input_size: int,
+        input_size: int | tuple[int, int],
         num_masking_patches: Optional[int] = None,
         min_num_patches: int = 4,
-        max_num_patches: int = None,
+        max_num_patches: int = None,  # type: ignore[assignment]
         min_aspect: float = 0.3,
         max_aspect: Optional[float] = None,
     ):
@@ -32,7 +32,7 @@ class MaskingGenerator:
             max_aspect (float): The maximum aspect ratio.
         """
         if not isinstance(input_size, tuple):
-            input_size = (input_size,) * 2
+            input_size = (input_size, input_size)
         self.height, self.width = input_size
 
         self.num_patches = self.height * self.width
