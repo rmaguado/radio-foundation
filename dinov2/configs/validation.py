@@ -279,16 +279,18 @@ class OptimConfig(BaseModel):
         return v
 
 
-class CropsStageConfig(BaseModel):
-    small_size: int
-    medium_size: int
-    large_size: int
+class CropGroup(BaseModel):
+    name: str
+    is_target: bool
+    target_groups: List[str]
+    size: int
+    num_crops: int
 
-    @field_validator("small_size", "medium_size", "large_size", mode="before")
+    @field_validator("size", "num_crops", mode="before")
     @classmethod
     def validate_positive_integers(cls, v):
         if v <= 0:
-            raise ValueError("Crop sizes must be positive integers")
+            raise ValueError("Value must be a positive integer")
         return v
 
 
@@ -296,14 +298,7 @@ class CropsConfig(BaseModel):
     global_crop_scale: Tuple[float, float]
     local_crop_scale: Tuple[float, float]
 
-    teacher_3d_global_crops: int
-    student_3d_local_crops: int
-    student_2d_global_crops: int
-    teacher_2d_global_crops: int
-    student_2d_local_crops: int
-
-    stage1: CropsStageConfig
-    stage2: CropsStageConfig
+    crop_groups: List[CropGroup]
 
     @field_validator("global_crop_scale", "local_crop_scale", mode="before")
     @classmethod
@@ -312,6 +307,18 @@ class CropsConfig(BaseModel):
             raise ValueError(
                 "Crop scales must be a tuple of two floats [min, max] between 0 and 1, with min <= max"
             )
+        return v
+
+    @field_validator("crop_groups", mode="before")
+    @classmethod
+    def validate_crop_groups(cls, v):
+        group_names = {group.name for group in v}
+        for crop_group in v:
+            targets = crop_group.target_groups
+            if not all(target in group_names for target in targets):
+                raise ValueError(
+                    f"Crop group '{crop_group.name}' has invalid target groups: {targets}"
+                )
         return v
 
 
