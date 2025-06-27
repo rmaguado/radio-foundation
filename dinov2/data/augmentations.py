@@ -16,54 +16,29 @@ logger = logging.getLogger("dinov2")
 
 
 class DataAugmentationDINO(object):
-    def __init__(
-        self, config: DictConfig, dataset_config: DictConfig, use_full_image: bool
-    ) -> None:
-        """
-        Initializes an instance of the Augmentations class.
-
-        Args:
-            config (DictConfig): The primary configuration object.
-            dataset_config (DictConfig): The dataset configuration object.
-            use_full_image (bool): Whether to use the full image
-        """
+    def __init__(self, config: DictConfig, dataset_config: DictConfig) -> None:
         self.dataset_config = dataset_config
         self.augmentations_config = config.augmentations[dataset_config.augmentation]
+        self.crops_config = config.crops
 
-        # number of crops
-        self.global_crops_3dld = config.crops.global_crops_3dld
-        self.local_crops_3dld = config.crops.local_crops_3dld
-        self.global_crops_2dld_peraxis = config.crops.global_crops_2dld_peraxis
-        self.global_crops_2dhd_peraxis = config.crops.global_crops_2dhd_peraxis
-        self.local_crops_2dhd_peraxis = config.crops.local_crops_2dhd_peraxis
+        self.global_crops_scale = self.crops_config.global_crops_scale
+        self.local_crops_scale = self.crops_config.local_crops_scale
 
-        # scale of crops
-        self.global_crops_scale = config.crops.global_crops_scale
-        self.local_crops_scale = config.crops.local_crops_scale
+        self.crop_groups = {}
+        self.target_groups = []
+        self.nontarget_groups = []
+        for group_dict in self.crops_config.crop_groups:
+            group_name = group_dict.pop("name")
+            self.crop_groups[group_name] = group_dict
 
-        # size of crops
-        if stage1:
-            crop_size_config = config.crops.stage1
-        else:
-            crop_size_config = config.crops.stage2
-
-        self.global_crop_size_ld = crop_size_config.global_crop_size_ld
-        self.local_crop_size_ld = crop_size_config.local_crop_size_ld
-        self.global_crop_size_hd = crop_size_config.global_crop_size_hd
-        self.local_crop_size_hd = crop_size_config.local_crop_size_hd
+            if group_dict["is_target"]:
+                self.target_groups.append(group_name)
+            else:
+                self.nontarget_groups.append(group_name)
 
         self.transforms = self.load_transforms_from_cfg()
 
     def build_transform_group(self, transform_key):
-        """
-        Builds a transformation group based on the given transform key.
-
-        Parameters:
-            transform_key (str): The key to identify the desired transformation group.
-
-        Returns:
-            transforms.Compose: The composed transformation group.
-        """
         image_transforms = ImageTransforms(
             self.dataset_config.pixel_range.lower,
             self.dataset_config.pixel_range.upper,
@@ -72,12 +47,12 @@ class DataAugmentationDINO(object):
         augmentations_list = copy.deepcopy(self.augmentations_config[transform_key])
         for tc in augmentations_list:
             name = tc.pop("name")
-            if name == "localcrop":
-                image_transforms.add_crop(self.local_crops_size, self.local_crops_scale)
-            elif name == "globalcrop":
-                image_transforms.add_crop(
-                    self.global_crops_size, self.global_crops_scale
-                )
+            if name == "globalcrop":
+                crop_size = self.crop_groups[transform_key]["size"]
+                image_transforms.add_crop(crop_size, self.global_crops_scale)
+            elif name == "localcrop":
+                crop_size = self.crop_groups[transform_key]["size"]
+                image_transforms.add_crop(crop_size, self.local_crops_scale)
             else:
                 image_transforms.add_transform(name, tc)
 
@@ -87,50 +62,48 @@ class DataAugmentationDINO(object):
         return image_transforms
 
     def load_transforms_from_cfg(self):
-        """
-        Load transforms from configuration file for each group (global1, global2, local).
-
-        Returns:
-            tuple: A tuple of transform groups.
-        """
-        transform_groups = [
-            self.build_transform_group(group)
-            for group in [
-                "global_3dld",
-                "local_3dld",
-                "global_2dld",
-                "global_2dhd",
-                "local_2dhd",
-            ]
-        ]
-        return tuple(transform_groups)
+        transform_groups = {
+            group: self.build_transform_group(group)
+            for group in self.crop_groups.keys()
+        }
+        return transform_groups
 
     def __call__(self, image: torch.Tensor) -> dict[str, list[torch.Tensor]]:
-        """
-        Apply augmentations to the input image.
-
-        Args:
-            image: The input image to apply augmentations to.
-
-        Returns:
-            output: A dictionary containing the augmented image crops and offsets.
-                - "global_crops": A list of global crops of the image.
-                - "global_crops_teacher": A list of global crops of the image.
-                - "local_crops": A list of local crops of the image.
-                - "offsets": An empty tuple.
-
-        """
         output = {}
 
-        global_crop_1 = self.global1(image)
-        global_crop_2 = self.global2(image)
+        for target_group in self.target_groups:
+            transform_group = self.transforms[target_group]
+            targets = self.crop_groups[target_group]["target_groups"]
+            group_outputs = [
+                transform_group(image)
+                for _ in range(self.crop_groups[target_group]["num_crops"])
+            ]
 
-        output["global_crops"] = [global_crop_1, global_crop_2]
-        output["global_crops_teacher"] = [global_crop_1, global_crop_2]
+            output[target_group] = {
+                "images": group_outputs,
+                "is_target": True,
+                "targets": targets,
+            }
 
-        local_crops = [self.local1(image) for _ in range(self.local_crops_number)]
+        for nontarget_group in self.nontarget_groups:
+            transform_group = self.transforms[nontarget_group]
+            targets = self.crop_groups[nontarget_group]["target_groups"]
+            main_target = targets[0]
+            source_images = output[main_target]["images"]
+            group_outputs = []
 
-        output["local_crops"] = local_crops
-        output["offsets"] = ()
+            for source_image in source_images:
+                group_outputs.append(
+                    [
+                        transform_group(source_image)
+                        for _ in range(self.crop_groups[nontarget_group]["num_crops"])
+                    ]
+                )
+
+            output[nontarget_group] = {
+                "images": group_outputs,
+                "is_target": False,
+                "targets": targets,
+            }
 
         return output
