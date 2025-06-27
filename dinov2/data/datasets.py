@@ -13,13 +13,11 @@ logger = logging.getLogger("dinov2")
 class VolumeDataset:
     def __init__(
         self,
-        dataset_name: str,
-        root_path: str,
         index_path: str,
+        root_path: str,
         modality: str,
         transform: Callable = lambda x: x,
     ) -> None:
-        self.dataset_name = dataset_name
         self.root_path = root_path
         self.df = pl.read_csv(index_path)
         self.modality = modality

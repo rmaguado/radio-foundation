@@ -64,9 +64,8 @@ def build_dataset_from_cfg(config, use_full_image: bool, dataset_config):
     weight = dataset_config.weight if hasattr(dataset_config, "weight") else None
 
     dataset_kwargs = {
-        "dataset_name": dataset_config.name,
+        "index_path": dataset_config.index_path,
         "root_path": dataset_config.root_path,
-        "transform": transform,
         "modality": dataset_type,
         "transform": transform,
     }
