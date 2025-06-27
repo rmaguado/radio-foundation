@@ -67,6 +67,8 @@ def build_dataset_from_cfg(config, use_full_image: bool, dataset_config):
         "dataset_name": dataset_config.name,
         "root_path": dataset_config.root_path,
         "transform": transform,
+        "modality": dataset_type,
+        "transform": transform,
     }
 
     if dataset_storage == "dicom":

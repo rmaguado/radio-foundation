@@ -1,6 +1,6 @@
 import os
 import torch
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, Callable
 import polars as pl
 import numpy as np
 import SimpleITK as sitk
@@ -17,11 +17,13 @@ class VolumeDataset:
         root_path: str,
         index_path: str,
         modality: str,
+        transform: Callable = lambda x: x,
     ) -> None:
         self.dataset_name = dataset_name
         self.root_path = root_path
         self.df = pl.read_csv(index_path)
         self.modality = modality
+        self.transform = transform
 
     def resample_to_isotropic(self, image, new_spacing):
         original_spacing = image.GetSpacing()
@@ -65,7 +67,9 @@ class VolumeDataset:
         volume = sitk.GetArrayFromImage(image)  # (slices, height, width)
         volume_tensor = torch.tensor(volume, dtype=torch.float32)
 
-        return volume_tensor
+        augmentations = self.transform(volume_tensor)
+
+        return augmentations
 
 
 class DicomVolumeDataset(VolumeDataset):
