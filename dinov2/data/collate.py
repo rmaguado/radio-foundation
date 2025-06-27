@@ -30,41 +30,51 @@ def collate_data_and_cast(
 
     Returns:
         dict: A dictionary containing the collated data.
-            - collated_global_crops (torch.Tensor): The collated global crops.
-            - collated_local_crops (torch.Tensor): The collated local crops.
+            - collated_views (dict): A dictionary of collated views.
             - collated_masks (torch.Tensor): The collated masks.
             - mask_indices_list (torch.Tensor): The mask indices list.
             - masks_weight (torch.Tensor): The masks weight.
             - upperbound (int): The upperbound.
             - n_masked_patches (torch.Tensor): The number of masked patches.
     """
-    n_global_crops = len(samples_list[0][0]["global_crops"])
-    n_local_crops = len(samples_list[0][0]["local_crops"])
 
-    collated_global_crops = torch.stack(
-        [s[0]["global_crops"][i] for i in range(n_global_crops) for s in samples_list]
-    )
+    view_groups = samples_list[0][0].keys()
+    collated_views = {}
 
-    collated_local_crops = torch.stack(
-        [s[0]["local_crops"][i] for i in range(n_local_crops) for s in samples_list]
-    )
+    for group_name in view_groups:
+        is_target = samples_list[0][0][group_name]["is_target"]
+        group_images = []
 
-    B = len(collated_global_crops)
-    N = n_tokens
-    n_samples_masked = int(B * mask_probability)
+        # Flatten and collect all images for this group across the batch
+        for sample in samples_list:
+            group_data = sample[0][group_name]["images"]
+            if isinstance(group_data[0], list):  # nested list for non-target
+                group_images.extend([img for sublist in group_data for img in sublist])
+            else:
+                group_images.extend(group_data)
+
+        # Stack and convert to desired dtype
+        collated_views[group_name] = {
+            "images": torch.stack(group_images).to(dtype),
+            "is_target": is_target,
+            "targets": samples_list[0][0][group_name]["targets"],
+        }
+
+    target_group_names = [k for k, v in collated_views.items() if v["is_target"]]
+    total_views = sum(collated_views[k]["images"].shape[0] for k in target_group_names)
+
+    n_samples_masked = int(total_views * mask_probability)
     probs = torch.linspace(*mask_ratio_tuple, n_samples_masked + 1)
     upperbound = 0
     masks_list = []
-    for i in range(0, n_samples_masked):
-        prob_min = probs[i]
-        prob_max = probs[i + 1]
-        masks_list.append(
-            torch.BoolTensor(
-                mask_generator(int(N * random.uniform(prob_min, prob_max)))
-            )
-        )
-        upperbound += int(N * prob_max)
-    for i in range(n_samples_masked, B):
+
+    for i in range(n_samples_masked):
+        prob_min = probs[i].item()
+        prob_max = probs[i + 1].item()
+        num_to_mask = int(n_tokens * random.uniform(prob_min, prob_max))
+        masks_list.append(torch.BoolTensor(mask_generator(num_to_mask)))
+        upperbound += int(n_tokens * prob_max)
+    for _ in range(n_samples_masked, total_views):
         masks_list.append(torch.BoolTensor(mask_generator(0)))
 
     random.shuffle(masks_list)
@@ -79,8 +89,7 @@ def collate_data_and_cast(
     )
 
     return {
-        "collated_global_crops": collated_global_crops.to(dtype),
-        "collated_local_crops": collated_local_crops.to(dtype),
+        "collated_views": {k: v["images"] for k, v in collated_views.items()},
         "collated_masks": collated_masks,
         "mask_indices_list": mask_indices_list,
         "masks_weight": masks_weight,
