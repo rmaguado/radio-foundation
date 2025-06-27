@@ -5,6 +5,7 @@ from typing import Dict
 from tqdm import tqdm
 import polars as pl
 import logging
+import argparse
 
 
 def walk(root_dir):
@@ -35,25 +36,24 @@ def CTValidation(metadata: Dict) -> str:
     """
     errors = []
 
-    if metadata["slice_thickness"] > 5.0:
+    # Check for 'slice_thickness' before accessing it
+    if (
+        "slice_thickness" in metadata
+        and metadata["slice_thickness"] is not None
+        and metadata["slice_thickness"] > 5.0
+    ):
         errors.append(f"Slice thickness is too high: {metadata['slice_thickness']}")
 
     return "\n".join(errors)
 
 
-def index_niftis():
+def index_niftis(root_path, output_path):
     """
     Main function to validate Nifti files in a directory.
     """
-    root_dir = "path/to/dicom/files"
-    output_file = "path/to/output/nifti_files.csv"
-
-    # column names for the output CSV file
-    # "path", "rows", "columns", "slices", "slice_thickness", "xyspacing", "zspacing"
-
     nifti_files = []
     for dirpath, dirnames, filenames in tqdm(
-        walk(root_dir), desc="Walking through directories"
+        walk(root_path), desc="Walking through directories"
     ):
         for filename in filenames:
             if filename.endswith(".nii") or filename.endswith(".nii.gz"):
@@ -61,14 +61,16 @@ def index_niftis():
 
                 try:
                     nifti_image = nib.load(file_path)
+                    zooms = nifti_image.header.get_zooms()
                     metadata = {
                         "path": file_path,
                         "rows": nifti_image.shape[0],
                         "columns": nifti_image.shape[1],
                         "slices": nifti_image.shape[2],
-                        "slice_thickness": nifti_image.header.get_zooms()[2],
-                        "xyspacing": nifti_image.header.get_zooms()[:2],
-                        "zspacing": nifti_image.header.get_zooms()[2],
+                        "slice_thickness": zooms[2],
+                        "x_spacing": zooms[0],
+                        "y_spacing": zooms[1],
+                        "z_spacing": zooms[2],
                     }
 
                     errors = CTValidation(metadata)
@@ -83,20 +85,17 @@ def index_niftis():
                     continue
 
     df = pl.DataFrame(nifti_files)
-    df.write_csv(output_file)
-    logging.info(f"Metadata saved to {output_file}")
+    df.write_csv(output_path)
+    logging.info(f"Metadata saved to {output_path}")
 
 
-def index_dicoms():
+def index_dicoms(root_path, output_path):
     """
     Main function to validate DICOM files in a directory.
     """
-    root_dir = "path/to/dicom/files"
-    output_file = "path/to/output/dicom_folders.csv"
-
     dicom_folders = []
     for dirpath, dirnames, filenames in tqdm(
-        walk(root_dir), desc="Walking through directories"
+        walk(root_path), desc="Walking through directories"
     ):
         dicom_files = [f for f in filenames if f.endswith(".dcm")]
         if not dicom_files:
@@ -105,18 +104,31 @@ def index_dicoms():
         try:
             first_file = os.path.join(dirpath, dicom_files[0])
             ds = pydicom.dcmread(first_file, stop_before_pixels=True)
+
+            # Handle PixelSpacing and SliceThickness potentially being missing or single values
+            pixel_spacing_x = (
+                float(ds.PixelSpacing[0])
+                if "PixelSpacing" in ds and len(ds.PixelSpacing) > 0
+                else None
+            )
+            pixel_spacing_y = (
+                float(ds.PixelSpacing[1])
+                if "PixelSpacing" in ds and len(ds.PixelSpacing) > 1
+                else None
+            )
+            slice_thickness_val = (
+                float(ds.SliceThickness) if "SliceThickness" in ds else None
+            )
+
             metadata = {
                 "path": dirpath,
-                "rows": ds.Rows,
-                "columns": ds.Columns,
+                "rows": ds.Rows if "Rows" in ds else None,
+                "columns": ds.Columns if "Columns" in ds else None,
                 "slices": len(dicom_files),
-                "slice_thickness": (
-                    float(ds.SliceThickness) if "SliceThickness" in ds else None
-                ),
-                "xyspacing": (float(ds.PixelSpacing[0]), float(ds.PixelSpacing[1])),
-                "zspacing": (
-                    float(ds.SliceThickness) if "SliceThickness" in ds else None
-                ),
+                "slice_thickness": slice_thickness_val,
+                "x_spacing": pixel_spacing_x,
+                "y_spacing": pixel_spacing_y,
+                "z_spacing": slice_thickness_val,
             }
 
             errors = CTValidation(metadata)
@@ -130,5 +142,29 @@ def index_dicoms():
             logging.error(f"Error processing {dirpath}: {e}")
             continue
     df = pl.DataFrame(dicom_folders)
-    df.write_csv(output_file)
-    logging.info(f"Metadata saved to {output_file}")
+    df.write_csv(output_path)
+    logging.info(f"Metadata saved to {output_path}")
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset_type", type=str)
+    parser.add_argument("--root_path", type=str)
+    parser.add_argument("--output_path", type=str)
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = get_args()
+
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    if args.dataset_type == "nifti":
+        index_niftis(args.root_path, args.output_path)
+    elif args.dataset_type == "dicom":
+        index_dicoms(args.root_path, args.output_path)
+    else:
+        raise ValueError(f"{args.dataset_type} not a recognized data type. ")
