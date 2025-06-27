@@ -29,18 +29,30 @@ class DataAugmentationDINO(object):
         """
         self.dataset_config = dataset_config
         self.augmentations_config = config.augmentations[dataset_config.augmentation]
-        self.local_crops_number = config.crops.local_crops_number
-        self.local_crops_size = config.crops.local_crops_size
+
+        # number of crops
+        self.global_crops_3dld = config.crops.global_crops_3dld
+        self.local_crops_3dld = config.crops.local_crops_3dld
+        self.global_crops_2dld_peraxis = config.crops.global_crops_2dld_peraxis
+        self.global_crops_2dhd_peraxis = config.crops.global_crops_2dhd_peraxis
+        self.local_crops_2dhd_peraxis = config.crops.local_crops_2dhd_peraxis
+
+        # scale of crops
+        self.global_crops_scale = config.crops.global_crops_scale
         self.local_crops_scale = config.crops.local_crops_scale
 
-        self.global_crops_size = (
-            config.student.full_image_size
-            if use_full_image
-            else config.crops.global_crops_size
-        )
-        self.global_crops_scale = config.crops.global_crops_scale
+        # size of crops
+        if stage1:
+            crop_size_config = config.crops.stage1
+        else:
+            crop_size_config = config.crops.stage2
 
-        self.global1, self.global2, self.local1 = self.load_transforms_from_cfg()
+        self.global_crop_size_ld = crop_size_config.global_crop_size_ld
+        self.local_crop_size_ld = crop_size_config.local_crop_size_ld
+        self.global_crop_size_hd = crop_size_config.global_crop_size_hd
+        self.local_crop_size_hd = crop_size_config.local_crop_size_hd
+
+        self.transforms = self.load_transforms_from_cfg()
 
     def build_transform_group(self, transform_key):
         """
@@ -83,7 +95,13 @@ class DataAugmentationDINO(object):
         """
         transform_groups = [
             self.build_transform_group(group)
-            for group in ["global_1", "global_2", "local"]
+            for group in [
+                "global_3dld",
+                "local_3dld",
+                "global_2dld",
+                "global_2dhd",
+                "local_2dhd",
+            ]
         ]
         return tuple(transform_groups)
 
