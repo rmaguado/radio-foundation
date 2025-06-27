@@ -82,7 +82,7 @@ checkpoints:
 student:
   arch: vit_large
   patch_size: 14
-  full_image_size: 504
+  full_image_size: 448
   channels: 1
   drop_path_rate: 0.4
   layerscale: 1.0e-05
