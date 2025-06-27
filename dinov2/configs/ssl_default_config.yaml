@@ -116,29 +116,75 @@ optim:
   adamw_beta1: 0.9
   adamw_beta2: 0.999
 crops:
-  global_crops_3dld: 1
-  local_crops_3dld: 3
-  global_crops_2dld_peraxis: 1
-  global_crops_2dhd_peraxis: 1
-  local_crops_2dhd_peraxis: 2
   global_crop_scale:
   - 0.30
-  - 1.00
+  - 0.80
   local_crop_scale:
-  - 0.05
+  - 0.16
   - 0.30
-  stage1:
-    global_crop_size_ld: 112
-    local_crop_size_ld: 56
-    global_crop_size_hd: 224
-    local_crop_size_hd: 112
-  stage2:
-    global_crop_size_ld: 224
-    local_crop_size_ld: 112
-    global_crop_size_hd: 448
-    local_crop_size_hd: 224
+  crop_groups:
+    - name: 3d_global_ld
+      is_target: true
+      target_groups:
+      - 3d_global_ld
+      size: 112
+      num_crops: 1
+    - name: 3d_local_ld
+      is_target: false
+      target_groups:
+      - 3d_global_ld
+      size: 56
+      num_crops: 3
+    - name: 2d_global_ld
+      is_target: false
+      target_groups:
+      - 3d_global_ld
+      size: 112
+      num_crops: 3
+    - name: 2d_global_hd
+      is_target: true
+      target_group:
+      - 2d_global_hd
+      size: 224
+      num_crops: 3
+    - name: 2d_local_hd
+      is_target: false
+      target_group:
+      - 3d_global_ld
+      - 2d_global_hd
+      size: 112
+      num_crops: 2
+augmentations:
+  default_ct:
+    3d_global_ld:
+      - name: rotate
+      - name: globalcrop
+      - name: gaussian_blur
+        p: 0.5
+    3d_local_ld:
+      - name: rotate
+      - name: localcrop
+      - name: gaussian_blur
+        p: 0.5
+    2d_global_ld:
+      - name: slice
+      - name: rotate
+      - name: globalcrop
+      - name: gaussian_blur
+        p: 0.5
+    2d_global_hd:
+      - name: slice
+      - name: rotate
+      - name: localcrop
+      - name: gaussian_blur
+        p: 0.5
+    2d_local_hd:
+      - name: rotate
+      - name: globalcrop
+      - name: gaussian_blur
+        p: 0.5
 datasets:
-  - name: radiomics_datasets
+  - name: default_dataset
     weight: 1.0
     root_path: .
     type: ct
@@ -151,28 +197,3 @@ datasets:
     norm:
       mean: -573.8
       std: 461.3
-augmentations:
-  default_ct:
-    global_3dld:
-      - name: rotate3D
-      - name: globalcrop3D
-      - name: gaussian_blur
-    local_3dld:
-      - name: rotate3D
-      - name: localcrop3D
-      - name: gaussian_blur
-        p: 0.5
-    global_2dld:
-      - name: rotate2D
-      - name: globalcrop2D
-      - name: gaussian_blur
-        p: 0.5
-    global_2dhd:
-      - name: rotate2D
-      - name: localcrop2D
-      - name: gaussian_blur
-    local_2dhd:
-      - name: rotate2D
-      - name: globalcrop2D
-      - name: gaussian_blur
-        p: 0.5
