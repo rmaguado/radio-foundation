@@ -3,6 +3,8 @@
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
 
+from typing import List
+
 import torch
 import torch.distributed as dist
 import torch.nn.functional as F
@@ -62,18 +64,26 @@ class DINOLoss(nn.Module):
         Q *= B  # the columns must sum to 1 so that Q is an assignment
         return Q.t()
 
-    def forward(self, student_output_list, teacher_out_softmaxed_centered_list):
+    def forward(
+        self, student_output: torch.Tensor, teacher_targets_list: List[torch.Tensor]
+    ) -> torch.Tensor:
         """
-        Cross-entropy between softmax outputs of the teacher and student networks.
+        Calculates cross-entropy between a single student output and a list of its teacher targets.
+
+        Args:
+            student_output (torch.Tensor): A single tensor of student embeddings, e.g., (n_crops, dim).
+            teacher_targets_list (List[torch.Tensor]): A list of teacher embedding tensors that the student
+                                                       output should be compared against.
         """
-        # TODO: Use cross_entropy_distribution here
+        lsm = F.log_softmax(student_output / self.student_temp, dim=-1)
+
         total_loss = 0
-        for s in student_output_list:
-            lsm = F.log_softmax(s / self.student_temp, dim=-1)
-            for t in teacher_out_softmaxed_centered_list:
-                loss = torch.sum(t * lsm, dim=-1)
-                total_loss -= loss.mean()
-        return total_loss
+        # Compare the student output against each of its designated teacher targets
+        for teacher_target in teacher_targets_list:
+            loss = torch.sum(teacher_target * lsm, dim=-1)
+            total_loss -= loss.mean()
+
+        return total_loss  # type: ignore
 
     @torch.no_grad()
     def update_center(self, teacher_output):
@@ -94,7 +104,7 @@ class DINOLoss(nn.Module):
 
             if self.reduce_handle is not None:
                 self.reduce_handle.wait()
-            _t = self.async_batch_center / (self.len_teacher_output * world_size)
+            _t = self.async_batch_center / (self.len_teacher_output * world_size)  # type: ignore
 
             self.center = self.center * self.center_momentum + _t * (
                 1 - self.center_momentum
