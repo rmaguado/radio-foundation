@@ -12,7 +12,7 @@ from tabulate import tabulate
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import MultiDataset, DicomCtDataset, NiftiCtDataset, MedicalImageDataset
+from .datasets import MultiDataset, DicomVolumeDataset, NiftiVolumeDataset
 from .samplers import (
     InfiniteSampler,
     WeightedInfiniteSampler,
@@ -69,13 +69,6 @@ def build_dataset_from_cfg(
     config, use_full_image, dataset_config
 ) -> Tuple[MedicalImageDataset, Optional[float]]:
 
-    def get_ct_kwargs(dataset_config):
-        return {
-            "channels": dataset_config.channels,
-            "lower_window": dataset_config.pixel_range.lower,
-            "upper_window": dataset_config.pixel_range.upper,
-        }
-
     dataset_type = dataset_config.type
     dataset_storage = dataset_config.storage
     transform = DataAugmentationDINO(config, dataset_config, use_full_image)
@@ -88,16 +81,13 @@ def build_dataset_from_cfg(
         "transform": transform,
     }
 
-    if dataset_type == "ct":
-        dataset_kwargs.update(get_ct_kwargs(dataset_config))
-        if dataset_storage == "dicom":
-            dataset_object = DicomCtDataset(**dataset_kwargs)
-        elif dataset_storage == "nifti":
-            dataset_object = NiftiCtDataset(**dataset_kwargs)
-        else:
-            raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
+    if dataset_storage == "dicom":
+        dataset_object = DicomVolumeDataset(**dataset_kwargs)
+    elif dataset_storage == "nifti":
+        dataset_object = NiftiVolumeDataset(**dataset_kwargs)
     else:
-        raise ValueError(f"Unsupported dataset type: {dataset_type}")
+        raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
+
     return dataset_object, weight
 
 
