@@ -1,7 +1,5 @@
-import yaml
-import os
 from omegaconf import OmegaConf
-from pydantic import BaseModel, validator, ValidationError, Field
+from pydantic import BaseModel, field_validator
 from typing import List, Optional, Literal, Tuple, Dict, Any
 
 
@@ -47,7 +45,8 @@ class IbotConfig(BaseModel):
     head_nlayers: int
     head_hidden_dim: int
 
-    @validator("mask_ratio_min_max")
+    @field_validator("mask_ratio_min_max", mode="before")
+    @classmethod
     def validate_mask_ratio(cls, v):
         if not 0.0 <= v[0] <= v[1] <= 1.0:
             raise ValueError(
@@ -106,7 +105,8 @@ class TeacherConfig(BaseModel):
     teacher_temp: float
     warmup_teacher_temp_epochs: int
 
-    @validator("momentum_teacher", "final_momentum_teacher")
+    @field_validator("momentum_teacher", "final_momentum_teacher", mode="before")
+    @classmethod
     def validate_momentum(cls, v):
         if not 0.0 <= v <= 1.0:
             raise ValueError("Momentum values must be between 0.0 and 1.0")
@@ -140,7 +140,8 @@ class CropsConfig(BaseModel):
     stage1: CropsStageConfig
     stage2: CropsStageConfig
 
-    @validator("global_crops_scale", "local_crops_scale")
+    @field_validator("global_crops_scale", "local_crops_scale", mode="before")
+    @classmethod
     def validate_scales(cls, v):
         if not 0.0 <= v[0] <= v[1] <= 1.0:
             raise ValueError(
@@ -205,5 +206,5 @@ class MainConfig(BaseModel):
 
 def validate_config(conf) -> bool:
     conf_dict = OmegaConf.to_container(conf, resolve=True)
-    MainConfig(**conf_dict)
+    MainConfig(**conf_dict)  # type: ignore
     return True
