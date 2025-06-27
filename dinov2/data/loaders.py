@@ -35,17 +35,7 @@ class SamplerType(Enum):
 def make_train_dataset(
     config: DictConfig,
     use_full_image: bool,
-) -> Tuple[MedicalImageDataset, Optional[List[float]]]:
-    """
-    Parse the dataset from the given OmegaConf configuration.
-
-    Args:
-        config (DictConfig): The OmegaConf dictionary configuration for the dataset.
-        use_full_image (bool): Whether to set the global crop size to the full size.
-
-    Returns:
-        MedicalImageDataset: The corresponding dataset object(s).
-    """
+):
 
     dataset_objects = []
     weights = []
@@ -65,13 +55,11 @@ def make_train_dataset(
     return dataset_objects[0], [1.0]
 
 
-def build_dataset_from_cfg(
-    config, use_full_image, dataset_config
-) -> Tuple[MedicalImageDataset, Optional[float]]:
+def build_dataset_from_cfg(config, use_full_image: bool, dataset_config):
 
-    dataset_type = dataset_config.type
+    dataset_type = dataset_config.type  # ct or mri
     dataset_storage = dataset_config.storage
-    transform = DataAugmentationDINO(config, dataset_config, use_full_image)
+    transform = DataAugmentationDINO(config, dataset_config)
 
     weight = dataset_config.weight if hasattr(dataset_config, "weight") else None
 
