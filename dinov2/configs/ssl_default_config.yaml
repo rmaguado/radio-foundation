@@ -116,19 +116,27 @@ optim:
   adamw_beta1: 0.9
   adamw_beta2: 0.999
 crops:
-  global_crops_scale:
-  - 0.32
-  - 1.0
-  local_crops_number: 8
-  local_crops_scale:
+  global_crops_3dld: 1
+  local_crops_3dld: 3
+  global_crops_2dld_peraxis: 1
+  global_crops_2dhd_peraxis: 1
+  local_crops_2dhd_peraxis: 2
+  global_crop_scale:
+  - 0.30
+  - 1.00
+  local_crop_scale:
   - 0.05
-  - 0.32
+  - 0.30
   stage1:
-    global_crops_size: 224
-    local_crops_size: 98
+    global_crop_size_ld: 112
+    local_crop_size_ld: 56
+    global_crop_size_hd: 224
+    local_crop_size_hd: 112
   stage2:
-    global_crops_size: 448
-    local_crops_size: 196
+    global_crop_size_ld: 224
+    local_crop_size_ld: 112
+    global_crop_size_hd: 448
+    local_crop_size_hd: 224
 datasets:
   - name: radiomics_datasets
     weight: 1.0
@@ -145,27 +153,26 @@ datasets:
       std: 461.3
 augmentations:
   default_ct:
-    global_1:
-    - name: rotate
-      p: 0.8
-    - name: globalcrop
-    - name: flip
-      p: 0.5
-    - name: gaussian_blur
-      p: 1.0
-    global_2:
-    - name: globalcrop
-    - name: flip
-      p: 0.5
-    - name: noise
-      p: 0.5
-      mean: 0.0
-      std: 0.1
-    - name: gaussian_blur
-      p: 0.1
-    local:
-    - name: localcrop
-    - name: flip
-      p: 0.5
-    - name: gaussian_blur
-      p: 0.5
+    global_3dld:
+      - name: rotate3D
+      - name: globalcrop3D
+      - name: gaussian_blur
+    local_3dld:
+      - name: rotate3D
+      - name: localcrop3D
+      - name: gaussian_blur
+        p: 0.5
+    global_2dld:
+      - name: rotate2D
+      - name: globalcrop2D
+      - name: gaussian_blur
+        p: 0.5
+    global_2dhd:
+      - name: rotate2D
+      - name: localcrop2D
+      - name: gaussian_blur
+    local_2dhd:
+      - name: rotate2D
+      - name: globalcrop2D
+      - name: gaussian_blur
+        p: 0.5
