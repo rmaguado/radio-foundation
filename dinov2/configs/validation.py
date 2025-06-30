@@ -384,8 +384,6 @@ class AugmentationStepConfig(BaseModel):
 
 
 class AugmentationCollection(BaseModel):
-    __pydantic_extra__ = "allow"
-
     @model_validator(mode="after")
     def validate_all_lists_of_augmentation_steps(self):
         for key, value in self.__dict__.items():
