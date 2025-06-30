@@ -49,7 +49,6 @@ train:
   seed: 0
   num_workers: 10
   iterations_per_epoch: 1000
-  cache_dataset: true
   centering: "centering"
   stage1:
     epochs: 90

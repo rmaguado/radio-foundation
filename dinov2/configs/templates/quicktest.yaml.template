@@ -6,7 +6,6 @@ train:
   print_freq: 1
   num_workers: 10
   iterations_per_epoch: 10
-  cache_dataset: true
   centering: "centering" # or "sinkhorn_knopp"
   full_image:
     epochs: 10

@@ -131,7 +131,6 @@ class TrainConfig(BaseModel):
     seed: int
     num_workers: int
     iterations_per_epoch: int
-    cache_dataset: bool
     centering: Literal["centering", "sinkhorn_knopp"]
     stage1: TrainStageConfig
     stage2: TrainStageConfig
