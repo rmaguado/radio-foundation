@@ -19,7 +19,7 @@ class Logs:
 
         self.grad_accum_steps = cfg.train.grad_accum_steps
         self.official_epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
-        self.total_epochs = cfg.optim.epochs
+        self.total_epochs = cfg.train.stage1.epochs
         self.full_size_epochs = cfg.train.full_image.epochs
         self.full_size_grad_accum_steps = cfg.train.full_image.grad_accum_steps
 
@@ -111,7 +111,7 @@ def main(runs):
 
     plt.xlabel("Epoch", fontsize=14)
     plt.ylabel("Total Loss", fontsize=14)
-    plt.legend(title="Runs", fontsize=12, title_fontsize='13')
+    plt.legend(title="Runs", fontsize=12, title_fontsize="13")
 
     plt.savefig(outpath, dpi=300)
 

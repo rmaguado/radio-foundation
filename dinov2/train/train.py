@@ -111,7 +111,6 @@ def do_train(cfg, model, resume=False):
         checkpointer,
         start_iter,
         max_iter,
-        full_size_iter,
     ) = setup_training_components(cfg, model, resume)
 
     iteration = start_iter
@@ -123,28 +122,17 @@ def do_train(cfg, model, resume=False):
 
     train_components = [cfg, metric_logger, model, optimizer, schedulers, checkpointer]
 
-    if iteration < max_iter - full_size_iter:
-        data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=False)
-        metric_logger.set_dataloader(data_loader)
-
-        iteration = train(
-            *train_components,
-            img_mode="crop",
-            start_iter=start_iter,
-            max_iter=max_iter - full_size_iter,
-        )
-
-        logger.info(f"Finished training on resize-crop images.")
-    logger.info(f"Resuming with full-size images for {max_iter - iteration} steps")
-
-    data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=True)
+    data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=False)
     metric_logger.set_dataloader(data_loader)
-    train(
+
+    iteration = train(
         *train_components,
-        img_mode="full",
-        start_iter=iteration,
+        img_mode="crop",
+        start_iter=start_iter,
         max_iter=max_iter,
     )
+
+    logger.info(f"Finished training stage 1.")
     do_test(cfg, model, f"training_{iteration}")
     logger.info("Finished training on full-size images")
 
