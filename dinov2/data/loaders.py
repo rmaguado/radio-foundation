@@ -56,7 +56,7 @@ def make_train_dataset(
 
 
 def build_dataset_from_cfg(config, use_full_image: bool, dataset_config):
-
+    dataset_name = dataset_config.name
     dataset_type = dataset_config.type  # ct or mri
     dataset_storage = dataset_config.storage
     transform = DataAugmentationDINO(config, dataset_config)
