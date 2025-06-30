@@ -101,7 +101,7 @@ class SSLMetaArch(nn.Module):
             name = group_cfg.pop("name")
             self.view_metadata[name] = group_cfg
             self.student_group_names.append(name)
-            if group_cfg["is_target"]:
+            if group_cfg.get("is_target", False):
                 self.target_group_names.append(name)
 
     def forward(self, inputs):
