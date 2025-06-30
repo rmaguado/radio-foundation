@@ -1,45 +1,31 @@
-MODEL:
-  WEIGHTS: ''
 compute_precision:
   grad_scaler: true
   teacher:
     backbone:
-      sharding_strategy: SHARD_GRAD_OP
-      mixed_precision:
-        param_dtype: fp16
-        reduce_dtype: fp16
-        buffer_dtype: fp32
+      param_dtype: bf16
+      reduce_dtype: bf16
+      buffer_dtype: fp32
     dino_head:
-      sharding_strategy: SHARD_GRAD_OP
-      mixed_precision:
-        param_dtype: fp16
-        reduce_dtype: fp16
-        buffer_dtype: fp32
+      param_dtype: bf16
+      reduce_dtype: bf16
+      buffer_dtype: fp32
     ibot_head:
-      sharding_strategy: SHARD_GRAD_OP
-      mixed_precision:
-        param_dtype: fp16
-        reduce_dtype: fp16
-        buffer_dtype: fp32
+      param_dtype: bf16
+      reduce_dtype: bf16
+      buffer_dtype: fp32
   student:
     backbone:
-      sharding_strategy: SHARD_GRAD_OP
-      mixed_precision:
-        param_dtype: fp16
-        reduce_dtype: fp16
-        buffer_dtype: fp32
+      param_dtype: bf16
+      reduce_dtype: bf16
+      buffer_dtype: fp32
     dino_head:
-      sharding_strategy: SHARD_GRAD_OP
-      mixed_precision:
-        param_dtype: fp16
-        reduce_dtype: fp32
-        buffer_dtype: fp32
+      param_dtype: bf16
+      reduce_dtype: fp32
+      buffer_dtype: fp32
     ibot_head:
-      sharding_strategy: SHARD_GRAD_OP
-      mixed_precision:
-        param_dtype: fp16
-        reduce_dtype: fp32
-        buffer_dtype: fp32
+      param_dtype: bf16
+      reduce_dtype: fp32
+      buffer_dtype: fp32
 dino:
   loss_weight: 1.0
   head_n_prototypes: 65536
@@ -64,7 +50,7 @@ train:
   num_workers: 10
   OFFICIAL_EPOCH_LENGTH: 1000
   cache_dataset: true
-  centering: "centering" # or "sinkhorn_knopp"
+  centering: "centering"
   stage1:
     epochs: 90
     batch_size_total: 2048
@@ -80,22 +66,28 @@ checkpoints:
   save_checkpoint_iterations: 1000
   save_teacher_iterations: 10000
 student:
-  arch: vit_large
-  patch_size: 14
-  full_image_size: 448
-  channels: 1
+  model_name: vitl14_2d3d
+  embed_dim: 1024
+  depth: 24
+  num_heads: 16
+  mlp_ratio: 4
+  embed_layers:
+  - type: patch2d
+    patch_size: 14
+    img_size: 448
+  - type: patch3d
+    patch_size: 14
+    img_size: 224
   drop_path_rate: 0.4
   layerscale: 1.0e-05
   drop_path_uniform: true
   pretrained_weights: ''
   ffn_layer: "swiglu"
-  block_chunks: 0
   qkv_bias: true
   proj_bias: true
   ffn_bias: true
   num_register_tokens: 4
   interpolate_antialias: true
-  interpolate_offset: 0.0
 teacher:
   momentum_teacher: 0.992
   final_momentum_teacher: 1.0
@@ -125,35 +117,27 @@ crops:
   crop_groups:
     - name: 3d_global_ld
       is_target: true
-      target_groups:
-      - 3d_global_ld
       size: 112
       num_crops: 1
+      encoder_type: 3d
     - name: 3d_local_ld
-      is_target: false
-      target_groups:
+      targets:
       - 3d_global_ld
       size: 56
       num_crops: 3
-    - name: 2d_global_ld
-      is_target: false
-      target_groups:
-      - 3d_global_ld
-      size: 112
-      num_crops: 3
+      encoder_type: 3d
     - name: 2d_global_hd
       is_target: true
-      target_group:
-      - 2d_global_hd
       size: 224
       num_crops: 3
+      encoder_type: 2d
     - name: 2d_local_hd
-      is_target: false
-      target_group:
+      targets:
       - 3d_global_ld
       - 2d_global_hd
       size: 112
       num_crops: 2
+      encoder_type: 2d
 augmentations:
   default_ct:
     3d_global_ld:
@@ -164,12 +148,6 @@ augmentations:
     3d_local_ld:
       - name: rotate
       - name: localcrop
-      - name: gaussian_blur
-        p: 0.5
-    2d_global_ld:
-      - name: slice
-      - name: rotate
-      - name: globalcrop
       - name: gaussian_blur
         p: 0.5
     2d_global_hd:

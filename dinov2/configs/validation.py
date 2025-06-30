@@ -1,10 +1,6 @@
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig, ListConfig
 from pydantic import BaseModel, field_validator
 from typing import List, Optional, Literal, Tuple, Dict, Any
-
-
-class ModelConfig(BaseModel):
-    WEIGHTS: str
 
 
 class MixedPrecisionConfig(BaseModel):
@@ -14,16 +10,15 @@ class MixedPrecisionConfig(BaseModel):
 
 
 class PrecisionComponentConfig(BaseModel):
-    sharding_strategy: Literal[
-        "SHARD_GRAD_OP", "FULL_SHARD", "NO_SHARD", "HYBRID_SHARD"
-    ]
-    mixed_precision: MixedPrecisionConfig
+    backbone: MixedPrecisionConfig
+    dino_head: MixedPrecisionConfig
+    ibot_head: MixedPrecisionConfig
 
 
 class ComputePrecisionConfig(BaseModel):
     grad_scaler: bool
-    teacher: Dict[str, PrecisionComponentConfig]
-    student: Dict[str, PrecisionComponentConfig]
+    teacher: PrecisionComponentConfig
+    student: PrecisionComponentConfig
 
 
 class DinoConfig(BaseModel):
@@ -168,7 +163,7 @@ class CheckpointsConfig(BaseModel):
 
 
 class StudentConfig(BaseModel):
-    arch: str
+    model_name: str
     patch_size: int
     full_image_size: int
     channels: int
@@ -281,10 +276,11 @@ class OptimConfig(BaseModel):
 
 class CropGroup(BaseModel):
     name: str
-    is_target: bool
-    target_groups: List[str]
+    is_target: bool = False
+    target_groups: Optional[List[str]]
     size: int
     num_crops: int
+    encoder_type: Literal["2d", "3d"]
 
     @field_validator("size", "num_crops", mode="before")
     @classmethod
@@ -383,7 +379,6 @@ class AugmentationsConfig(BaseModel):
 
 
 class MainConfig(BaseModel):
-    MODEL: ModelConfig
     compute_precision: ComputePrecisionConfig
     dino: DinoConfig
     ibot: IbotConfig
@@ -397,7 +392,7 @@ class MainConfig(BaseModel):
     augmentations: AugmentationsConfig
 
 
-def validate_config(conf) -> bool:
+def validate_config(conf: DictConfig) -> bool:
     conf_dict = OmegaConf.to_container(conf, resolve=True)
-    MainConfig(**conf_dict)  # type: ignore
+    MainConfig(**conf_dict)
     return True
