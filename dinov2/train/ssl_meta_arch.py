@@ -98,10 +98,11 @@ class SSLMetaArch(nn.Module):
         self.target_group_names = []
         self.student_group_names = []
         for group_cfg in self.cfg.crops.crop_groups:
-            name = group_cfg.pop("name")
-            self.view_metadata[name] = group_cfg
+            group_cfg_copy = group_cfg.copy()
+            name = group_cfg_copy.pop("name")
+            self.view_metadata[name] = group_cfg_copy
             self.student_group_names.append(name)
-            if group_cfg.get("is_target", False):
+            if group_cfg_copy.get("is_target", False):
                 self.target_group_names.append(name)
 
     def forward(self, inputs):
