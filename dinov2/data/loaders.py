@@ -60,7 +60,6 @@ def build_dataset_from_cfg(config, dataset_config):
     dataset_kwargs = {
         "dataset_name": dataset_name,
         "index_path": dataset_config.index_path,
-        "root_path": dataset_config.root_path,
         "modality": dataset_type,
         "transform": transform,
     }
