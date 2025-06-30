@@ -158,7 +158,7 @@ def main(rank, world_size):
     args = get_args_parser(add_help=True).parse_args()
     cfg = setup(args)
 
-    model = SSLMetaArch(cfg).to(torch.device("cuda"))
+    model = SSLMetaArch(cfg).to(rank)
     model = DDP(model, device_ids=[rank])
 
     logger.debug("Model:\n{}".format(model))
