@@ -74,7 +74,7 @@ class DicomVolumeDataset(VolumeDataset):
 
     def get_image_data(self, idx: int) -> sitk.Image:
         meta = self.df.row(idx)
-        dicom_folder = meta["path"]
+        dicom_folder = meta[0]
 
         reader = sitk.ImageSeriesReader()
         series_IDs = reader.GetGDCMSeriesIDs(dicom_folder)
@@ -90,7 +90,7 @@ class NiftiVolumeDataset(VolumeDataset):
 
     def get_image_data(self, idx: int) -> sitk.Image:
         meta = self.df.row(idx)
-        nifti_file_path = meta["path"]
+        nifti_file_path = meta[0]
 
         image = sitk.ReadImage(nifti_file_path)
 
