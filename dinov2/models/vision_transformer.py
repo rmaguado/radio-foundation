@@ -51,7 +51,7 @@ def get_embedding_layers(
     """
     embed_layers = nn.ModuleDict()
     for config in embed_configs:
-        layer_type = config["layer_type"]
+        layer_type = config["type"]
         if layer_type not in EMBED_LAYER_REGISTRY:
             raise NotImplementedError(
                 f"Embedding layer type '{layer_type}' is not implemented. Available: {list(EMBED_LAYER_REGISTRY.keys())}"
