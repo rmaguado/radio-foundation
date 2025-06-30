@@ -1,31 +1,4 @@
-compute_precision:
-  grad_scaler: true
-  teacher:
-    backbone:
-      param_dtype: bf16
-      reduce_dtype: bf16
-      buffer_dtype: fp32
-    dino_head:
-      param_dtype: bf16
-      reduce_dtype: bf16
-      buffer_dtype: fp32
-    ibot_head:
-      param_dtype: bf16
-      reduce_dtype: bf16
-      buffer_dtype: fp32
-  student:
-    backbone:
-      param_dtype: bf16
-      reduce_dtype: bf16
-      buffer_dtype: fp32
-    dino_head:
-      param_dtype: bf16
-      reduce_dtype: fp32
-      buffer_dtype: fp32
-    ibot_head:
-      param_dtype: bf16
-      reduce_dtype: fp32
-      buffer_dtype: fp32
+compute_precision: bf16
 dino:
   loss_weight: 1.0
   head_n_prototypes: 65536

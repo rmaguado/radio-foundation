@@ -55,7 +55,6 @@ def train(
     start_iter: int,
     max_iter: int,
 ):
-    fp16_scaler = model.fp16_scaler
     grad_accum_counter = 0
     iteration = start_iter
 
@@ -83,7 +82,7 @@ def train(
         loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
 
         if should_apply_training_step(grad_accum_counter, accum_steps):
-            apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps)
+            apply_gradient_operations(cfg, model, optimizer, accum_steps)
             model.update_teacher(mom)
 
             log_training_step(metric_logger, loss_dict, schedulers, iteration)

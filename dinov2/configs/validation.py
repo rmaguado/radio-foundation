@@ -3,24 +3,6 @@ from pydantic import BaseModel, field_validator, model_validator
 from typing import List, Optional, Literal, Tuple, Dict, Any
 
 
-class MixedPrecisionConfig(BaseModel):
-    param_dtype: Literal["fp16", "fp32", "bf16"]
-    reduce_dtype: Literal["fp16", "fp32", "bf16"]
-    buffer_dtype: Literal["fp16", "fp32", "bf16"]
-
-
-class PrecisionComponentConfig(BaseModel):
-    backbone: MixedPrecisionConfig
-    dino_head: MixedPrecisionConfig
-    ibot_head: MixedPrecisionConfig
-
-
-class ComputePrecisionConfig(BaseModel):
-    grad_scaler: bool
-    teacher: PrecisionComponentConfig
-    student: PrecisionComponentConfig
-
-
 class DinoConfig(BaseModel):
     loss_weight: float
     head_n_prototypes: int
@@ -401,7 +383,7 @@ class AugmentationsConfig(BaseModel):
 
 
 class MainConfig(BaseModel):
-    compute_precision: ComputePrecisionConfig
+    compute_precision: Literal["fp16", "fp32", "bf16"]
     dino: DinoConfig
     ibot: IbotConfig
     train: TrainConfig

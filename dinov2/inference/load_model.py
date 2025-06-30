@@ -163,12 +163,10 @@ def get_config(path_to_run):
 
 
 def get_autocast_dtype(cfg):
-    teacher_dtype_str = (
-        cfg.compute_precision.teacher.backbone.mixed_precision.param_dtype
-    )
-    if teacher_dtype_str == "fp16":
+    dtype_str = cfg.compute_precision
+    if dtype_str == "fp16":
         return torch.half
-    elif teacher_dtype_str == "bf16":
+    elif dtype_str == "bf16":
         return torch.bfloat16
     else:
         return torch.float

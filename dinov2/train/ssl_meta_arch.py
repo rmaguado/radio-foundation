@@ -109,12 +109,6 @@ class SSLMetaArch(nn.Module):
             "forward method is not implemented in SSLMetaArch. Use forward_backward instead."
         )
 
-    def backprop_loss(self, loss):
-        if self.fp16_scaler is not None:
-            self.fp16_scaler.scale(loss).backward()
-        else:
-            loss.backward()
-
     def forward_backward(self, images, teacher_temp):
 
         collated_views = {
@@ -356,7 +350,7 @@ class SSLMetaArch(nn.Module):
 
         # Backpropagation
 
-        self.backprop_loss(loss_accumulator)
+        loss_accumulator.backward()
 
         return loss_dict
 
