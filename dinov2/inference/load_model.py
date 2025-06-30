@@ -175,7 +175,7 @@ def get_autocast_dtype(cfg):
 
 
 def load_model_eval(path_to_checkpoint, config, device, select_layers):
-    model, _ = build_model_from_cfg(config, only_teacher=True)
+    _, model = build_model_from_cfg(config, only_teacher=True)
     load_pretrained_weights(model, path_to_checkpoint, "teacher")
     model.eval()
     model.to(device)
