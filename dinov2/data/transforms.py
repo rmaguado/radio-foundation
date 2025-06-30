@@ -105,7 +105,7 @@ class ImageTransforms:
 
     def _slice(self, img: torch.Tensor) -> torch.Tensor:
         shape = img.shape
-        axis = random.randint(0, 3)
+        axis = random.randint(0, 2)
         slice_index = random.randint(0, shape[axis] - 1)
 
         if axis == 0:
