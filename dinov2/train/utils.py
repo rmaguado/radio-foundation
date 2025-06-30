@@ -22,8 +22,8 @@ def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
 def update_schedules(optimizer, schedulers, iteration) -> Tuple[float, float]:
     lr = schedulers["lr"][iteration]
     wd = schedulers["wd"][iteration]
-    momentum = schedulers["momentum"][iteration]
-    teacher_temp = schedulers["teacher_temp"][iteration]
+    momentum: float = schedulers["momentum"][iteration]
+    teacher_temp: float = schedulers["teacher_temp"][iteration]
     last_layer_lr = schedulers["last_layer_lr"][iteration]
     apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
 

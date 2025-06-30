@@ -28,18 +28,17 @@ torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")
 
 
-def should_reset_grad(cfg, grad_accum_counter, accum_steps):
+def should_reset_grad(grad_accum_counter, accum_steps):
     return grad_accum_counter % accum_steps == 0
 
 
-def should_apply_training_step(cfg, grad_accum_counter, accum_steps):
+def should_apply_training_step(grad_accum_counter, accum_steps):
     return (grad_accum_counter + 1) % accum_steps == 0
 
 
-def should_eval_model(cfg, iteration):
+def should_eval_model(iteration, save_teacher_iterations):
     return (
-        cfg.checkpoints.save_teacher_iterations > 0
-        and (iteration + 1) % cfg.checkpoints.save_teacher_iterations == 0
+        save_teacher_iterations > 0 and (iteration + 1) % save_teacher_iterations == 0
     )
 
 
@@ -75,15 +74,15 @@ def train(
         if iteration > max_iter:
             return
 
-        if should_reset_grad(cfg, grad_accum_counter, accum_steps):
+        if should_reset_grad(grad_accum_counter, accum_steps):
             mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
             optimizer.zero_grad(set_to_none=True)
 
-        loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)  # type: ignore
+        loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
 
-        if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
+        if should_apply_training_step(grad_accum_counter, accum_steps):
             apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps)
-            model.update_teacher(mom)  # type: ignore
+            model.update_teacher(mom)
 
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
 
@@ -91,7 +90,7 @@ def train(
 
             iteration += 1
 
-            if should_eval_model(cfg, iteration):
+            if should_eval_model(iteration, cfg.checkpoints.save_teacher_iterations):
                 do_test(cfg, model, f"training_{iteration}")
                 torch.cuda.synchronize()
 
@@ -134,14 +133,14 @@ def do_train(cfg, model, resume=False):
         )
 
         logger.info(f"Finished training on resize-crop images.")
-    logger.info(f"Resuming with full-size images for {max_iter - iteration} steps")  # type: ignore
+    logger.info(f"Resuming with full-size images for {max_iter - iteration} steps")
 
     data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=True)
     metric_logger.set_dataloader(data_loader)
     train(
         *train_components,
         img_mode="full",
-        start_iter=iteration,  # type: ignore
+        start_iter=iteration,
         max_iter=max_iter,
     )
     do_test(cfg, model, f"training_{iteration}")
