@@ -20,22 +20,23 @@ def build_optimizer(cfg, params_groups):
 
 def build_schedulers(cfg):
     epoch_len = cfg.train.iterations_per_epoch
+    total_epochs = cfg.train.stage1.epochs
     lr = dict(
         base_value=cfg.optim["lr"],
         final_value=cfg.optim["min_lr"],
-        total_iters=cfg.optim["epochs"] * epoch_len,
+        total_iters=total_epochs * epoch_len,
         warmup_iters=cfg.optim["warmup_epochs"] * epoch_len,
         start_warmup_value=0,
     )
     wd = dict(
         base_value=cfg.optim["weight_decay"],
         final_value=cfg.optim["weight_decay_end"],
-        total_iters=cfg.optim["epochs"] * epoch_len,
+        total_iters=total_epochs * epoch_len,
     )
     momentum = dict(
         base_value=cfg.teacher["momentum_teacher"],
         final_value=cfg.teacher["final_momentum_teacher"],
-        total_iters=cfg.optim["epochs"] * epoch_len,
+        total_iters=total_epochs * epoch_len,
     )
     teacher_temp = dict(
         base_value=cfg.teacher["teacher_temp"],
@@ -115,7 +116,7 @@ def get_full_size_iter(cfg):
 
 
 def get_cropped_iter(cfg):
-    total_epochs = cfg.optim.epochs
+    total_epochs = cfg.train.stage1.epochs
     full_img_epochs = cfg.train.full_image.epochs
     cropped_epochs = total_epochs - full_img_epochs
     epoch_len = cfg.train.iterations_per_epoch
@@ -132,7 +133,7 @@ def setup_training_components(cfg, model, resume) -> Tuple[
 ]:
     logger = logging.getLogger("dinov2")
 
-    optimizer = build_optimizer(cfg, model.get_params_groups())
+    optimizer = build_optimizer(cfg, model.module.student.parameters())
     logger.info("Optimizer ready.")
     schedulers = build_schedulers(cfg)
     logger.info("Schedulers ready.")
@@ -142,6 +143,9 @@ def setup_training_components(cfg, model, resume) -> Tuple[
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
+    total_epochs = cfg.train.stage1.epochs
+    epoch_len = cfg.train.iterations_per_epoch
+
     start_iter = (
         checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get(
             "iteration", -1
@@ -149,9 +153,7 @@ def setup_training_components(cfg, model, resume) -> Tuple[
         + 1
     )
 
-    full_size_iter = get_full_size_iter(cfg)
-    cropped_iter = get_cropped_iter(cfg)
-    max_iter = cropped_iter + full_size_iter
+    max_iter = total_epochs * epoch_len
 
     checkpointer = FlexiblePeriodicCheckpointer(
         checkpointer,
@@ -166,5 +168,4 @@ def setup_training_components(cfg, model, resume) -> Tuple[
         checkpointer,
         start_iter,
         max_iter,
-        full_size_iter,
     )
