@@ -1,5 +1,5 @@
 from omegaconf import OmegaConf, DictConfig, ListConfig
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from typing import List, Optional, Literal, Tuple, Dict, Any
 
 
@@ -161,17 +161,31 @@ class CheckpointsConfig(BaseModel):
         return v
 
 
+class EmbedLayerConfig(BaseModel):
+    type: Literal["patch2d", "patch3d"]
+    patch_size: int
+    img_size: int
+
+    @field_validator("patch_size", "img_size", mode="before")
+    @classmethod
+    def validate_positive_integers(cls, v):
+        if v <= 0:
+            raise ValueError("Value must be a positive integer")
+        return v
+
+
 class StudentConfig(BaseModel):
     model_name: str
-    patch_size: int
-    full_image_size: int
-    channels: int
+    embed_dim: int
+    depth: int
+    num_heads: int
+    mlp_ratio: int
+    embed_layers: List[EmbedLayerConfig]
     drop_path_rate: float
     layerscale: float
     drop_path_uniform: bool
     pretrained_weights: str
     ffn_layer: Literal["mlp", "swiglu"]
-    block_chunks: int
     qkv_bias: bool
     proj_bias: bool
     ffn_bias: bool
@@ -184,7 +198,14 @@ class StudentConfig(BaseModel):
             raise ValueError("Value must be between 0.0 and 1.0")
         return v
 
-    @field_validator("patch_size", "full_image_size", "channels", mode="before")
+    @field_validator(
+        "embed_dim",
+        "depth",
+        "num_heads",
+        "mlp_ratio",
+        "num_register_tokens",
+        mode="before",
+    )
     @classmethod
     def validate_positive_integers(cls, v):
         if v <= 0:
@@ -206,14 +227,13 @@ class TeacherConfig(BaseModel):
             raise ValueError("Momentum values must be between 0.0 and 1.0")
         return v
 
-    @field_validator("final_momentum_teacher", mode="before")
-    @classmethod
-    def validate_final_momentum(cls, v, values):
-        if "momentum_teacher" in values and v < values["momentum_teacher"]:
+    @model_validator(mode="after")
+    def validate_final_momentum(self):
+        if self.final_momentum_teacher < self.momentum_teacher:
             raise ValueError(
                 "final_momentum_teacher must be greater than or equal to momentum_teacher"
             )
-        return v
+        return self
 
     @field_validator("warmup_teacher_temp", "teacher_temp", mode="before")
     @classmethod
@@ -274,7 +294,7 @@ class OptimConfig(BaseModel):
 class CropGroup(BaseModel):
     name: str
     is_target: bool = False
-    target_groups: Optional[List[str]]
+    targets: Optional[List[str]] = None  # Updated from target_groups
     size: int
     num_crops: int
     encoder_type: Literal["2d", "3d"]
@@ -302,29 +322,27 @@ class CropsConfig(BaseModel):
             )
         return v
 
-    @field_validator("crop_groups", mode="before")
-    @classmethod
-    def validate_crop_groups(cls, v):
-        group_names = {group.name for group in v}
-        for crop_group in v:
-            targets = crop_group.target_groups
-            if not all(target in group_names for target in targets):
-                raise ValueError(
-                    f"Crop group '{crop_group.name}' has invalid target groups: {targets}"
-                )
-        return v
+    @model_validator(mode="after")
+    def validate_crop_groups(self):
+        group_names = {group.name for group in self.crop_groups}
+        for crop_group in self.crop_groups:
+            if crop_group.targets:
+                if not all(target in group_names for target in crop_group.targets):
+                    raise ValueError(
+                        f"Crop group '{crop_group.name}' has invalid target groups: {crop_group.targets}"
+                    )
+        return self
 
 
 class PixelRangeConfig(BaseModel):
     lower: float
     upper: float
 
-    @field_validator("lower", "upper", mode="before")
-    @classmethod
-    def validate_pixel_lower_upper(cls, v, values):
-        if not values["lower"] < values["upper"]:
+    @model_validator(mode="after")
+    def validate_pixel_lower_upper(self):
+        if not self.lower < self.upper:
             raise ValueError("Pixel range lower must be less than upper")
-        return v
+        return self
 
 
 class NormConfig(BaseModel):
@@ -366,9 +384,18 @@ class AugmentationStepConfig(BaseModel):
 
 
 class AugmentationCollection(BaseModel):
-    global_1: List[AugmentationStepConfig]
-    global_2: List[AugmentationStepConfig]
-    local: List[AugmentationStepConfig]
+    __pydantic_extra__ = "allow"
+
+    @model_validator(mode="after")
+    def validate_all_lists_of_augmentation_steps(self):
+        for key, value in self.__dict__.items():
+            if not isinstance(value, list) or not all(
+                isinstance(item, AugmentationStepConfig) for item in value
+            ):
+                raise ValueError(
+                    f"Augmentation collection '{key}' must be a list of AugmentationStepConfig objects."
+                )
+        return self
 
 
 class AugmentationsConfig(BaseModel):
