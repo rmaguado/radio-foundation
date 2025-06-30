@@ -162,7 +162,7 @@ augmentations:
 datasets:
   - name: default_dataset
     weight: 1.0
-    root_path: .
+    index_path: .
     type: ct
     storage: dicom
     augmentation: default_ct

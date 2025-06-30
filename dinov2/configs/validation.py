@@ -353,7 +353,7 @@ class NormConfig(BaseModel):
 class DatasetConfig(BaseModel):
     name: str
     weight: float
-    root_path: str
+    index_path: str
     type: Literal["ct", "mri"]
     storage: Literal["dicom", "nifti"]
     augmentation: str

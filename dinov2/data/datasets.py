@@ -14,11 +14,9 @@ class VolumeDataset:
     def __init__(
         self,
         index_path: str,
-        root_path: str,
         modality: str,
         transform: Callable = lambda x: x,
     ) -> None:
-        self.root_path = root_path
         self.df = pl.read_csv(index_path)
         self.modality = modality
         self.transform = transform
@@ -74,7 +72,7 @@ class DicomVolumeDataset(VolumeDataset):
 
     def get_image_data(self, idx: int) -> sitk.Image:
         meta = self.df.row(idx)
-        dicom_folder = os.path.join(self.root_path, meta["path"])
+        dicom_folder = meta["path"]
 
         reader = sitk.ImageSeriesReader()
         series_IDs = reader.GetGDCMSeriesIDs(dicom_folder)
@@ -90,7 +88,7 @@ class NiftiVolumeDataset(VolumeDataset):
 
     def get_image_data(self, idx: int) -> sitk.Image:
         meta = self.df.row(idx)
-        nifti_file_path = os.path.join(self.root_path, meta["path"])
+        nifti_file_path = meta["path"]
 
         image = sitk.ReadImage(nifti_file_path)
 
