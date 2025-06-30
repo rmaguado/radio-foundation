@@ -16,15 +16,17 @@ logger = logging.getLogger("dinov2")
 
 def build_model(args, only_teacher: bool) -> Tuple[nn.Module | None, nn.Module]:
     vit_kwargs = dict(
-        init_values=args.layerscale,
-        ffn_layer=args.ffn_layer,
-        block_chunks=args.block_chunks,
+        embed_dim=args.embed_dim,
+        depth=args.depth,
+        num_heads=args.num_heads,
+        mlp_ratio=args.mlp_ratio,
         qkv_bias=args.qkv_bias,
-        proj_bias=args.proj_bias,
         ffn_bias=args.ffn_bias,
-        embed_layer=args.embed_layer,
-        conv_channels=args.conv_channels,
+        proj_bias=args.proj_bias,
+        ffn_layer=args.ffn_layer,
         num_register_tokens=args.num_register_tokens,
+        embed_configs=args.embed_layers,
+        init_values=args.layerscale,
     )
     teacher = DinoVisionTransformer(**vit_kwargs)
     if only_teacher:
