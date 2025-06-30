@@ -20,19 +20,21 @@ class DataAugmentationDINO(object):
         self.dataset_config = dataset_config
         self.augmentations_config = config.augmentations[dataset_config.augmentation]
         self.crops_config = config.crops
+        self.embed_config = config.student.embed_layers
 
         self.global_crops_scale = self.crops_config.global_crops_scale
         self.local_crops_scale = self.crops_config.local_crops_scale
 
-        self.crop_groups = {}
+        self.crop_groups_config = {}
         self.target_groups = []
         self.nontarget_groups = []
+
         for group_dict in self.crops_config.crop_groups:
-            group_name = group_dict.pop("name")
-            self.crop_groups[group_name] = group_dict
+            group_dict_copy = group_dict.copy()
+            group_name = group_dict_copy.pop("name")
+            self.crop_groups_config[group_name] = group_dict_copy
 
-            is_target = group_dict.get("is_target", False)
-
+            is_target = group_dict_copy.get("is_target", False)
             if is_target:
                 self.target_groups.append(group_name)
             else:
@@ -40,20 +42,44 @@ class DataAugmentationDINO(object):
 
         self.transforms = self.load_transforms_from_cfg()
 
+        self.group_info = {}
+        for group_name, group_config in self.crop_groups_config.items():
+            is_target = group_config.get("is_target", False)
+            embed_layer = group_config["embed_layer"]
+            img_size = group_config["size"]
+            patch_size = self.embed_config[embed_layer]["patch_size"]
+
+            if is_target:
+                targets = group_config.get("targets", [group_name])
+            else:
+                targets = group_config["target_groups"]
+
+            self.group_info[group_name] = {
+                "num_crops": group_config["num_crops"],
+                "output_template": {
+                    "is_target": is_target,
+                    "targets": targets,
+                    "embed_layer": embed_layer,
+                    "patches_shape": img_size // patch_size,
+                },
+            }
+
     def build_transform_group(self, transform_key):
         image_transforms = ImageTransforms(
             self.dataset_config.pixel_range.lower,
             self.dataset_config.pixel_range.upper,
             self.dataset_config.channels,
         )
+        group_config = self.crop_groups_config[transform_key]
         augmentations_list = copy.deepcopy(self.augmentations_config[transform_key])
+
         for tc in augmentations_list:
             name = tc.pop("name")
             if name == "globalcrop":
-                crop_size = self.crop_groups[transform_key]["size"]
+                crop_size = group_config["size"]
                 image_transforms.add_crop(crop_size, self.global_crops_scale)
             elif name == "localcrop":
-                crop_size = self.crop_groups[transform_key]["size"]
+                crop_size = group_config["size"]
                 image_transforms.add_crop(crop_size, self.local_crops_scale)
             else:
                 image_transforms.add_transform(name, tc)
@@ -66,7 +92,7 @@ class DataAugmentationDINO(object):
     def load_transforms_from_cfg(self):
         transform_groups = {
             group: self.build_transform_group(group)
-            for group in self.crop_groups.keys()
+            for group in self.crop_groups_config.keys()
         }
         return transform_groups
 
@@ -74,42 +100,30 @@ class DataAugmentationDINO(object):
         output = {}
 
         for target_group in self.target_groups:
+            info = self.group_info[target_group]
             transform_group = self.transforms[target_group]
-            targets = self.crop_groups[target_group].get("targets", [target_group])
-            encoder_type = self.crop_groups[target_group]["encoder_type"]
-            group_outputs = [
-                transform_group(image)
-                for _ in range(self.crop_groups[target_group]["num_crops"])
-            ]
 
-            output[target_group] = {
-                "images": group_outputs,
-                "is_target": True,
-                "targets": targets,
-                "encoder_type": encoder_type,
-            }
+            group_outputs = [transform_group(image) for _ in range(info["num_crops"])]
+
+            output_dict = info["output_template"].copy()
+            output_dict["images"] = group_outputs
+            output[target_group] = output_dict
 
         for nontarget_group in self.nontarget_groups:
+            info = self.group_info[nontarget_group]
             transform_group = self.transforms[nontarget_group]
-            targets = self.crop_groups[nontarget_group]["target_groups"]
-            encoder_type = self.crop_groups[nontarget_group]["encoder_type"]
-            main_target = targets[0]
+
+            main_target = info["output_template"]["targets"][0]
             source_images = output[main_target]["images"]
             group_outputs = []
 
             for source_image in source_images:
                 group_outputs.append(
-                    [
-                        transform_group(source_image)
-                        for _ in range(self.crop_groups[nontarget_group]["num_crops"])
-                    ]
+                    [transform_group(source_image) for _ in range(info["num_crops"])]
                 )
 
-            output[nontarget_group] = {
-                "images": group_outputs,
-                "is_target": False,
-                "targets": targets,
-                "encoder_type": encoder_type,
-            }
+            output_dict = info["output_template"].copy()
+            output_dict["images"] = group_outputs
+            output[nontarget_group] = output_dict
 
         return output

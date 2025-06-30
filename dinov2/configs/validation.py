@@ -297,7 +297,7 @@ class CropGroup(BaseModel):
     targets: Optional[List[str]] = None  # Updated from target_groups
     size: int
     num_crops: int
-    encoder_type: Literal["2d", "3d"]
+    embed_layer: Literal["patch2d", "patch3d"]
 
     @field_validator("size", "num_crops", mode="before")
     @classmethod

@@ -1,12 +1,8 @@
-import logging
 import torch
 from functools import partial
 from typing import Dict, Tuple
 
-from dinov2.utils.checkpointer import (
-    DistributedCheckpointer,
-    FlexiblePeriodicCheckpointer,
-)
+from dinov2.utils.checkpointer import get_checkpointer, DDPPeriodicCheckpointer
 from dinov2.utils.utils import CosineScheduler
 from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
@@ -66,20 +62,12 @@ def build_schedulers(cfg):
 
 
 def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
-
-    image_size = (
-        cfg.student.full_image_size if use_full_image else cfg.crops.global_crops_size
-    )
-
-    patch_size = cfg.student.patch_size
-    n_tokens = (image_size // patch_size) ** 2
     mask_generator = MaskingGenerator()
 
     collate_fn = partial(
         collate_data_and_cast,
         mask_ratio_tuple=cfg.ibot.mask_ratio_min_max,
         mask_probability=cfg.ibot.mask_sample_probability,
-        n_tokens=n_tokens,
         mask_generator=mask_generator,
         dtype=inputs_dtype,
     )
@@ -126,36 +114,21 @@ def get_cropped_iter(cfg):
 def setup_training_components(cfg, model, resume) -> Tuple[
     torch.optim.Optimizer,
     Dict[str, CosineScheduler],
-    FlexiblePeriodicCheckpointer,
-    int,
+    DDPPeriodicCheckpointer,
     int,
     int,
 ]:
-    logger = logging.getLogger("dinov2")
-
     optimizer = build_optimizer(cfg, model.module.student.parameters())
-    logger.info("Optimizer ready.")
     schedulers = build_schedulers(cfg)
-    logger.info("Schedulers ready.")
-
-    checkpointer = DistributedCheckpointer(
-        model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
-    )
 
     total_epochs = cfg.train.stage1.epochs
     epoch_len = cfg.train.iterations_per_epoch
 
     # start_iter = checkpointer.resume_or_load(cfg.train.output_dir, resume=resume).get("iteration", -1) + 1
     start_iter = 0
-
     max_iter = total_epochs * epoch_len
 
-    checkpointer = FlexiblePeriodicCheckpointer(
-        checkpointer,
-        period=cfg.checkpoints.save_checkpoint_iterations,
-        max_iter=max_iter,
-        max_to_keep=3,
-    )
+    checkpointer = get_checkpointer(cfg, model, optimizer, max_iter=max_iter)
 
     return (
         optimizer,

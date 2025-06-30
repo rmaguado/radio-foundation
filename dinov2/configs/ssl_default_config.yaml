@@ -117,25 +117,25 @@ crops:
       is_target: true
       size: 112
       num_crops: 1
-      encoder_type: 3d
+      embed_layer: patch3d
     - name: 3d_local_ld
       targets:
       - 3d_global_ld
       size: 56
       num_crops: 3
-      encoder_type: 3d
+      embed_layer: patch3d
     - name: 2d_global_hd
       is_target: true
       size: 224
       num_crops: 3
-      encoder_type: 2d
+      embed_layer: patch2d
     - name: 2d_local_hd
       targets:
       - 3d_global_ld
       - 2d_global_hd
       size: 112
       num_crops: 2
-      encoder_type: 2d
+      embed_layer: patch2d
 augmentations:
   default_ct:
     3d_global_ld:

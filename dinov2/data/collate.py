@@ -14,29 +14,8 @@ def collate_data_and_cast(
     mask_ratio_tuple: Tuple[float, float],
     mask_probability: float,
     dtype: torch.dtype,
-    n_tokens: int,
     mask_generator: Callable,
 ) -> Dict[str, Any]:
-    """
-    Collates data and casts it to the specified data type.
-
-    Args:
-        samples_list (list): A list of samples.
-        mask_ratio_tuple (tuple): A tuple containing the minimum and maximum mask ratios.
-        mask_probability (float): The probability of masking.
-        dtype (torch.dtype): The data type to cast the collated crops to.
-        n_tokens (int): The number of tokens.
-        mask_generator (function): A function that generates masks.
-
-    Returns:
-        dict: A dictionary containing the collated data.
-            - collated_views (dict): A dictionary of collated views.
-            - collated_masks (torch.Tensor): The collated masks.
-            - mask_indices_list (torch.Tensor): The mask indices list.
-            - masks_weight (torch.Tensor): The masks weight.
-            - upperbound (int): The upperbound.
-            - n_masked_patches (torch.Tensor): The number of masked patches.
-    """
 
     view_groups = samples_list[0][0].keys()
     collated_views = {}
@@ -56,41 +35,33 @@ def collate_data_and_cast(
             "images": torch.stack(group_images).to(dtype),
             "is_target": is_target,
             "targets": samples_list[0][0][group_name]["targets"],
+            "embed_layer": samples_list[0][0][group_name]["embed_layer"],
+            "patches_shape": samples_list[0][0][group_name]["patches_shape"],
         }
 
     target_group_names = [k for k, v in collated_views.items() if v["is_target"]]
     total_views = sum(collated_views[k]["images"].shape[0] for k in target_group_names)
 
     n_samples_masked = int(total_views * mask_probability)
-    probs = torch.linspace(*mask_ratio_tuple, n_samples_masked + 1)
-    upperbound = 0
-    masks_list = []
+    probs = torch.linspace(*mask_ratio_tuple, n_samples_masked).tolist()
+    probs += [0] * (total_views - n_samples_masked)
+    random.shuffle(probs)
 
-    for i in range(n_samples_masked):
-        mask_prob = probs[i].item()
-        masks_list.append(torch.BoolTensor(mask_generator(input_shape, mask_prob)))
-        upperbound += int(n_tokens * mask_prob)
-    for _ in range(n_samples_masked, total_views):
-        masks_list.append(torch.BoolTensor(mask_generator(0)))
+    collated_masks = {}
 
-    random.shuffle(masks_list)
+    for group_name in target_group_names:
+        n_images = collated_views[group_name]["images"].shape[0]
+        group_masks = []
 
-    collated_masks = torch.stack(masks_list).flatten(1)
-    mask_indices_list = collated_masks.flatten().nonzero().flatten()
+        for i in range(n_images):
+            mask_ratio = probs.pop()
+            image_shape = collated_views[group_name]["patches_shape"]
+            mask = mask_generator(image_shape, mask_ratio)
+            group_masks.append(mask)
 
-    masks_weight = (
-        (1 / collated_masks.sum(-1).clamp(min=1.0))
-        .unsqueeze(-1)
-        .expand_as(collated_masks)[collated_masks]
-    )
+        collated_masks[group_name] = torch.BoolTensor(group_masks)
 
     return {
-        "collated_views": {k: v["images"] for k, v in collated_views.items()},
+        "collated_views": collated_views,
         "collated_masks": collated_masks,
-        "mask_indices_list": mask_indices_list,
-        "masks_weight": masks_weight,
-        "upperbound": upperbound,
-        "n_masked_patches": torch.full(
-            (1,), fill_value=mask_indices_list.shape[0], dtype=torch.long
-        ),
     }

@@ -16,7 +16,7 @@ def rankstr():
     return f"rank_{dist.get_rank()}"
 
 
-class DistributedCheckpointer(Checkpointer):
+class DDPCheckpointer(Checkpointer):
     def save(self, name: str, **kwargs: Any) -> None:
         """
         Dump model and checkpointables to a file.
@@ -79,7 +79,7 @@ class DistributedCheckpointer(Checkpointer):
             f.write(last_filename_basename)
 
 
-class FlexiblePeriodicCheckpointer(PeriodicCheckpointer):
+class DDPPeriodicCheckpointer(PeriodicCheckpointer):
     def step(self, iteration: int, **kwargs: Any) -> None:
         iteration = int(iteration)
         additional_state = {"iteration": iteration}
@@ -105,3 +105,16 @@ class FlexiblePeriodicCheckpointer(PeriodicCheckpointer):
         if self.max_iter is not None:
             if iteration >= self.max_iter - 1:
                 self.checkpointer.save(f"{self.file_prefix}_final", **additional_state)
+
+
+def get_checkpointer(cfg, model, optimizer, max_iter: int) -> "DDPPeriodicCheckpointer":
+    checkpointer = DDPCheckpointer(
+        model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
+    )
+    checkpointer = DDPPeriodicCheckpointer(
+        checkpointer,
+        period=cfg.checkpoints.save_checkpoint_iterations,
+        max_iter=max_iter,
+        max_to_keep=3,
+    )
+    return checkpointer
