@@ -4,7 +4,17 @@ from torchvision import transforms
 from typing import Union, Tuple, Callable
 import copy
 
-Param = Union[str, float]
+
+class RandomApply:
+    def __init__(self, transform_function: Callable, p: float, kwargs: dict):
+        self.transform_function = transform_function
+        self.p = p
+        self.kwargs = kwargs
+
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        if random.random() < self.p:
+            return self.transform_function(img, **self.kwargs)
+        return img
 
 
 class ImageTransforms:
@@ -91,12 +101,7 @@ class ImageTransforms:
         p = kwargs.pop("p", 1.0)
         transform_function = self._transforms[transform_name]
 
-        def random_apply(img):
-            if random.random() < p:
-                return transform_function(img, **kwargs)
-            return img
-
-        return random_apply
+        return RandomApply(transform_function, p, kwargs)
 
     def _slice(self, img: torch.Tensor) -> torch.Tensor:
         shape = img.shape
