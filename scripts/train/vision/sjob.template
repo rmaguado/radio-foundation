@@ -19,8 +19,6 @@ cd $HOME/projects/radio-foundation
 
 export PYTHONPATH=$PWD
 
-srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS \
-    python3 ${PYTHONPATH}/dinov2/train/train.py \
-            --config-file="$CONF" \
-            --output-dir="$OUT"
-
+python3 ${PYTHONPATH}/dinov2/train/train.py \
+    --config-file="$CONF" \
+    --output-dir="$OUT"
