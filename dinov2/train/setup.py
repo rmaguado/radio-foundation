@@ -61,7 +61,7 @@ def build_schedulers(cfg):
     }
 
 
-def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
+def setup_dataloader(cfg, inputs_dtype):
     mask_generator = MaskingGenerator()
 
     collate_fn = partial(
@@ -72,13 +72,9 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         dtype=inputs_dtype,
     )
 
-    dataset, weights = make_train_dataset(cfg, use_full_image)
+    dataset, weights = make_train_dataset(cfg)
 
-    batch_size = (
-        cfg.train.full_image.batch_size_per_gpu
-        if use_full_image
-        else cfg.train.batch_size_per_gpu
-    )
+    batch_size = cfg.train.stage1.batch_size_per_gpu
     if weights is not None:
         sampler_type = SamplerType.WEIGHTED_SHARDED_INFINITE
     else:
@@ -95,20 +91,6 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
     )
 
     return data_loader
-
-
-def get_full_size_iter(cfg):
-    full_img_epochs = cfg.train.full_image.epochs
-    epoch_len = cfg.train.iterations_per_epoch
-    return full_img_epochs * epoch_len
-
-
-def get_cropped_iter(cfg):
-    total_epochs = cfg.train.stage1.epochs
-    full_img_epochs = cfg.train.full_image.epochs
-    cropped_epochs = total_epochs - full_img_epochs
-    epoch_len = cfg.train.iterations_per_epoch
-    return cropped_epochs * epoch_len
 
 
 def setup_training_components(cfg, model, resume) -> Tuple[

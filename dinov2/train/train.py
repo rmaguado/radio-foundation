@@ -51,19 +51,12 @@ def train(
     optimizer,
     schedulers,
     checkpointer,
-    img_mode: str,
     start_iter: int,
     max_iter: int,
 ):
     grad_accum_counter = 0
     iteration = start_iter
-
-    if img_mode == "crop":
-        accum_steps = cfg.train.grad_accum_steps
-    elif img_mode == "full":
-        accum_steps = cfg.train.full_image.grad_accum_steps
-    else:
-        raise ValueError
+    accum_steps = cfg.train.stage1.grad_accum_steps
 
     for data in metric_logger.log_every(
         cfg.checkpoints.print_iterations,
@@ -121,12 +114,11 @@ def do_train(cfg, model, resume=False):
 
     train_components = [cfg, metric_logger, model, optimizer, schedulers, checkpointer]
 
-    data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=False)
+    data_loader = setup_dataloader(cfg, inputs_dtype)
     metric_logger.set_dataloader(data_loader)
 
     iteration = train(
         *train_components,
-        img_mode="crop",
         start_iter=start_iter,
         max_iter=max_iter,
     )

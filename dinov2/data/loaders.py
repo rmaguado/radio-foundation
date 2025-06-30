@@ -32,18 +32,12 @@ class SamplerType(Enum):
     WEIGHTED_SHARDED_INFINITE = 3
 
 
-def make_train_dataset(
-    config: DictConfig,
-    use_full_image: bool,
-):
-
+def make_train_dataset(config: DictConfig):
     dataset_objects = []
     weights = []
 
     for dataset_config in config.datasets:
-        dataset_object, weight = build_dataset_from_cfg(
-            config, use_full_image, dataset_config
-        )
+        dataset_object, weight = build_dataset_from_cfg(config, dataset_config)
         dataset_objects.append(dataset_object)
         weights.append(weight)
     if any(weight is None for weight in weights):
@@ -55,7 +49,7 @@ def make_train_dataset(
     return dataset_objects[0], [1.0]
 
 
-def build_dataset_from_cfg(config, use_full_image: bool, dataset_config):
+def build_dataset_from_cfg(config, dataset_config):
     dataset_name = dataset_config.name
     dataset_type = dataset_config.type  # ct or mri
     dataset_storage = dataset_config.storage
