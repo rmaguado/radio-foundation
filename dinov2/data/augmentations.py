@@ -47,7 +47,9 @@ class DataAugmentationDINO(object):
             is_target = group_config.get("is_target", False)
             embed_layer = group_config["embed_layer"]
             img_size = group_config["size"]
-            patch_size = self.embed_config[embed_layer]["patch_size"]
+            patch_size = [
+                x["patch_size"] for x in self.embed_config if x["type"] == embed_layer
+            ][0]
 
             targets = group_config.get("targets", [group_name])
 
