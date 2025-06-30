@@ -6,7 +6,7 @@
 import logging
 import os
 
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig, ListConfig
 
 import dinov2.distributed as distributed
 from dinov2.logging import setup_logging
@@ -55,11 +55,12 @@ def default_setup(args):
     )
 
 
-def setup(args):
+def setup(args) -> DictConfig:
     """
     Create configs and perform basic setups.
     """
     cfg = get_cfg_from_args(args)
+    assert isinstance(cfg, DictConfig), "Config should be a DictConfig instance"
     os.makedirs(args.output_dir, exist_ok=True)
     default_setup(args)
     cfg.optim.lr = cfg.optim.base_lr
