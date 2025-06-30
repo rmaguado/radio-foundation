@@ -220,7 +220,7 @@ def drop_add_residual_stochastic_depth_list(
     attn_bias, x_cat = get_attn_bias_and_cat(x_list, branges)
 
     # 3) apply residual_func to get residual, and split the result
-    residual_list = attn_bias.split(residual_func(x_cat, attn_bias=attn_bias))  # type: ignore
+    residual_list = attn_bias.split(residual_func(x_cat, attn_bias=attn_bias))
 
     outputs = []
     for x, brange, residual, residual_scale_factor in zip(
