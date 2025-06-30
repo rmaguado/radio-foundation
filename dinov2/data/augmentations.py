@@ -49,10 +49,7 @@ class DataAugmentationDINO(object):
             img_size = group_config["size"]
             patch_size = self.embed_config[embed_layer]["patch_size"]
 
-            if is_target:
-                targets = group_config.get("targets", [group_name])
-            else:
-                targets = group_config["target_groups"]
+            targets = group_config.get("targets", [group_name])
 
             self.group_info[group_name] = {
                 "num_crops": group_config["num_crops"],
