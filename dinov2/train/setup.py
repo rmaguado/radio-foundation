@@ -3,9 +3,8 @@ import torch
 from functools import partial
 from typing import Dict, Tuple
 
-from dinov2.fsdp import (
-    FSDPCheckpointer,
-    FlexibleFSDPCheckpointer,
+from dinov2.utils.checkpointer import (
+    DistributedCheckpointer,
     FlexiblePeriodicCheckpointer,
 )
 from dinov2.utils.utils import CosineScheduler
@@ -73,10 +72,7 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
 
     patch_size = cfg.student.patch_size
     n_tokens = (image_size // patch_size) ** 2
-    mask_generator = MaskingGenerator(
-        input_size=(image_size // patch_size, image_size // patch_size),
-        max_num_patches=0.5 * image_size // patch_size * image_size // patch_size,
-    )
+    mask_generator = MaskingGenerator()
 
     collate_fn = partial(
         collate_data_and_cast,
@@ -141,15 +137,7 @@ def setup_training_components(cfg, model, resume) -> Tuple[
     schedulers = build_schedulers(cfg)
     logger.info("Schedulers ready.")
 
-    sharding_strategy = cfg.compute_precision.teacher.backbone.sharding_strategy
-    if sharding_strategy in [
-        "NO_SHARD",
-        "SHARD_GRAD_OP",
-    ]:
-        checkpointer_wrapper = FlexibleFSDPCheckpointer
-    else:
-        checkpointer_wrapper = FSDPCheckpointer
-
+    checkpointer = DistributedCheckpointer
     checkpointer = checkpointer_wrapper(
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
