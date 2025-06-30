@@ -66,7 +66,7 @@ class DINOLoss(nn.Module):
 
     def forward(
         self, student_output: torch.Tensor, teacher_targets_list: List[torch.Tensor]
-    ) -> torch.Tensor:
+    ) -> float | torch.Tensor:
         """
         Calculates cross-entropy between a single student output and a list of its teacher targets.
 
@@ -77,13 +77,13 @@ class DINOLoss(nn.Module):
         """
         lsm = F.log_softmax(student_output / self.student_temp, dim=-1)
 
-        total_loss = 0
+        total_loss = 0.0
         # Compare the student output against each of its designated teacher targets
         for teacher_target in teacher_targets_list:
             loss = torch.sum(teacher_target * lsm, dim=-1)
             total_loss -= loss.mean()
 
-        return total_loss  # type: ignore
+        return total_loss
 
     @torch.no_grad()
     def update_center(self, teacher_output):
@@ -102,9 +102,12 @@ class DINOLoss(nn.Module):
         if self.updated is False:
             world_size = dist.get_world_size() if dist.is_initialized() else 1
 
+            assert self.async_batch_center is not None
+            assert self.len_teacher_output is not None
+
             if self.reduce_handle is not None:
                 self.reduce_handle.wait()
-            _t = self.async_batch_center / (self.len_teacher_output * world_size)  # type: ignore
+            _t = self.async_batch_center / (self.len_teacher_output * world_size)
 
             self.center = self.center * self.center_momentum + _t * (
                 1 - self.center_momentum
