@@ -25,8 +25,6 @@ def build_model(args, only_teacher: bool) -> Tuple[nn.Module | None, nn.Module]:
         embed_layer=args.embed_layer,
         conv_channels=args.conv_channels,
         num_register_tokens=args.num_register_tokens,
-        interpolate_offset=args.interpolate_offset,
-        interpolate_antialias=args.interpolate_antialias,
     )
     teacher = DinoVisionTransformer(**vit_kwargs)
     if only_teacher:

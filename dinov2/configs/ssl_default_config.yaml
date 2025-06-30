@@ -87,7 +87,6 @@ student:
   proj_bias: true
   ffn_bias: true
   num_register_tokens: 4
-  interpolate_antialias: true
 teacher:
   momentum_teacher: 0.992
   final_momentum_teacher: 1.0

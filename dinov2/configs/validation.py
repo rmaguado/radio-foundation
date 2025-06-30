@@ -177,8 +177,6 @@ class StudentConfig(BaseModel):
     proj_bias: bool
     ffn_bias: bool
     num_register_tokens: int
-    interpolate_antialias: bool
-    interpolate_offset: float
 
     @field_validator("drop_path_rate", "layerscale", mode="before")
     @classmethod
