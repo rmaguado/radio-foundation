@@ -68,10 +68,10 @@ class ImageTransforms:
 
     def add_crop(self, crop_size: int, crop_scale: Tuple):
         self.transform_list.append(
-            transforms.RandomResizedCrop(  # type: ignore
+            transforms.RandomResizedCrop(
                 crop_size,
                 scale=crop_scale,
-                interpolation=transforms.InterpolationMode.BICUBIC,  # type: ignore
+                interpolation=transforms.InterpolationMode.BICUBIC,
                 antialias=True,
             )
         )
@@ -84,7 +84,7 @@ class ImageTransforms:
             mean (float): The mean value of the image pixel.
             std (float): The standard deviation of the image pixel.
         """
-        self.transform_list.append(transforms.Normalize(mean=mean, std=std))  # type: ignore
+        self.transform_list.append(transforms.Normalize(mean=mean, std=std))
 
     def _get_random_transform(self, transform_name: str, kwargs: dict) -> Callable:
         kwargs = copy.deepcopy(kwargs)
@@ -134,16 +134,16 @@ class ImageTransforms:
         img: torch.Tensor,
     ) -> torch.Tensor:
         angle = 180.0 * random.uniform(-1, 1)
-        return transforms.functional.rotate(img, angle, fill=self.lower_bound)  # type: ignore
+        return transforms.functional.rotate(img, angle, fill=self.lower_bound)
 
     def _flip(self, img: torch.Tensor) -> torch.Tensor:
-        return transforms.functional.hflip(img)  # type: ignore
+        return transforms.functional.hflip(img)
 
     def _gaussian_blur(
         self, img: torch.Tensor, bounds: Tuple = (0.1, 0.9)
     ) -> torch.Tensor:
         sigma = random.uniform(bounds[0], bounds[1])
-        return transforms.functional.gaussian_blur(img, kernel_size=3, sigma=sigma)  # type: ignore
+        return transforms.functional.gaussian_blur(img, kernel_size=3, sigma=sigma)
 
     def _noise(
         self, img: torch.Tensor, mean: float = 0.0, std: float = 1.0
