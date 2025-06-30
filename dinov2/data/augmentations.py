@@ -22,8 +22,8 @@ class DataAugmentationDINO(object):
         self.crops_config = config.crops
         self.embed_config = config.student.embed_layers
 
-        self.global_crops_scale = self.crops_config.global_crops_scale
-        self.local_crops_scale = self.crops_config.local_crops_scale
+        self.global_crop_scale = self.crops_config.global_crop_scale
+        self.local_crop_scale = self.crops_config.local_crop_scale
 
         self.crop_groups_config = {}
         self.target_groups = []
@@ -77,10 +77,10 @@ class DataAugmentationDINO(object):
             name = tc.pop("name")
             if name == "globalcrop":
                 crop_size = group_config["size"]
-                image_transforms.add_crop(crop_size, self.global_crops_scale)
+                image_transforms.add_crop(crop_size, self.global_crop_scale)
             elif name == "localcrop":
                 crop_size = group_config["size"]
-                image_transforms.add_crop(crop_size, self.local_crops_scale)
+                image_transforms.add_crop(crop_size, self.local_crop_scale)
             else:
                 image_transforms.add_transform(name, tc)
 
