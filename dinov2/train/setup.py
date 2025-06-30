@@ -19,7 +19,7 @@ def build_optimizer(cfg, params_groups):
 
 
 def build_schedulers(cfg):
-    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
+    epoch_len = cfg.train.iterations_per_epoch
     lr = dict(
         base_value=cfg.optim["lr"],
         final_value=cfg.optim["min_lr"],
@@ -110,7 +110,7 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
 
 def get_full_size_iter(cfg):
     full_img_epochs = cfg.train.full_image.epochs
-    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
+    epoch_len = cfg.train.iterations_per_epoch
     return full_img_epochs * epoch_len
 
 
@@ -118,7 +118,7 @@ def get_cropped_iter(cfg):
     total_epochs = cfg.optim.epochs
     full_img_epochs = cfg.train.full_image.epochs
     cropped_epochs = total_epochs - full_img_epochs
-    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
+    epoch_len = cfg.train.iterations_per_epoch
     return cropped_epochs * epoch_len
 
 

@@ -130,17 +130,17 @@ class TrainConfig(BaseModel):
     output_dir: str
     seed: int
     num_workers: int
-    OFFICIAL_EPOCH_LENGTH: int
+    iterations_per_epoch: int
     cache_dataset: bool
     centering: Literal["centering", "sinkhorn_knopp"]
     stage1: TrainStageConfig
     stage2: TrainStageConfig
 
-    @field_validator("OFFICIAL_EPOCH_LENGTH", mode="before")
+    @field_validator("iterations_per_epoch", mode="before")
     @classmethod
     def validate_epoch_length(cls, v):
         if v <= 0:
-            raise ValueError("OFFICIAL_EPOCH_LENGTH must be a positive integer")
+            raise ValueError("iterations_per_epoch must be a positive integer")
         return v
 
 

@@ -48,7 +48,7 @@ train:
   output_dir: .
   seed: 0
   num_workers: 10
-  OFFICIAL_EPOCH_LENGTH: 1000
+  iterations_per_epoch: 1000
   cache_dataset: true
   centering: "centering"
   stage1:
