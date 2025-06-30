@@ -106,11 +106,11 @@ class DinoVisionTransformer(nn.Module):
         qkv_bias: bool,
         ffn_bias: bool,
         proj_bias: bool,
-        drop_path_rate: float,
-        drop_path_uniform: bool,
         ffn_layer: str,
         num_register_tokens: int,
         embed_configs: List[Dict],
+        drop_path_rate: float = 0.0,
+        drop_path_uniform: bool = True,
         init_values: Optional[float] = None,
         act_layer: Callable = nn.GELU,
         block_fn: Callable = Block,
@@ -211,7 +211,10 @@ class DinoVisionTransformer(nn.Module):
         return x
 
     def forward(
-        self, x: torch.Tensor, embed_layer: str = "patch2d", masks: Optional[torch.Tensor] = None
+        self,
+        x: torch.Tensor,
+        embed_layer: str = "patch2d",
+        masks: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         x = self._prepare_tokens(x, embed_layer, masks)
 
