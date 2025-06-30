@@ -31,7 +31,9 @@ class DataAugmentationDINO(object):
             group_name = group_dict.pop("name")
             self.crop_groups[group_name] = group_dict
 
-            if group_dict["is_target"]:
+            is_target = group_dict.get("is_target", False)
+
+            if is_target:
                 self.target_groups.append(group_name)
             else:
                 self.nontarget_groups.append(group_name)
@@ -73,7 +75,8 @@ class DataAugmentationDINO(object):
 
         for target_group in self.target_groups:
             transform_group = self.transforms[target_group]
-            targets = self.crop_groups[target_group]["target_groups"]
+            targets = self.crop_groups[target_group].get("targets", [target_group])
+            encoder_type = self.crop_groups[target_group]["encoder_type"]
             group_outputs = [
                 transform_group(image)
                 for _ in range(self.crop_groups[target_group]["num_crops"])
@@ -83,11 +86,13 @@ class DataAugmentationDINO(object):
                 "images": group_outputs,
                 "is_target": True,
                 "targets": targets,
+                "encoder_type": encoder_type,
             }
 
         for nontarget_group in self.nontarget_groups:
             transform_group = self.transforms[nontarget_group]
             targets = self.crop_groups[nontarget_group]["target_groups"]
+            encoder_type = self.crop_groups[nontarget_group]["encoder_type"]
             main_target = targets[0]
             source_images = output[main_target]["images"]
             group_outputs = []
@@ -104,6 +109,7 @@ class DataAugmentationDINO(object):
                 "images": group_outputs,
                 "is_target": False,
                 "targets": targets,
+                "encoder_type": encoder_type,
             }
 
         return output
