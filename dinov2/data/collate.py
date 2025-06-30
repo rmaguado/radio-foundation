@@ -15,7 +15,7 @@ def collate_data_and_cast(
     mask_probability: float,
     dtype: torch.dtype,
     n_tokens: int,
-    mask_generator: Callable[[int], Any],
+    mask_generator: Callable,
 ) -> Dict[str, Any]:
     """
     Collates data and casts it to the specified data type.
@@ -45,15 +45,13 @@ def collate_data_and_cast(
         is_target = samples_list[0][0][group_name]["is_target"]
         group_images = []
 
-        # Flatten and collect all images for this group across the batch
         for sample in samples_list:
             group_data = sample[0][group_name]["images"]
-            if isinstance(group_data[0], list):  # nested list for non-target
+            if isinstance(group_data[0], list):
                 group_images.extend([img for sublist in group_data for img in sublist])
             else:
                 group_images.extend(group_data)
 
-        # Stack and convert to desired dtype
         collated_views[group_name] = {
             "images": torch.stack(group_images).to(dtype),
             "is_target": is_target,
@@ -69,11 +67,9 @@ def collate_data_and_cast(
     masks_list = []
 
     for i in range(n_samples_masked):
-        prob_min = probs[i].item()
-        prob_max = probs[i + 1].item()
-        num_to_mask = int(n_tokens * random.uniform(prob_min, prob_max))
-        masks_list.append(torch.BoolTensor(mask_generator(num_to_mask)))
-        upperbound += int(n_tokens * prob_max)
+        mask_prob = probs[i].item()
+        masks_list.append(torch.BoolTensor(mask_generator(input_shape, mask_prob)))
+        upperbound += int(n_tokens * mask_prob)
     for _ in range(n_samples_masked, total_views):
         masks_list.append(torch.BoolTensor(mask_generator(0)))
 
