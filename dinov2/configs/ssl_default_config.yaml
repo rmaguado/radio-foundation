@@ -51,7 +51,7 @@ train:
   iterations_per_epoch: 1000
   centering: "centering"
   stage1:
-    epochs: 90
+    epochs: 100
     batch_size_total: 2048
     batch_size_per_gpu: 64
     grad_accum_steps: 1
