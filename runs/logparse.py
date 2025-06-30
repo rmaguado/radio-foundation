@@ -47,7 +47,7 @@ class Logs:
                     self.attr[key].append(line[key])
 
         self.num_gpus = num_gpus
-        self.batch_size_per_gpu = cfg.train.batch_size_per_gpu
+        self.batch_size_per_gpu = cfg.train.stage1.batch_size_per_gpu
         self.total_batch_size = (
             self.num_gpus * self.batch_size_per_gpu * self.grad_accum_steps
         )
