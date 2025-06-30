@@ -5,8 +5,7 @@ import logging
 import time
 
 import torch
-
-import dinov2.distributed as distributed
+import torch.distributed as dist
 
 logger = logging.getLogger("dinov2")
 
@@ -48,7 +47,7 @@ class MetricLogger(object):
         self.meters[name] = meter
 
     def dump_in_output_file(self, iteration, iter_time, data_time):
-        if self.output_file is None or not distributed.is_main_process():
+        if self.output_file is None or not dist.get_rank() == 0:
             return
         dict_to_dump = dict(
             iteration=iteration,

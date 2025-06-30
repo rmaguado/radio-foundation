@@ -8,9 +8,9 @@ import logging
 import os
 import sys
 from typing import Optional
+import torch.distributed as dist
 
 from .helpers import MetricLogger
-import dinov2.distributed as distributed
 
 
 # So that calling _configure_logger multiple times won't add many handlers
@@ -54,7 +54,7 @@ def _configure_logger(
     formatter = logging.Formatter(fmt=fmt, datefmt=datefmt)
 
     # stdout logging for main worker only
-    if distributed.is_main_process():
+    if dist.get_rank() == 0:
         handler = logging.StreamHandler(stream=sys.stdout)
         handler.setLevel(logging.DEBUG)
         handler.setFormatter(formatter)
@@ -67,8 +67,8 @@ def _configure_logger(
         else:
             filename = os.path.join(output, "logs", "log.txt")
 
-        if not distributed.is_main_process():
-            global_rank = distributed.get_global_rank()
+        if not dist.get_rank() == 0:
+            global_rank = dist.get_rank()
             filename = filename + ".rank{}".format(global_rank)
 
         os.makedirs(os.path.dirname(filename), exist_ok=True)

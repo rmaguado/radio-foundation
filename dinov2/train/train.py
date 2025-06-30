@@ -6,6 +6,9 @@
 import logging
 import os
 import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
 import warnings
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -22,7 +25,6 @@ from dinov2.train.utils import (
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
 from dinov2.train.setup import setup_training_components, setup_dataloader
-from dinov2.configs.validation import validate_config
 
 torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")
@@ -147,27 +149,30 @@ def do_train(cfg, model, resume=False):
     logger.info("Finished training on full-size images")
 
 
-def main(args):
+def main(rank, world_size):
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "12355"
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
+
+    args = get_args_parser(add_help=True).parse_args()
     cfg = setup(args)
 
-    if not args.skip_validation:
-        logger.info("Validating config.")
-        validate_config(cfg)
-
     model = SSLMetaArch(cfg).to(torch.device("cuda"))
-    model.prepare_for_distributed_training()
+    model = DDP(model, device_ids=[rank])
 
     logger.debug("Model:\n{}".format(model))
 
     do_train(cfg, model, resume=not args.no_resume)
 
 
+def cleanup():
+    dist.destroy_process_group()
+
+
 if __name__ == "__main__":
     if os.environ.get("PYTHONPATH") is not None and not os.path.exists("dinov2"):
         os.chdir(os.environ["PYTHONPATH"])
 
-    args = get_args_parser(add_help=True).parse_args()
-    try:
-        main(args)
-    finally:
-        torch.distributed.destroy_process_group()
+    world_size = torch.cuda.device_count()
+    mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)

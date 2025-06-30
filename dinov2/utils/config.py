@@ -5,13 +5,14 @@
 
 import logging
 import os
+import torch.distributed as dist
 
 from omegaconf import OmegaConf, DictConfig, ListConfig
 
-import dinov2.distributed as distributed
 from dinov2.logging import setup_logging
 from dinov2.utils import utils
 from dinov2.configs import dinov2_default_config
+from dinov2.configs.validation import validate_config
 
 
 logger = logging.getLogger("dinov2")
@@ -34,10 +35,16 @@ def get_cfg_from_args(args):
     return cfg
 
 
-def default_setup(args):
-    distributed.enable(overwrite=True)
+def setup(args) -> DictConfig:
+    """
+    Create configs and perform basic setups.
+    """
+    cfg = get_cfg_from_args(args)
+    assert isinstance(cfg, DictConfig), "Config should be a DictConfig instance"
+    os.makedirs(args.output_dir, exist_ok=True)
+
     seed = getattr(args, "seed", 0)
-    rank = distributed.get_global_rank()
+    rank = dist.get_rank()
 
     if getattr(args, "debug", False):
         logging_level = logging.DEBUG
@@ -54,15 +61,8 @@ def default_setup(args):
         "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items()))
     )
 
-
-def setup(args) -> DictConfig:
-    """
-    Create configs and perform basic setups.
-    """
-    cfg = get_cfg_from_args(args)
-    assert isinstance(cfg, DictConfig), "Config should be a DictConfig instance"
-    os.makedirs(args.output_dir, exist_ok=True)
-    default_setup(args)
     cfg.optim.lr = cfg.optim.base_lr
     write_config(cfg, args.output_dir)
+    validate_config(cfg)
+
     return cfg

@@ -9,11 +9,11 @@ from typing import Any
 import torch
 from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 
-import dinov2.distributed as distributed
+import torch.distributed as dist
 
 
 def rankstr():
-    return f"rank_{distributed.get_global_rank()}"
+    return f"rank_{dist.get_rank()}"
 
 
 class DistributedCheckpointer(Checkpointer):
@@ -73,8 +73,7 @@ class DistributedCheckpointer(Checkpointer):
         Args:
             last_filename_basename (str): the basename of the last filename.
         """
-        if distributed.is_enabled():
-            torch.distributed.barrier()
+        torch.distributed.barrier()
         save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
         with self.path_manager.open(save_file, "w") as f:
             f.write(last_filename_basename)
