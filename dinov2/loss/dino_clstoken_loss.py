@@ -64,24 +64,24 @@ class DINOLoss(nn.Module):
         Q *= B  # the columns must sum to 1 so that Q is an assignment
         return Q.t()
 
-    def forward(
-        self, student_output: torch.Tensor, teacher_targets_list: List[torch.Tensor]
-    ) -> float | torch.Tensor:
+    def forward(self, student_outputs, teacher_outputs):
         """
-        Calculates cross-entropy between a single student output and a list of its teacher targets.
-
-        Args:
-            student_output (torch.Tensor): A single tensor of student embeddings, e.g., (n_crops, dim).
-            teacher_targets_list (List[torch.Tensor]): A list of teacher embedding tensors that the student
-                                                       output should be compared against.
+        Cross-entropy between softmax outputs of the teacher and student networks.
         """
-        lsm = F.log_softmax(student_output / self.student_temp, dim=-1)
+        total_loss = 0
+        B, num_student_views, head_dim = student_outputs.shape
+        _, num_teacher_views, _ = teacher_outputs.shape
 
-        total_loss = 0.0
-        # Compare the student output against each of its designated teacher targets
-        for teacher_target in teacher_targets_list:
-            loss = torch.sum(teacher_target * lsm, dim=-1)
-            total_loss -= loss.mean()
+        student_flat = student_outputs.view(-1, head_dim)
+        lsm = F.log_softmax(student_flat / self.student_temp, dim=-1)
+        lsm = lsm.view(B, num_student_views, head_dim)
+
+        for s_idx in range(num_student_views):
+            student_output = lsm[:, s_idx, :].unsqueeze(1)
+
+            loss_per_student_view = torch.sum(teacher_outputs * student_output, dim=-1)
+
+            total_loss -= loss_per_student_view.mean()
 
         return total_loss
 
