@@ -5,8 +5,11 @@
 
 import torch
 import random
+import logging
 
 from typing import List, Tuple, Dict, Callable, Any
+
+logger = logging.getLogger("dinov2")
 
 
 def collate_data_and_cast(
@@ -16,52 +19,57 @@ def collate_data_and_cast(
     dtype: torch.dtype,
     mask_generator: Callable,
 ) -> Dict[str, Any]:
-
-    view_groups = samples_list[0][0].keys()
+    view_groups = samples_list[0].keys()
     collated_views = {}
 
     for group_name in view_groups:
-        is_target = samples_list[0][0][group_name]["is_target"]
+        is_target = samples_list[0][group_name]["is_target"]
         group_images = []
 
-        for sample in samples_list:
-            group_data = sample[0][group_name]["images"]
-            if isinstance(group_data[0], list):
-                group_images.extend([img for sublist in group_data for img in sublist])
+        for sample_idx, sample in enumerate(samples_list):
+            group_data = sample[group_name]["images"]
+
+            if is_target:
+                group_images.append(torch.stack(group_data))
             else:
-                group_images.extend(group_data)
+                group_images.append(
+                    torch.stack([torch.stack(crop) for crop in group_data])
+                )
 
         collated_views[group_name] = {
             "images": torch.stack(group_images).to(dtype),
             "is_target": is_target,
-            "targets": samples_list[0][0][group_name]["targets"],
-            "embed_layer": samples_list[0][0][group_name]["embed_layer"],
-            "patches_shape": samples_list[0][0][group_name]["patches_shape"],
+            "targets": samples_list[0][group_name]["targets"],
+            "embed_layer": samples_list[0][group_name]["embed_layer"],
+            "mask_shape": samples_list[0][group_name]["mask_shape"],
         }
 
     target_group_names = [k for k, v in collated_views.items() if v["is_target"]]
-    total_views = sum(collated_views[k]["images"].shape[0] for k in target_group_names)
-
+    total_views = sum(
+        sum(collated_views[k]["images"].shape[:2]) for k in target_group_names
+    )
     n_samples_masked = int(total_views * mask_probability)
-    probs = torch.linspace(*mask_ratio_tuple, n_samples_masked).tolist()
+
+    probs = torch.linspace(*mask_ratio_tuple, n_samples_masked + 1).tolist()
     probs += [0] * (total_views - n_samples_masked)
     random.shuffle(probs)
 
-    collated_masks = {}
-
     for group_name in target_group_names:
-        n_images = collated_views[group_name]["images"].shape[0]
+
         group_masks = []
+        batch_shape = collated_views[group_name]["images"].shape
+        mask_shape = collated_views[group_name]["mask_shape"]
 
-        for i in range(n_images):
-            mask_ratio = probs.pop()
-            image_shape = collated_views[group_name]["patches_shape"]
-            mask = mask_generator(image_shape, mask_ratio)
-            group_masks.append(mask)
+        for i in range(batch_shape[0]):
 
-        collated_masks[group_name] = torch.BoolTensor(group_masks)
+            crop_masks = []
+            for j in range(batch_shape[1]):
+                mask_ratio = probs.pop(0)
+                crop_masks.append(
+                    torch.from_numpy(mask_generator(mask_shape, mask_ratio))
+                )
+            group_masks.append(torch.stack(crop_masks))
 
-    return {
-        "collated_views": collated_views,
-        "collated_masks": collated_masks,
-    }
+        collated_views[group_name]["masks"] = torch.BoolTensor(torch.stack(group_masks))
+
+    return collated_views
