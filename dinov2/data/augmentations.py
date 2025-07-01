@@ -47,9 +47,16 @@ class DataAugmentationDINO(object):
             is_target = group_config.get("is_target", False)
             embed_layer = group_config["embed_layer"]
             img_size = group_config["size"]
-            patch_size = [
+
+            patch_size_list = [
                 x["patch_size"] for x in self.embed_config if x["type"] == embed_layer
-            ][0]
+            ]
+            if not patch_size_list:
+                logger.error(f"Embed layer '{embed_layer}' not found in embed_config.")
+                raise ValueError(
+                    f"Embed layer '{embed_layer}' not found in embed_config."
+                )
+            patch_size = patch_size_list[0]
 
             targets = group_config.get("targets", [group_name])
 
@@ -115,11 +122,11 @@ class DataAugmentationDINO(object):
             main_target = info["output_template"]["targets"][0]
             source_images = output[main_target]["images"]
             group_outputs = []
-
-            for source_image in source_images:
-                group_outputs.append(
-                    [transform_group(source_image) for _ in range(info["num_crops"])]
-                )
+            for i, source_image in enumerate(source_images):
+                transformed_crops = [
+                    transform_group(source_image) for _ in range(info["num_crops"])
+                ]
+                group_outputs.append(transformed_crops)
 
             output_dict = info["output_template"].copy()
             output_dict["images"] = group_outputs
