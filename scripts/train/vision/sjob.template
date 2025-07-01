@@ -21,4 +21,5 @@ export PYTHONPATH=$PWD
 
 python3 ${PYTHONPATH}/dinov2/train/train.py \
     --config-file="$CONF" \
-    --output-dir="$OUT"
+    --output-dir="$OUT" \
+    --debug

@@ -72,7 +72,8 @@ def train(
             mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
             optimizer.zero_grad(set_to_none=True)
 
-        loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
+        loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)
+        loss_accumulator.backward()
 
         if should_apply_training_step(grad_accum_counter, accum_steps):
             apply_gradient_operations(cfg, model, optimizer, accum_steps)

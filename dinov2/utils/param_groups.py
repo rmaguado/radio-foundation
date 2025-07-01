@@ -25,21 +25,13 @@ def get_vit_lr_decay_rate(
         (float): lr decay rate for the given parameter.
     """
     layer_id = num_layers + 1
-    if name.startswith("backbone") or force_is_backbone:
+    if name.startswith("backbone"):
         if (
             ".pos_embed" in name
             or ".patch_embed" in name
             or ".mask_token" in name
             or ".cls_token" in name
             or ".register_tokens" in name
-        ):
-            layer_id = 0
-        elif force_is_backbone and (
-            "pos_embed" in name
-            or "patch_embed" in name
-            or "mask_token" in name
-            or "cls_token" in name
-            or "register_tokens" in name
         ):
             layer_id = 0
         elif ".blocks." in name and ".residual." not in name:
@@ -69,8 +61,6 @@ def get_params_groups_with_decay(model, lr_decay_rate=1.0, patch_embed_lr_mult=1
             name,
             lr_decay_rate,
             num_layers=n_blocks,
-            force_is_backbone=n_blocks > 0,
-            chunked_blocks=chunked_blocks,
         )
         d = {
             "params": param,

@@ -100,7 +100,7 @@ def setup_training_components(cfg, model, resume) -> Tuple[
     int,
     int,
 ]:
-    optimizer = build_optimizer(cfg, model.module.student.parameters())
+    optimizer = build_optimizer(cfg, model.module.get_params_groups())
     schedulers = build_schedulers(cfg)
 
     total_epochs = cfg.train.stage1.epochs
