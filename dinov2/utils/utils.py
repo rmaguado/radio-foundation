@@ -111,3 +111,36 @@ def has_batchnorms(model):
         if isinstance(module, bn_types):
             return True
     return False
+
+
+def custom_repr_nested(obj, indent=0):
+    indent_str = "  " * indent
+
+    if isinstance(obj, dict):
+        msg = f"{indent_str}{{"
+        if not obj:
+            msg += "}\n"
+            return msg
+
+        msg += "\n"
+        for key, value in obj.items():
+            msg += f"{indent_str}{repr(key)}: {custom_repr_nested(value, indent + 1).lstrip()}"
+        msg += f"{indent_str}}}\n"
+    elif isinstance(obj, (list, tuple)):
+        opening_bracket = "[" if isinstance(obj, list) else "("
+        closing_bracket = "]" if isinstance(obj, list) else ")"
+        msg = f"{indent_str}{opening_bracket}"
+        if not obj:
+            msg += f"{closing_bracket}\n"
+            return msg
+
+        msg += "\n"
+        for item in obj:
+            msg += custom_repr_nested(item, indent + 1)
+        msg += f"{indent_str}{closing_bracket}\n"
+    elif isinstance(obj, torch.Tensor):
+        msg = f"{indent_str}Tensor(shape={tuple(obj.shape)})\n"
+    else:
+        msg = f"{indent_str}{repr(obj)}\n"
+
+    return msg
