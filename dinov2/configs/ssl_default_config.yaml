@@ -123,6 +123,7 @@ augmentations:
         p: 0.5
     2d_global_hd:
       - name: slice
+        channels: 1
       - name: rotate
       - name: localcrop
       - name: gaussian_blur

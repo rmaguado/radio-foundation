@@ -103,17 +103,19 @@ class ImageTransforms:
 
         return RandomApply(transform_function, p, kwargs)
 
-    def _slice(self, img: torch.Tensor) -> torch.Tensor:
+    def _slice(self, img: torch.Tensor, channels: int = 1) -> torch.Tensor:
         shape = img.shape
         axis = random.randint(0, 2)
-        slice_index = random.randint(0, shape[axis] - 1)
+        idx = random.randint(0, shape[axis] - 1)
 
         if axis == 0:
-            return img[slice_index, :, :]
+            img = img[idx : idx + channels, :, :]
         elif axis == 1:
-            return img[:, slice_index, :]
+            img = img[:, idx : idx + channels, :]
         else:
-            return img[:, :, slice_index]
+            img = img[:, :, idx : idx + channels]
+
+        img = img.permute(*([axis] + [i for i in range(3) if i != axis]))
 
     def _sharpness(self, img: torch.Tensor, bounds: Tuple = (0.9, 1.5)) -> torch.Tensor:
         img = img.unsqueeze(0)
