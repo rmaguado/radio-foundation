@@ -59,6 +59,13 @@ class DataAugmentationDINO(object):
             patch_size = patch_size_list[0]
 
             targets = group_config.get("targets", [group_name])
+            patches_shape = img_size // patch_size
+            if embed_layer == "patch2d":
+                mask_shape = (patches_shape,) * 2
+            elif embed_layer == "patch2d":
+                mask_shape = (patches_shape,) * 3
+            else:
+                raise ValueError(f"Embed layer {embed_layer} not recognized.")
 
             self.group_info[group_name] = {
                 "num_crops": group_config["num_crops"],
@@ -66,7 +73,7 @@ class DataAugmentationDINO(object):
                     "is_target": is_target,
                     "targets": targets,
                     "embed_layer": embed_layer,
-                    "patches_shape": img_size // patch_size,
+                    "mask_shape": mask_shape,
                 },
             }
 
