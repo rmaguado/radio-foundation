@@ -13,6 +13,7 @@ from torch import nn
 from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
 from dinov2.models import build_model_from_cfg
 from dinov2.layers import DINOHead
+from dinov2.utils.param_groups import get_params_groups_with_decay
 
 
 try:
@@ -276,3 +277,14 @@ class SSLMetaArch(nn.Module):
     def train(self, mode):  # type: ignore
         super().train(mode)
         self.teacher.eval()
+
+    def get_params_groups(self):
+
+        all_params_groups = []
+        for m in self.student.values():
+            all_params_groups += self.get_params_groups_with_decay(
+                m,
+                lr_decay_rate=self.cfg.optim.layerwise_decay,
+                patch_embed_lr_mult=self.cfg.optim.patch_embed_lr_mult,
+            )
+        return all_params_groups
