@@ -116,6 +116,7 @@ class ImageTransforms:
             img = img[:, :, idx : idx + channels]
 
         img = img.permute(*([axis] + [i for i in range(3) if i != axis]))
+        return img
 
     def _sharpness(self, img: torch.Tensor, bounds: Tuple = (0.9, 1.5)) -> torch.Tensor:
         img = img.unsqueeze(0)
