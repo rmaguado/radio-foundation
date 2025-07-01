@@ -7,12 +7,11 @@ import logging
 import os
 import torch.distributed as dist
 
-from omegaconf import OmegaConf, DictConfig, ListConfig
+from omegaconf import OmegaConf, DictConfig
 
 from dinov2.logging import setup_logging
 from dinov2.utils import utils
-from dinov2.configs import dinov2_default_config
-from dinov2.configs.validation import validate_config
+from dinov2.configs import dinov2_default_config, validate_config
 
 
 logger = logging.getLogger("dinov2")

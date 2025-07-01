@@ -6,7 +6,7 @@
 import pathlib
 
 from omegaconf import OmegaConf, DictConfig, ListConfig
-from typing import Dict, List
+from dinov2.configs.validation import validate_config
 
 
 def load_config(config_name: str) -> DictConfig | ListConfig:
@@ -15,9 +15,3 @@ def load_config(config_name: str) -> DictConfig | ListConfig:
 
 
 dinov2_default_config = load_config("ssl_default_config")
-
-
-def load_and_merge_config(config_name: str) -> DictConfig | ListConfig:
-    default_config = OmegaConf.create(dinov2_default_config)
-    loaded_config = load_config(config_name)
-    return OmegaConf.merge(default_config, loaded_config)
