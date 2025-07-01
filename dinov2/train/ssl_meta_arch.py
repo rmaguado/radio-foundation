@@ -110,27 +110,19 @@ class SSLMetaArch(nn.Module):
             "forward method is not implemented in SSLMetaArch. Use forward_backward instead."
         )
 
-    def forward_backward(self, images, teacher_temp):
-
-        collated_views = {
-            k: v.cuda(non_blocking=True) for k, v in images["collated_views"].items()
+    def forward_backward(self, collated_views, teacher_temp):
+        image_views = {
+            k: v["images"].cuda(non_blocking=True) for k, v in collated_views.items()
         }
-
-        masks = images["collated_masks"].cuda(non_blocking=True)
-        mask_indices_list = images["mask_indices_list"].cuda(non_blocking=True)
-        n_masked_patches_tensor = images["n_masked_patches"].cuda(non_blocking=True)
-        n_masked_patches = mask_indices_list.shape[0]
-        upperbound = images["upperbound"]
-        masks_weight = images["masks_weight"].cuda(non_blocking=True)
+        masks = {
+            k: v["masks"].cuda(non_blocking=True) for k, v in collated_views.items()
+        }
 
         loss_accumulator = 0.0
         loss_dict = {}
 
         @torch.no_grad()
         def get_teacher_output() -> Tuple[Dict[str, Any], Any]:
-            teacher_inputs = torch.cat(
-                [collated_views[name] for name in self.target_group_names], dim=0
-            )
 
             teacher_backbone_output = self.teacher.backbone(
                 teacher_inputs, is_training=True
