@@ -1,6 +1,6 @@
-from omegaconf import OmegaConf, DictConfig, ListConfig
+from omegaconf import OmegaConf, DictConfig
 from pydantic import BaseModel, field_validator, model_validator
-from typing import List, Optional, Literal, Tuple, Dict, Any
+from typing import List, Optional, Literal, Tuple
 
 
 class DinoConfig(BaseModel):
@@ -397,6 +397,13 @@ class MainConfig(BaseModel):
 
 
 def validate_config(conf: DictConfig) -> bool:
+    """
+    Validates the configuration dictionary against the MainConfig model.
+    Raises an error if the configuration is invalid.
+
+    Args:
+        conf (DictConfig): The configuration dictionary to validate loaded from a YAML file using omegaconf.
+    """
     conf_dict = OmegaConf.to_container(conf, resolve=True)
-    MainConfig(**conf_dict)
+    MainConfig(**conf_dict)  # type: ignore
     return True
