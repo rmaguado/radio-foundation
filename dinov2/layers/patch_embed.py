@@ -40,24 +40,20 @@ class PatchEmbed(nn.Module):
         """Rearrange the projected tensor from (B, E, Dims...) to (B, N, E)."""
         raise NotImplementedError
 
-    def get_pos_embed(self, *input_dims: int) -> torch.Tensor:
+    def get_pos_embed(self, *patch_dims: int) -> torch.Tensor:
         """
-        Interpolate positional embeddings to match the input's spatial resolution.
-        `input_dims` should be (H, W) for 2D and (D, H, W) for 3D.
+        Interpolate positional embeddings to match the input's patch dimensions.
+        `patch_dims` should be (H, W) for 2D and (D, H, W) for 3D.
         """
-        if self.pos_embed.shape[1] == self.num_patches:
-            return self.pos_embed
-
         raise NotImplementedError
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, C, *spatial_dims = x.shape
-
         x = self.proj(x)
+        B, E, *patch_dims = x.shape
         x = self._rearrange_projection(x)
         x = self.norm(x)
 
-        pos_embed = self.get_pos_embed(*spatial_dims)
+        pos_embed = self.get_pos_embed(*patch_dims)
 
         x = x + repeat(pos_embed, "1 n d -> b n d", b=B)
 
@@ -81,12 +77,12 @@ class PatchEmbed2D(PatchEmbed):
     def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
         return rearrange(x, "b e h w -> b (h w) e")
 
-    def get_pos_embed(self, *input_dims: int) -> torch.Tensor:
+    def get_pos_embed(self, *patch_dims: int) -> torch.Tensor:
         """
         Interpolate positional embeddings to match the input's spatial resolution.
-        `input_dims` should be (H, W).
+        `patch_dims` should be (H, W).
         """
-        H, W = input_dims
+        H, W = patch_dims
         num_patches = H * W
         if num_patches == self.num_patches:
             return self.pos_embed
@@ -122,12 +118,12 @@ class PatchEmbed3D(PatchEmbed):
     def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
         return rearrange(x, "b e d h w -> b (d h w) e")
 
-    def get_pos_embed(self, *input_dims: int) -> torch.Tensor:
+    def get_pos_embed(self, *patch_dims: int) -> torch.Tensor:
         """
         Interpolate positional embeddings to match the input's spatial resolution.
-        `input_dims` should be (D, H, W).
+        `patch_dims` should be (D, H, W).
         """
-        D, H, W = input_dims
+        D, H, W = patch_dims
         num_patches = D * H * W
         if num_patches == self.num_patches:
             return self.pos_embed
