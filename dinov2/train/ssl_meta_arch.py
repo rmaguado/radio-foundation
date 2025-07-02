@@ -9,6 +9,7 @@ from typing import Dict, Any, Tuple
 
 import torch
 from torch import nn
+from einops import rearrange
 
 from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
 from dinov2.models import build_model_from_cfg
@@ -17,7 +18,7 @@ from dinov2.utils.param_groups import get_params_groups_with_decay
 
 
 try:
-    from xformers.ops import fmha
+    from xformers.ops import fmha  # type: ignore
 except ImportError:
     raise AssertionError("xFormers is required for training")
 
@@ -66,6 +67,7 @@ class SSLMetaArch(nn.Module):
 
         self.dino_loss = DINOLoss(self.dino_out_dim)
         if self.do_koleo:
+            self.koleo_loss_weight = cfg.dino.koleo_loss_weight
             self.koleo_loss = KoLeoLoss()
 
         if self.do_ibot:
@@ -106,277 +108,253 @@ class SSLMetaArch(nn.Module):
             if group_cfg_copy.get("is_target", False):
                 self.target_group_names.append(name)
 
-    def forward(self, collated_views, teacher_temp):
-        image_views = {
+    def _prepare_inputs(
+        self, collated_views: Dict[str, Any]
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        """Moves images and masks to the appropriate device."""
+        images = {
             k: v["images"].cuda(non_blocking=True) for k, v in collated_views.items()
         }
         masks = {
             k: v["masks"].cuda(non_blocking=True) for k, v in collated_views.items()
         }
-        logger.info(f"Image views keys: {image_views.keys()}")
-        logger.info(f"Masks keys: {masks.keys()}")
+        return images, masks
 
-        teacher_dino_tokens = {}
-        teacher_ibot_tokens = {}
-
-        with torch.no_grad():
-            for group_name in self.target_group_names:
-                logger.info(f"Processing teacher group: {group_name}")
-                group_data = image_views[group_name]
-                group_masks = masks[group_name]
-                embed_layer = collated_views[group_name]["embed_layer"]
-                logger.info(
-                    f"Teacher group {group_name} - data shape: {group_data.shape}, masks shape: {group_masks.shape}"
-                )
-
-                B, V = group_data.shape[:2]
-                flattened_group_data = rearrange(group_data, "b v ... -> (b v) ...")
-                flattened_group_masks = rearrange(group_masks, "b v ... -> (b v) (...)")
-                logger.info(
-                    f"Teacher group {group_name} - flattened data shape: {flattened_group_data.shape}"
-                )
-
-                teacher_output = self.teacher["backbone"](
-                    group_data, embed_layer=embed_layer, masks=None
-                )
-                logger.info(
-                    f"Teacher backbone output keys for {group_name}: {teacher_output.keys()}"
-                )
-
-                teacher_cls_tokens = teacher_output["clstoken"]
-                logger.info(
-                    f"Teacher CLS tokens shape for {group_name}: {teacher_cls_tokens.shape}"
-                )
-                teacher_dino_tokens_flattened = self.teacher.dino_head(
-                    teacher_cls_tokens
-                )
-                logger.info(
-                    f"Teacher flattened DINO tokens shape for {group_name}: {teacher_dino_tokens_flattened.shape}"
-                )
-                teacher_dino_tokens_flattened_centered = (
-                    self.dino_loss.softmax_center_teacher(
-                        teacher_dino_tokens_flattened, teacher_temp
-                    )
-                )
-                logger.info(
-                    f"Teacher centered flattened DINO tokens shape for {group_name}: {teacher_dino_tokens_flattened_centered.shape}"
-                )
-
-                teacher_dino_tokens[group_name] = rearrange(
-                    teacher_dino_tokens_flattened_centered, "(b v) d -> b v d", b=B, v=V
-                )
-
-                logger.info(
-                    f"Teacher DINO tokens shape (rearranged) for {group_name}: {teacher_dino_tokens[group_name].shape}"
-                )
-
-                if self.do_ibot:
-                    teacher_patch_tokens = teacher_output["patchtokens"]
-                    logger.info(
-                        f"Teacher patch tokens shape for {group_name}: {teacher_patch_tokens.shape}"
-                    )
-                    teacher_masked_patch_tokens = torch.masked_select(
-                        teacher_patch_tokens,
-                        flattened_group_masks,
-                    )
-                    logger.info(
-                        f"Teacher masked patch tokens shape for {group_name}: {teacher_masked_patch_tokens.shape}"
-                    )
-                    if self.ibot_separate_head:
-                        teacher_ibot_tokens_flattened = self.teacher.ibot_head(
-                            teacher_masked_patch_tokens
-                        )
-                    else:
-                        teacher_ibot_tokens_flattened = self.teacher.dino_head(
-                            teacher_masked_patch_tokens
-                        )
-                    logger.info(
-                        f"Teacher flattened iBOT tokens shape for {group_name}: {teacher_ibot_tokens_flattened.shape}"
-                    )
-                    teacher_ibot_tokens_flattened_centered = (
-                        self.ibot_patch_loss.softmax_center_teacher(
-                            teacher_ibot_tokens_flattened, teacher_temp
-                        )
-                    )
-                    logger.info(
-                        f"Teacher centered flattened iBOT tokens shape for {group_name}: {teacher_ibot_tokens_flattened_centered.shape}"
-                    )
-                    teacher_ibot_tokens[group_name] = (
-                        teacher_ibot_tokens_flattened_centered
-                    )
-                    logger.info(
-                        f"Teacher iBOT tokens shape for {group_name}: {teacher_ibot_tokens[group_name].shape}"
-                    )
-
-        student_dino_tokens = {}
-        student_ibot_tokens = {}
-        for group_name in image_views.keys():
-            logger.info(f"Processing student group: {group_name}")
-            group_data = image_views[group_name]
-            group_masks = masks[group_name]
-            embed_layer = collated_views[group_name]["embed_layer"]
-
-            is_target = collated_views[group_name]["is_target"]
-            logger.info(f"Student group {group_name} - is_target: {is_target}")
-            if is_target:
-                B, V = group_data.shape[:2]
-                flattened_group_data = rearrange(group_data, "b v ... -> (b v) ...")
-                flattened_group_masks = rearrange(group_masks, "b v ... -> (b v) (...)")
-                logger.info(
-                    f"Student target group {group_name} - flattened data shape: {flattened_group_data.shape}, flattened masks shape: {flattened_group_masks.shape}"
-                )
-                student_output = self.student["backbone"](
-                    flattened_group_data,
-                    embed_layer=embed_layer,
-                    masks=flattened_group_masks,
-                )
-                logger.info(
-                    f"Student backbone output keys for {group_name} (is_target): {student_output.keys()}"
-                )
-                student_cls_tokens = student_output["clstoken"]
-                logger.info(
-                    f"Student CLS tokens shape for {group_name} (is_target): {student_cls_tokens.shape}"
-                )
-                student_dino_tokens_flattened = self.student.dino_head(
-                    student_cls_tokens
-                )
-                logger.info(
-                    f"Student flattened DINO tokens shape for {group_name} (is_target): {student_dino_tokens_flattened.shape}"
-                )
-
-                student_dino_tokens[group_name] = rearrange(
-                    student_dino_tokens_flattened, "(b v) d -> b v d", b=B, v=V
-                )
-                logger.info(
-                    f"Student DINO tokens shape (rearranged) for {group_name} (is_target): {student_dino_tokens[group_name].shape}"
-                )
-                if self.do_ibot:
-                    logger.info(
-                        f"Processing iBOT for student target group: {group_name}"
-                    )
-                    student_patch_tokens = student_output["patchtokens"]
-                    logger.info(
-                        f"Student patch tokens shape for {group_name} (is_target): {student_patch_tokens.shape}"
-                    )
-                    student_masked_patch_tokens = torch.masked_select(
-                        student_patch_tokens,
-                        flattened_group_masks,
-                    )
-                    logger.info(
-                        f"Student masked patch tokens shape for {group_name} (is_target): {student_masked_patch_tokens.shape}"
-                    )
-                    if self.ibot_separate_head:
-                        student_ibot_tokens[group_name] = self.student.ibot_head(
-                            student_masked_patch_tokens
-                        )
-                    else:
-                        student_ibot_tokens[group_name] = self.student.dino_head(
-                            student_masked_patch_tokens
-                        )
-                    logger.info(
-                        f"Student iBOT tokens shape for {group_name} (is_target): {student_ibot_tokens[group_name].shape}"
-                    )
-            else:
-                B, V_target, V = group_data.shape[:3]
-                flattened_group_data = rearrange(group_data, "b t v... -> (b t v) ...")
-                logger.info(
-                    f"Student non-target group {group_name} - flattened data shape: {flattened_group_data.shape}"
-                )
-                student_output = self.student["backbone"](
-                    flattened_group_data,
-                    embed_layer=embed_layer,
-                )
-                logger.info(
-                    f"Student backbone output keys for {group_name} (non_target): {student_output.keys()}"
-                )
-                student_cls_tokens = student_output["clstoken"]
-                logger.info(
-                    f"Student CLS tokens shape for {group_name} (non_target): {student_cls_tokens.shape}"
-                )
-                student_dino_tokens_flattened = self.student.dino_head(
-                    student_cls_tokens
-                )
-                logger.info(
-                    f"Student flattened DINO tokens shape for {group_name} (non_target): {student_dino_tokens_flattened.shape}"
-                )
-                student_dino_tokens[group_name] = rearrange(
-                    student_dino_tokens_flattened,
-                    "(b t v) d -> b t v d",
-                    b=B,
-                    t=V_target,
-                    v=V,
-                )
-                logger.info(
-                    f"Student DINO tokens shape (rearranged) for {group_name} (non_target): {student_dino_tokens[group_name].shape}"
-                )
-
-        loss_accumulator = 0.0
-        loss_dict = {}
-
-        total_dino_loss = 0
-        total_dino_terms = 0
-
-        for group_name in image_views.keys():
-            logger.info(f"Calculating DINO loss for group: {group_name}")
-            student_dino_tokens_group = student_dino_tokens[group_name]
-            targets = collated_views[group_name]["targets"]
-            is_target = collated_views[group_name]["is_target"]
-            logger.info(
-                f"Group {group_name} - student DINO tokens shape: {student_dino_tokens_group.shape}, targets: {targets}, is_target: {is_target}"
+    def _process_group(
+        self,
+        model: nn.Module,
+        images: torch.Tensor,
+        masks: torch.Tensor,
+        embed_layer: int,
+        is_target: bool,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Processes a single group of views through a model (student or teacher).
+        Handles different tensor shapes for target vs. non-target views.
+        """
+        if is_target:
+            B, V = images.shape[:2]
+            V_target = None
+            flat_images = rearrange(images, "b v ... -> (b v) ...")
+            flat_masks = (
+                rearrange(masks, "b v ... -> (b v) (...)")
+                if masks is not None
+                else None
             )
+            backbone_masks = flat_masks
+        else:
+            B, V_target, V = images.shape[:3]
+            flat_images = rearrange(images, "b t v ... -> (b t v) ...")
+            backbone_masks = None
 
-            for i, target_group in enumerate(targets):
-                logger.info(
-                    f"  Comparing {group_name} to target group: {target_group} (index {i})"
-                )
-                student_dino_tokens_target = (
-                    student_dino_tokens_group
-                    if is_target
-                    else student_dino_tokens_group[:, i, ...]
-                )
-                teacher_dino_tokens_target = teacher_dino_tokens[target_group]
-                logger.info(
-                    f"    Student DINO tokens target shape: {student_dino_tokens_target.shape}"
-                )
-                logger.info(
-                    f"    Teacher DINO tokens target shape: {teacher_dino_tokens_target.shape}"
-                )
-                num_comparisons = (
-                    teacher_dino_tokens_target.shape[1]
-                    * student_dino_tokens_target.shape[1]
-                )
-                logger.info(
-                    f"    Number of comparisons for this pair: {num_comparisons}"
-                )
-                dino_loss_term = self.dino_loss(
-                    student_dino_tokens_target,
-                    teacher_dino_tokens_target,
-                    group_name,
-                )
-                logger.info(
-                    f"    DINO loss term for this pair: {dino_loss_term.item()}"
-                )
-                total_dino_loss += dino_loss_term
-                total_dino_terms += num_comparisons
-        logger.info(
-            f"Total DINO loss: {total_dino_loss.item()}, Total DINO terms: {total_dino_terms}"
+        backbone_output = model.backbone(
+            flat_images,
+            embed_layer=embed_layer,
+            masks=backbone_masks,
         )
 
-        if total_dino_terms > 0:
-            loss_accumulator += (
-                self.dino_loss_weight * total_dino_loss / total_dino_terms
-            )
-            loss_dict["dino_loss"] = total_dino_loss / total_dino_terms
+        student_cls_tokens = backbone_output["clstoken"]
+        dino_tokens_flat = model.dino_head(student_cls_tokens)
+
+        if is_target:
+            dino_tokens = rearrange(dino_tokens_flat, "(b v) d -> b v d", b=B, v=V)
         else:
-            loss_dict["dino_loss"] = 0
-            logger.warning(
-                "No DINO comparisons were made (total_dino_terms is 0). DINO loss will be 0."
+            dino_tokens = rearrange(
+                dino_tokens_flat, "(b t v) d -> b t v d", b=B, t=V_target, v=V
             )
 
-        if self.do_ibot:
-            pass
+        output = {"dino": dino_tokens}
 
-        return loss_accumulator, loss_dict
+        if self.do_ibot and is_target:
+            patch_tokens = backbone_output["patchtokens"]
+            masked_patch_tokens = torch.masked_select(patch_tokens, flat_masks)  # type: ignore
+
+            ibot_head = model.ibot_head if self.ibot_separate_head else model.dino_head
+            output["ibot"] = ibot_head(masked_patch_tokens)
+
+        return output
+
+    def _run_teacher_pass(
+        self,
+        images: Dict[str, torch.Tensor],
+        masks: Dict[str, torch.Tensor],
+        collated_views: Dict[str, Any],
+        teacher_temp: float,
+    ) -> Dict[str, Dict[str, torch.Tensor]]:
+        """Runs the teacher model and computes centered tokens."""
+        teacher_outputs = {"dino": {}, "ibot": {}}
+        with torch.no_grad():
+            for group_name in self.target_group_names:
+                # Process the group to get raw tokens
+                group_output = self._process_group(
+                    model=self.teacher,
+                    images=images[group_name],
+                    masks=masks[group_name],
+                    embed_layer=collated_views[group_name]["embed_layer"],
+                    is_target=True,  # Teacher only sees target views
+                )
+
+                # Center DINO tokens
+                dino_tokens_centered = self.dino_loss.softmax_center_teacher(
+                    group_output["dino"], teacher_temp
+                )
+                teacher_outputs["dino"][group_name] = dino_tokens_centered
+
+                # Center iBOT tokens
+                if self.do_ibot:
+                    ibot_tokens_centered = self.ibot_patch_loss.softmax_center_teacher(
+                        group_output["ibot"], teacher_temp
+                    )
+                    teacher_outputs["ibot"][group_name] = ibot_tokens_centered
+        return teacher_outputs
+
+    def _run_student_pass(
+        self,
+        images: Dict[str, torch.Tensor],
+        masks: Dict[str, torch.Tensor],
+        collated_views: Dict[str, Any],
+    ) -> Dict[str, Dict[str, torch.Tensor]]:
+        """Runs the student model across all view groups."""
+        student_outputs = {"dino": {}, "ibot": {}}
+        for group_name in images.keys():
+            group_output = self._process_group(
+                model=self.student,
+                images=images[group_name],
+                masks=masks[group_name],
+                embed_layer=collated_views[group_name]["embed_layer"],
+                is_target=collated_views[group_name]["is_target"],
+            )
+            student_outputs["dino"][group_name] = group_output["dino"]
+            if self.do_ibot and "ibot" in group_output:
+                student_outputs["ibot"][group_name] = group_output["ibot"]
+        return student_outputs
+
+    def _calculate_dino_loss(
+        self,
+        student_dino_tokens: Dict[str, torch.Tensor],
+        teacher_dino_tokens: Dict[str, torch.Tensor],
+        collated_views: Dict[str, Any],
+    ) -> torch.Tensor:
+        """Calculates the total DINO loss across all student-teacher view pairs."""
+        total_loss = torch.tensor(0.0)
+        total_terms = 0
+
+        for group_name, s_tokens in student_dino_tokens.items():
+            is_target = collated_views[group_name]["is_target"]
+            targets = collated_views[group_name]["targets"]
+
+            for i, target_group_name in enumerate(targets):
+                s_tokens_for_comparison = s_tokens if is_target else s_tokens[:, i, ...]
+                t_tokens = teacher_dino_tokens[target_group_name]
+
+                loss_term: torch.Tensor = self.dino_loss(
+                    s_tokens_for_comparison, t_tokens
+                )
+                num_comparisons: int = (
+                    s_tokens_for_comparison.shape[1] * t_tokens.shape[1]
+                )
+
+                total_loss += loss_term
+                total_terms += num_comparisons
+
+        if total_terms == 0:
+            logger.warning("No DINO comparisons were made. DINO loss is 0.")
+            return torch.tensor(0.0)
+
+        return total_loss / total_terms
+
+    def _calculate_koleo_loss(
+        self,
+        student_dino_tokens: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
+        """Calculates the total KoLeo loss among student target views within a batch."""
+        if not self.do_koleo:
+            return torch.tensor(0.0)
+
+        total_loss = torch.tensor(0.0)
+        total_terms = 0
+
+        # KoLeo loss is computed only on target views
+        for group_name, s_tokens in student_dino_tokens.items():
+            if not self.view_metadata[group_name].get("is_target", False):
+                continue
+
+            # Flatten the tokens to compute pairwise distances
+            flat_s_tokens = rearrange(s_tokens, "b v d -> (b v) d")
+            loss_term = self.koleo_loss(flat_s_tokens)
+
+            total_loss += loss_term
+            total_terms += 1
+
+        if total_terms == 0:
+            return torch.tensor(0.0)
+
+        return total_loss / total_terms
+
+    def _calculate_ibot_loss(
+        self,
+        student_ibot_tokens: Dict[str, torch.Tensor],
+        teacher_ibot_tokens: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
+        """Calculates the total iBOT loss across all student-teacher view pairs."""
+        if not self.do_ibot:
+            return torch.tensor(0.0)
+
+        total_loss = torch.tensor(0.0)
+        total_terms = 0
+
+        # iBOT loss is a direct comparison between student and teacher tokens from the same group
+        for group_name, s_tokens in student_ibot_tokens.items():
+            if group_name in teacher_ibot_tokens:
+                t_tokens = teacher_ibot_tokens[group_name]
+                loss_term = self.ibot_patch_loss(s_tokens, t_tokens)
+
+                # Here we assume the loss is already averaged; if not, adjust accordingly
+                total_loss += loss_term
+                total_terms += 1
+
+        if total_terms == 0:
+            return torch.tensor(0.0)
+
+        return total_loss / total_terms
+
+    def forward(
+        self, collated_views: Dict[str, Any], teacher_temp: float
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Main forward pass for DINOv2 training.
+        """
+        images, masks = self._prepare_inputs(collated_views)
+
+        # Teacher forward pass (with no_grad)
+        teacher_outputs = self._run_teacher_pass(
+            images, masks, collated_views, teacher_temp
+        )
+
+        # Student forward pass
+        student_outputs = self._run_student_pass(images, masks, collated_views)
+
+        # Calculate losses
+        dino_loss = self._calculate_dino_loss(
+            student_outputs["dino"], teacher_outputs["dino"], collated_views
+        )
+        ibot_loss = self._calculate_ibot_loss(
+            student_outputs["ibot"], teacher_outputs["ibot"]
+        )
+        koleo_loss = self._calculate_koleo_loss(student_outputs["dino"])
+
+        total_loss = (
+            (self.dino_loss_weight * dino_loss)
+            + (self.ibot_loss_weight * ibot_loss)
+            + (self.koleo_loss_weight * koleo_loss)
+        )
+        loss_dict = {
+            "dino_loss": dino_loss.detach(),
+            "ibot_loss": ibot_loss.detach(),
+            "total_loss": total_loss.detach(),
+        }
+
+        return total_loss, loss_dict
 
     def update_teacher(self, m):
         student_param_list = []
