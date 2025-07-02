@@ -1,0 +1,22 @@
+student:
+  model_name: vitl14_2d3d
+  embed_dim: 512
+  depth: 4
+  num_heads: 8
+  mlp_ratio: 4
+  embed_layers:
+  - type: patch2d
+    patch_size: 14
+    img_size: 448
+  - type: patch3d
+    patch_size: 14
+    img_size: 224
+  drop_path_rate: 0
+  layerscale: 1.0e-05
+  drop_path_uniform: true
+  pretrained_weights: ''
+  ffn_layer: "mlp"
+  qkv_bias: true
+  proj_bias: true
+  ffn_bias: true
+  num_register_tokens: 4

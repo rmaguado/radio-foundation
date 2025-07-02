@@ -1,6 +1,8 @@
 import pytest
 import torch
 from types import SimpleNamespace
+from omegaconf import OmegaConf
+import os
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 
 
@@ -41,6 +43,7 @@ class DummyLoss:
 def minimal_cfg(monkeypatch):
     # Patch build_model_from_cfg and DINOHead, DINOLoss, KoLeoLoss, iBOTPatchLoss
     from dinov2 import models, layers, loss
+    from dinov2.configs import dinov2_default_config
 
     monkeypatch.setattr(
         models,
@@ -51,24 +54,24 @@ def minimal_cfg(monkeypatch):
     monkeypatch.setattr(loss, "DINOLoss", DummyLoss)
     monkeypatch.setattr(loss, "KoLeoLoss", DummyLoss)
     monkeypatch.setattr(loss, "iBOTPatchLoss", DummyLoss)
-    # Minimal config
-    cfg = SimpleNamespace(
-        student=SimpleNamespace(pretrained_weights=None, embed_dim=8),
-        dino=SimpleNamespace(
-            head_n_prototypes=4,
-            head_hidden_dim=8,
-            head_bottleneck_dim=4,
-            head_nlayers=1,
-            koleo_loss_weight=0.0,
-            loss_weight=1.0,
-        ),
-        ibot=SimpleNamespace(loss_weight=0.0, separate_head=False),
-        crops=SimpleNamespace(
-            crop_groups=[{"name": "g1", "is_target": True, "embed_layer": "patch2d"}]
-        ),
-        optim=SimpleNamespace(layerwise_decay=1.0, patch_embed_lr_mult=1.0),
+    # Load and merge configs
+    minimal_model_path = os.path.join(
+        os.path.dirname(__file__), "configs/minimal_model.yaml"
     )
-    return cfg
+    minimal_model_cfg = OmegaConf.load(minimal_model_path)
+    merged_cfg = OmegaConf.merge(dinov2_default_config, minimal_model_cfg)
+
+    # Convert to SimpleNamespace recursively
+    def to_ns(obj):
+        if isinstance(obj, dict):
+            return SimpleNamespace(**{k: to_ns(v) for k, v in obj.items()})
+        elif isinstance(obj, list):
+            return [to_ns(i) for i in obj]
+        else:
+            return obj
+
+    cfg_ns = to_ns(OmegaConf.to_container(merged_cfg, resolve=True))
+    return cfg_ns
 
 
 def test_ssl_meta_arch_init(minimal_cfg):
