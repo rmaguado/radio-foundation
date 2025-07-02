@@ -17,12 +17,6 @@ from dinov2.layers import DINOHead
 from dinov2.utils.param_groups import get_params_groups_with_decay
 
 
-try:
-    from xformers.ops import fmha  # type: ignore
-except ImportError:
-    raise AssertionError("xFormers is required for training")
-
-
 logger = logging.getLogger("dinov2")
 
 
