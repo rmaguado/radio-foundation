@@ -71,15 +71,15 @@ def test_ssl_meta_arch_forward(minimal_cfg):
     arch = SSLMetaArch(minimal_cfg)
     collated_views = {
         "2d_global_hd": {
-            "images": torch.zeros(2, 1, 224, 224),
-            "masks": torch.zeros(2, 1, 16, 16, dtype=torch.bool),
+            "images": torch.zeros(8, 3, 1, 224, 224),
+            "masks": torch.zeros(8, 3, 2, 1, 16, 16, dtype=torch.bool),
             "embed_layer": "patch2d",
             "is_target": True,
             "targets": ["2d_global_hd"],
         },
         "2d_local_hd": {
-            "images": torch.zeros(2, 1, 112, 112),
-            "masks": torch.zeros(2, 1, 8, 8, dtype=torch.bool),
+            "images": torch.zeros(8, 1, 112, 112),
+            "masks": torch.zeros(8, 1, 8, 8, dtype=torch.bool),
             "embed_layer": "patch2d",
             "is_target": False,
             "targets": ["2d_global_hd"],
