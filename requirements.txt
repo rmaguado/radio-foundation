@@ -15,3 +15,4 @@ fvcore
 einops
 tensorboard
 SimpleITK
+pytest
