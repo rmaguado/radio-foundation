@@ -60,9 +60,9 @@ def index_niftis(root_path, output_path):
                 file_path = os.path.join(dirpath, filename)
 
                 try:
-                    nifti_image = nib.load(file_path)  # type: ignore
-                    zooms = nifti_image.header.get_zooms()  # type: ignore
-                    rows, cols, slices = nifti_image.shape  # type: ignore
+                    nifti_image = nib.load(file_path)
+                    zooms = nifti_image.header.get_zooms()
+                    rows, cols, slices = nifti_image.shape
                     metadata = {
                         "path": file_path,
                         "rows": rows,
