@@ -41,7 +41,6 @@ class DummyLoss:
 
 @pytest.fixture
 def minimal_cfg(monkeypatch):
-    # Patch build_model_from_cfg and DINOHead, DINOLoss, KoLeoLoss, iBOTPatchLoss
     from dinov2 import models, layers, loss
     from dinov2.configs import dinov2_default_config
 
@@ -54,24 +53,12 @@ def minimal_cfg(monkeypatch):
     monkeypatch.setattr(loss, "DINOLoss", DummyLoss)
     monkeypatch.setattr(loss, "KoLeoLoss", DummyLoss)
     monkeypatch.setattr(loss, "iBOTPatchLoss", DummyLoss)
-    # Load and merge configs
     minimal_model_path = os.path.join(
         os.path.dirname(__file__), "configs/minimal_model.yaml"
     )
     minimal_model_cfg = OmegaConf.load(minimal_model_path)
     merged_cfg = OmegaConf.merge(dinov2_default_config, minimal_model_cfg)
-
-    # Convert to SimpleNamespace recursively
-    def to_ns(obj):
-        if isinstance(obj, dict):
-            return SimpleNamespace(**{k: to_ns(v) for k, v in obj.items()})
-        elif isinstance(obj, list):
-            return [to_ns(i) for i in obj]
-        else:
-            return obj
-
-    cfg_ns = to_ns(OmegaConf.to_container(merged_cfg, resolve=True))
-    return cfg_ns
+    return OmegaConf.to_container(merged_cfg, resolve=True)
 
 
 def test_ssl_meta_arch_init(minimal_cfg):
@@ -83,7 +70,6 @@ def test_ssl_meta_arch_init(minimal_cfg):
 
 def test_ssl_meta_arch_forward(minimal_cfg):
     arch = SSLMetaArch(minimal_cfg)
-    # Dummy collated_views
     collated_views = {
         "g1": {
             "images": torch.zeros(2, 1, 8, 8),
@@ -100,31 +86,18 @@ def test_ssl_meta_arch_forward(minimal_cfg):
     assert "total_loss" in loss_dict
 
 
-def test_ssl_meta_arch_init_error(monkeypatch):
-    # Patch build_model_from_cfg to return None for student
+def test_ssl_meta_arch_init_error(monkeypatch, minimal_cfg):
     from dinov2 import models
 
+    # Patch build_model_from_cfg to return None for student
     monkeypatch.setattr(
         models,
         "build_model_from_cfg",
         lambda cfg, only_teacher=False: (None, DummyBackbone()),
     )
-    cfg = SimpleNamespace(
-        student=SimpleNamespace(pretrained_weights=None, embed_dim=8),
-        dino=SimpleNamespace(
-            head_n_prototypes=4,
-            head_hidden_dim=8,
-            head_bottleneck_dim=4,
-            head_nlayers=1,
-            koleo_loss_weight=0.0,
-            loss_weight=1.0,
-        ),
-        ibot=SimpleNamespace(loss_weight=0.0, separate_head=False),
-        crops=SimpleNamespace(
-            crop_groups=[{"name": "g1", "is_target": True, "embed_layer": "patch2d"}]
-        ),
-        optim=SimpleNamespace(layerwise_decay=1.0, patch_embed_lr_mult=1.0),
-    )
+    # Use a valid config dict (copied from minimal_cfg)
+    cfg = minimal_cfg.copy()
+    cfg["student"]["embed_dim"] = 8
     with pytest.raises(ValueError):
         SSLMetaArch(cfg)
 
