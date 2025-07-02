@@ -7,5 +7,5 @@ from .dino_head import DINOHead
 from .mlp import Mlp
 from .patch_embed import PatchEmbed2D, PatchEmbed3D
 from .swiglu_ffn import SwiGLUFFN, SwiGLUFFNFused
-from .block import NestedTensorBlock
+from .block import Block
 from .attention import MemEffAttention

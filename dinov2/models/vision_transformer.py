@@ -23,7 +23,7 @@ from dinov2.layers import (
     PatchEmbed3D,
     SwiGLUFFNFused,
     MemEffAttention,
-    NestedTensorBlock as Block,
+    Block,
 )
 
 
@@ -164,7 +164,7 @@ class DinoVisionTransformer(nn.Module):
                     act_layer=act_layer,
                     ffn_layer=ffn_layer_class,
                     init_values=init_values,
-                    attn_class=MemEffAttention,
+                    # attn_class=MemEffAttention,
                 )
                 for i in range(depth)
             ]
