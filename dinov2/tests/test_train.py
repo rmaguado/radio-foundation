@@ -1,6 +1,5 @@
 import pytest
 import torch
-from types import SimpleNamespace
 from omegaconf import OmegaConf
 import os
 from dinov2.train.ssl_meta_arch import SSLMetaArch
@@ -58,7 +57,7 @@ def minimal_cfg(monkeypatch):
     )
     minimal_model_cfg = OmegaConf.load(minimal_model_path)
     merged_cfg = OmegaConf.merge(dinov2_default_config, minimal_model_cfg)
-    return OmegaConf.to_container(merged_cfg, resolve=True)
+    return merged_cfg
 
 
 def test_ssl_meta_arch_init(minimal_cfg):
@@ -71,13 +70,20 @@ def test_ssl_meta_arch_init(minimal_cfg):
 def test_ssl_meta_arch_forward(minimal_cfg):
     arch = SSLMetaArch(minimal_cfg)
     collated_views = {
-        "g1": {
-            "images": torch.zeros(2, 1, 8, 8),
-            "masks": torch.zeros(2, 1, 8, 8, dtype=torch.bool),
+        "2d_global_hd": {
+            "images": torch.zeros(2, 1, 224, 224),
+            "masks": torch.zeros(2, 1, 16, 16, dtype=torch.bool),
             "embed_layer": "patch2d",
             "is_target": True,
-            "targets": [],
-        }
+            "targets": ["2d_global_hd"],
+        },
+        "2d_local_hd": {
+            "images": torch.zeros(2, 1, 112, 112),
+            "masks": torch.zeros(2, 1, 8, 8, dtype=torch.bool),
+            "embed_layer": "patch2d",
+            "is_target": False,
+            "targets": ["2d_global_hd"],
+        },
     }
     teacher_temp = 1.0
     loss, loss_dict = arch.forward(collated_views, teacher_temp)
