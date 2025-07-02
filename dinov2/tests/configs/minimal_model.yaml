@@ -8,9 +8,6 @@ student:
   - type: patch2d
     patch_size: 14
     img_size: 448
-  - type: patch3d
-    patch_size: 14
-    img_size: 224
   drop_path_rate: 0
   layerscale: 1.0e-05
   drop_path_uniform: true
@@ -20,3 +17,44 @@ student:
   proj_bias: true
   ffn_bias: true
   num_register_tokens: 4
+crops:
+  crop_groups:
+    - name: 2d_global_hd
+      is_target: true
+      size: 224
+      num_crops: 3
+      embed_layer: patch2d
+    - name: 2d_local_hd
+      targets:
+      - 2d_global_hd
+      size: 112
+      num_crops: 2
+      embed_layer: patch2d
+augmentations:
+  test_augmentations:
+    2d_global_hd:
+      - name: slice
+        channels: 1
+      - name: rotate
+      - name: localcrop
+      - name: gaussian_blur
+        p: 0.5
+    2d_local_hd:
+      - name: rotate
+      - name: globalcrop
+      - name: gaussian_blur
+        p: 0.5
+datasets:
+  - name: default_dataset
+    weight: 1.0
+    index_path: .
+    type: ct
+    storage: dicom
+    augmentation: test_augmentations
+    channels: 1
+    pixel_range:
+      lower: -3
+      upper: 3
+    norm:
+      mean: 0
+      std: 1
