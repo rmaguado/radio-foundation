@@ -3,7 +3,7 @@ from typing import Callable, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange
+from einops import rearrange, repeat
 
 
 class PatchEmbed(nn.Module):
@@ -57,7 +57,9 @@ class PatchEmbed(nn.Module):
         x = self._rearrange_projection(x)
         x = self.norm(x)
 
-        x = x + self.get_pos_embed(*spatial_dims)
+        pos_embed = self.get_pos_embed(*spatial_dims)
+
+        x = x + repeat(pos_embed, "1 n d -> b n d", b=B)
 
         return x
 
