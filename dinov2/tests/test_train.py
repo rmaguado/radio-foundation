@@ -69,6 +69,7 @@ def test_ssl_meta_arch_init(minimal_cfg):
 
 def test_ssl_meta_arch_forward(minimal_cfg):
     arch = SSLMetaArch(minimal_cfg)
+    arch.to("cuda")
     collated_views = {
         "2d_global_hd": {
             "images": torch.zeros(8, 3, 1, 224, 224),
