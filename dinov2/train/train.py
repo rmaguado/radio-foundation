@@ -14,14 +14,15 @@ import warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 from dinov2.logging import MetricLogger
-from dinov2.utils.config import setup
 
+from dinov2.configs import get_cfg_from_path, write_config, validate_config
 from dinov2.train.utils import (
     update_schedules,
     apply_gradient_operations,
     log_training_step,
     do_test,
 )
+from dinov2.utils import utils
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
 from dinov2.train.setup import setup_training_components, setup_dataloader
@@ -136,12 +137,28 @@ def main(rank, world_size):
     torch.cuda.set_device(rank)
 
     args = get_args_parser(add_help=True).parse_args()
-    cfg = setup(args)
+    cfg = get_cfg_from_path(args.config_path)
+    os.makedirs(args.output_path, exist_ok=True)
+
+    seed = getattr(args, "seed", 0)
+    rank = dist.get_rank()
+
+    if getattr(args, "debug", False):
+        logging_level = logging.DEBUG
+    else:
+        logging_level = logging.INFO
+
+    global logger
+    setup_logging(output=args.output_path, level=logging_level)
+    logger = logging.getLogger("dinov2")
+
+    utils.fix_random_seeds(seed + rank)
+
+    write_config(cfg, args.output_path)
+    validate_config(cfg)
 
     model = SSLMetaArch(cfg).to(rank)
     model = DDP(model, device_ids=[rank])
-
-    logger.debug("Model:\n{}".format(model))
 
     do_train(cfg, model, resume=not args.no_resume)
 

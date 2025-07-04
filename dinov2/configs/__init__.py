@@ -9,9 +9,19 @@ from omegaconf import OmegaConf, DictConfig, ListConfig
 from dinov2.configs.validation import validate_config
 
 
-def load_config(config_name: str) -> DictConfig | ListConfig:
-    config_filename = config_name + ".yaml"
-    return OmegaConf.load(pathlib.Path(__file__).parent.resolve() / config_filename)
+dinov2_default_config = OmegaConf.load("dinov2/configs/ssl_default_config.yaml")
 
 
-dinov2_default_config = load_config("ssl_default_config")
+def write_config(cfg, output_dir, name="config.yaml"):
+    logger.info(OmegaConf.to_yaml(cfg))
+    saved_cfg_path = os.path.join(output_dir, name)
+    with open(saved_cfg_path, "w") as f:
+        OmegaConf.save(config=cfg, f=f)
+    return saved_cfg_path
+
+
+def get_cfg_from_path(config_file):
+    default_cfg = OmegaConf.create(dinov2_default_config)
+    cfg = OmegaConf.load(config_file)
+    cfg = OmegaConf.merge(default_cfg, cfg, OmegaConf.from_cli(args.opts))
+    return cfg
