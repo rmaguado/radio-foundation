@@ -20,6 +20,6 @@ cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
 python3 ${PYTHONPATH}/dinov2/train/train.py \
-    --config-file="$CONF" \
-    --output-dir="$OUT" \
+    --config_path="$CONF" \
+    --output_path="$OUT" \
     --debug
