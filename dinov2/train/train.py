@@ -221,7 +221,7 @@ def main(rank, world_size):
     validate_config(cfg)
     logger.info(OmegaConf.to_yaml(cfg))
 
-    model = SSLMetaArch(cfg).to(rank)
+    model = SSLMetaArch(cfg, rank).to(rank)
     model = DDP(model, device_ids=[rank])
 
     do_train(cfg, model, resume=not args.no_resume)

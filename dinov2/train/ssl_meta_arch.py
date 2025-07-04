@@ -21,9 +21,10 @@ logger = logging.getLogger("dinov2")
 
 
 class SSLMetaArch(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, device):
         super().__init__()
         self.cfg = cfg
+        self.device = device
 
         student_model_dict = dict()
         teacher_model_dict = dict()
@@ -107,10 +108,10 @@ class SSLMetaArch(nn.Module):
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         """Moves images and masks to the appropriate device."""
         images = {
-            k: v["images"].cuda(non_blocking=True) for k, v in collated_views.items()
+            k: v["images"].to(self.device, non_blocking=True) for k, v in collated_views.items()
         }
         masks = {
-            k: v["masks"].cuda(non_blocking=True) for k, v in collated_views.items()
+            k: v["masks"].to(self.device, non_blocking=True) for k, v in collated_views.items()
         }
         return images, masks
 
