@@ -13,12 +13,7 @@ import torch
 from torch.utils.data import Sampler
 
 from .datasets import MultiDataset, DicomVolumeDataset, NiftiVolumeDataset
-from .samplers import (
-    InfiniteSampler,
-    WeightedInfiniteSampler,
-    ShardedInfiniteSampler,
-    WeightedShardedInfiniteSampler,
-)
+from .samplers import InfiniteSampler, WeightedInfiniteSampler
 from .augmentations import DataAugmentationDINO
 
 
@@ -85,7 +80,7 @@ def _make_sampler(
     Creates a sampler with the specified parameters.
     A sampler is a strategy for sampling data from a dataset.
     Supported sampler types includes:
-        - INFINITE, SHARDED_INFINITE, WEIGHTED_INFINITE, WEIGHTED_SHARDED_INFINITE.
+        - INFINITE or WEIGHTED_INFINITE.
 
     Args:
         dataset: The dataset to create the sampler for.
@@ -104,10 +99,7 @@ def _make_sampler(
         dataset_names = [dataset.dataset_name]
     sample_count = len(dataset)
 
-    if sampler_type in [
-        SamplerType.WEIGHTED_INFINITE,
-        SamplerType.WEIGHTED_SHARDED_INFINITE,
-    ]:
+    if sampler_type == SamplerType.WEIGHTED_INFINITE:
         assert weights is not None, "Weights must be provided for weighted sampling"
 
     if weights is not None:
@@ -138,17 +130,9 @@ def _make_sampler(
     if sampler_type == SamplerType.INFINITE:
         logger.info("sampler: infinite")
         return InfiniteSampler(sample_count=sample_count, seed=seed)
-    elif sampler_type == SamplerType.SHARDED_INFINITE:
-        logger.info("sampler: sharded infinite")
-        return ShardedInfiniteSampler(sample_count=sample_count, seed=seed)
     elif sampler_type == SamplerType.WEIGHTED_INFINITE:
         logger.info("sampler: weighted infinite")
         return WeightedInfiniteSampler(
-            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
-        )
-    elif sampler_type == SamplerType.WEIGHTED_SHARDED_INFINITE:
-        logger.info("sampler: weighted sharded infinite")
-        return WeightedShardedInfiniteSampler(
             dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
         )
 
@@ -180,7 +164,7 @@ def make_data_loader(
         num_workers: The number of workers to use.
         seed: The random seed to use.
         weights: The weights for each dataset if using multiple groups of data.
-        sampler_type: Which sampler to use: EPOCH, INFINITE, SHARDED_INFINITE, DISTRIBUTED or None.
+        sampler_type: Which sampler to use: INFINITE or WEIGHTED_INFINITE.
         sampler_size: The number of images per epoch (when applicable) or -1 for the entire dataset.
         drop_last: Whether the last non-full batch of data should be dropped.
         persistent_workers: maintain the workers Dataset instances alive after a dataset has been consumed once.
