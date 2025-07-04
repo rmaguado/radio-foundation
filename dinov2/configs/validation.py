@@ -238,7 +238,6 @@ class OptimConfig(BaseModel):
     weight_decay: float
     weight_decay_end: float
     base_lr: float
-    lr: float
     warmup_epochs: int
     min_lr: float
     clip_grad: float
