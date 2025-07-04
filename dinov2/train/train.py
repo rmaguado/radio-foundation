@@ -16,12 +16,6 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 from dinov2.logging import MetricLogger
 
 from dinov2.configs import get_cfg_from_path, write_config, validate_config
-from dinov2.train.utils import (
-    update_schedules,
-    apply_gradient_operations,
-    log_training_step,
-    do_test,
-)
 from dinov2.utils import utils
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
@@ -43,6 +37,61 @@ def should_eval_model(iteration, save_teacher_iterations):
     return (
         save_teacher_iterations > 0 and (iteration + 1) % save_teacher_iterations == 0
     )
+
+
+def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
+    for param_group in optimizer.param_groups:
+        is_last_layer = param_group["is_last_layer"]
+        lr_multiplier = param_group["lr_multiplier"]
+        wd_multiplier = param_group["wd_multiplier"]
+        param_group["weight_decay"] = wd * wd_multiplier
+        param_group["lr"] = (last_layer_lr if is_last_layer else lr) * lr_multiplier
+
+
+def update_schedules(optimizer, schedulers, iteration) -> Tuple[float, float]:
+    lr = schedulers["lr"][iteration]
+    wd = schedulers["wd"][iteration]
+    momentum: float = schedulers["momentum"][iteration]
+    teacher_temp: float = schedulers["teacher_temp"][iteration]
+    last_layer_lr = schedulers["last_layer_lr"][iteration]
+    apply_optim_scheduler(optimizer, lr, wd, last_layer_lr)
+
+    return momentum, teacher_temp
+
+
+def apply_gradient_operations(cfg, model, optimizer, accum_steps):
+    for group in optimizer.param_groups:
+        for param in group["params"]:
+            if param.grad is not None:
+                param.grad.data.div_(accum_steps)
+
+    if cfg.optim.clip_grad:
+        for v in model.student.values():
+            v.clip_grad_norm_(cfg.optim.clip_grad)
+
+    optimizer.step()
+
+
+def log_training_step(metric_logger, loss_dict, schedulers, iteration):
+    if dist.get_world_size() > 1:
+        for v in loss_dict.values():
+            torch.distributed.all_reduce(v)
+    loss_dict_reduced = {
+        k: v.item() / dist.get_world_size() for k, v in loss_dict.items()
+    }
+
+    if math.isnan(sum(loss_dict_reduced.values())):
+        logger.error(f"NaN detected in reduced loss at iteration {iteration}")
+        logger.info(f"Reduced loss dict: {loss_dict_reduced}")
+        raise AssertionError
+
+    losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+
+    metric_logger.update(lr=schedulers["lr"][iteration])
+    metric_logger.update(wd=schedulers["wd"][iteration])
+    metric_logger.update(mom=schedulers["momentum"][iteration])
+    metric_logger.update(last_layer_lr=schedulers["last_layer_lr"][iteration])
+    metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
 
 
 def train(
@@ -128,6 +177,22 @@ def do_train(cfg, model, resume=False):
     logger.info(f"Finished training stage 1.")
     do_test(cfg, model, f"training_{iteration}")
     logger.info("Finished training on full-size images")
+
+
+def do_test(cfg, model, iteration):
+    torch.cuda.synchronize()
+
+    new_state_dict = {k: v.cpu() for k, v in model.teacher.state_dict().items()}
+
+    if dist.get_rank() == 0:
+        iterstring = str(iteration)
+        eval_dir = os.path.join(cfg.train.output_dir, "eval", iterstring)
+        os.makedirs(eval_dir, exist_ok=True)
+
+        torch.cuda.empty_cache()
+
+        teacher_ckp_path = os.path.join(eval_dir, "teacher_checkpoint.pth")
+        torch.save({"teacher": new_state_dict}, teacher_ckp_path)
 
 
 def main(rank, world_size):
