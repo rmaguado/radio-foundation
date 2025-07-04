@@ -69,9 +69,8 @@ optim:
   weight_decay: 0.04
   weight_decay_end: 0.2
   base_lr: 3.5e-4
-  lr: 0.
-  warmup_epochs: 10
   min_lr: 1.0e-05
+  warmup_epochs: 10
   clip_grad: 3.0
   freeze_last_layer_epochs: 1
   patch_embed_lr_mult: 0.2
