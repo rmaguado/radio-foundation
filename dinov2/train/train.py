@@ -4,22 +4,20 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import logging
+from omegaconf import OmegaConf
+from typing import Tuple
 import os
+import math
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
-import warnings
 
-warnings.simplefilter(action="ignore", category=FutureWarning)
-
-from dinov2.logging import MetricLogger
-
+from dinov2.logging import MetricLogger, setup_logging
 from dinov2.configs import get_cfg_from_path, write_config, validate_config
-from dinov2.utils import utils
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
-from dinov2.train.setup import setup_training_components, setup_dataloader
+from dinov2.train.setup import setup_training_components, setup_dataloader, fix_random_seeds
 
 torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")
@@ -174,7 +172,7 @@ def do_train(cfg, model, resume=False):
         max_iter=max_iter,
     )
 
-    logger.info(f"Finished training stage 1.")
+    logger.info("Finished training stage 1.")
     do_test(cfg, model, f"training_{iteration}")
     logger.info("Finished training on full-size images")
 
@@ -217,10 +215,11 @@ def main(rank, world_size):
     setup_logging(output=args.output_path, level=logging_level)
     logger = logging.getLogger("dinov2")
 
-    utils.fix_random_seeds(seed + rank)
+    fix_random_seeds(seed + rank)
 
     write_config(cfg, args.output_path)
     validate_config(cfg)
+    logger.info(OmegaConf.to_yaml(cfg))
 
     model = SSLMetaArch(cfg).to(rank)
     model = DDP(model, device_ids=[rank])
