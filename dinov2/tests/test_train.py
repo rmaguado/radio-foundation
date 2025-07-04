@@ -6,7 +6,7 @@ from dinov2.train.ssl_meta_arch import SSLMetaArch
 
 @pytest.fixture
 def arch():
-    cfg = get_cfg_from_path("tests/configs/minimal_model.yaml")
+    cfg = get_cfg_from_path("dinov2/tests/configs/minimal_model.yaml")
     return SSLMetaArch(cfg, device=torch.device("cpu"))
 
 
