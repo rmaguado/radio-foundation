@@ -161,7 +161,7 @@ class SSLMetaArch(nn.Module):
 
         if self.do_ibot and is_target:
             patch_tokens = backbone_output["patchtokens"]
-            masked_patch_tokens = torch.masked_select(patch_tokens, flat_masks)  # type: ignore
+            masked_patch_tokens = torch.masked_select(patch_tokens, flat_masks)
 
             ibot_head = model.ibot_head if self.ibot_separate_head else model.dino_head
             output["ibot"] = ibot_head(masked_patch_tokens)
@@ -361,7 +361,7 @@ class SSLMetaArch(nn.Module):
             torch._foreach_mul_(teacher_param_list, m)
             torch._foreach_add_(teacher_param_list, student_param_list, alpha=1 - m)
 
-    def train(self, mode):  # type: ignore
+    def train(self, mode):
         super().train(mode)
         self.teacher.eval()
 

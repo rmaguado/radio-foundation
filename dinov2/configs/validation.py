@@ -405,5 +405,5 @@ def validate_config(conf: DictConfig) -> bool:
         conf (DictConfig): The configuration dictionary to validate loaded from a YAML file using omegaconf.
     """
     conf_dict = OmegaConf.to_container(conf, resolve=True)
-    MainConfig(**conf_dict)  # type: ignore
+    MainConfig(**conf_dict)
     return True
