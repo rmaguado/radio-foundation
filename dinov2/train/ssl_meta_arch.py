@@ -108,10 +108,12 @@ class SSLMetaArch(nn.Module):
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         """Moves images and masks to the appropriate device."""
         images = {
-            k: v["images"].to(self.device, non_blocking=True) for k, v in collated_views.items()
+            k: v["images"].to(self.device, non_blocking=True)
+            for k, v in collated_views.items()
         }
         masks = {
-            k: v["masks"].to(self.device, non_blocking=True) for k, v in collated_views.items()
+            k: v["masks"].to(self.device, non_blocking=True)
+            for k, v in collated_views.items()
         }
         return images, masks
 
@@ -162,7 +164,8 @@ class SSLMetaArch(nn.Module):
 
         if self.do_ibot and is_target:
             patch_tokens = backbone_output["patchtokens"]
-            masked_patch_tokens = torch.masked_select(patch_tokens, flat_masks)
+            patch_tokens = rearrange(patch_tokens, "(b v) p d -> (b v p) d", b=B, v=V)
+            masked_patch_tokens = patch_tokens[masks.view(-1)]
 
             ibot_head = model.ibot_head if self.ibot_separate_head else model.dino_head
             output["ibot"] = ibot_head(masked_patch_tokens)
