@@ -5,7 +5,7 @@
 
 from functools import partial
 import logging
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 
 import torch
 from torch import nn
@@ -105,7 +105,7 @@ class SSLMetaArch(nn.Module):
 
     def _prepare_inputs(
         self, collated_views: Dict[str, Any]
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, Optional[torch.Tensor]]]:
         """Moves images and masks to the appropriate device."""
         images = {
             k: v["images"].to(self.device, non_blocking=True)
@@ -113,6 +113,8 @@ class SSLMetaArch(nn.Module):
         }
         masks = {
             k: v["masks"].to(self.device, non_blocking=True)
+            if "masks" in v and v["masks"] is not None
+            else None
             for k, v in collated_views.items()
         }
         return images, masks
