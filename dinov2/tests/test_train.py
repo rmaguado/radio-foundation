@@ -15,14 +15,13 @@ def collated_views():
     return {
         "2d_global_hd": {
             "images": torch.zeros(8, 3, 1, 224, 224),
-            "masks": torch.zeros(8, 3, 16, 16, dtype=torch.bool),
+            "masks": torch.rand(8, 3, 16, 16) > 0.5,
             "embed_layer": "patch2d",
             "is_target": True,
             "targets": ["2d_global_hd"],
         },
         "2d_local_hd": {
             "images": torch.zeros(8, 3, 2, 1, 112, 112),
-            "masks": torch.zeros(8, 3, 8, 8, dtype=torch.bool),
             "embed_layer": "patch2d",
             "is_target": False,
             "targets": ["2d_global_hd"],
