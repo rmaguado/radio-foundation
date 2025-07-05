@@ -64,22 +64,22 @@ class DINOLoss(nn.Module):
         Q *= B  # the columns must sum to 1 so that Q is an assignment
         return Q.t()
 
-    def forward(self, student_outputs, teacher_outputs):
+    def forward(self, student_outputs: torch.Tensor, teacher_output: torch.Tensor) -> torch.Tensor:
         """
-        Cross-entropy between softmax outputs of the teacher and student networks.
+        Cross-entropy between softmax a single teacher target and possibly several student embeddings.
         """
-        total_loss = 0
+        total_loss = torch.tensor(0.0, device=student_outputs.device)
+
         B, num_student_views, head_dim = student_outputs.shape
-        _, num_teacher_views, _ = teacher_outputs.shape
 
         student_flat = student_outputs.view(-1, head_dim)
         lsm = F.log_softmax(student_flat / self.student_temp, dim=-1)
         lsm = lsm.view(B, num_student_views, head_dim)
 
         for s_idx in range(num_student_views):
-            student_output = lsm[:, s_idx, :].unsqueeze(1)
+            student_output = lsm[:, s_idx, :]
 
-            loss_per_student_view = torch.sum(teacher_outputs * student_output, dim=-1)
+            loss_per_student_view = torch.sum(teacher_output * student_output, dim=-1)
 
             total_loss -= loss_per_student_view.mean()
 
