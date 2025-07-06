@@ -89,38 +89,47 @@ transform_groups:
     size: 112
     num_crops: 1
     embed_layer: patch3d
+    is_target: true
     transforms:
       - name: rotate
-      - name: globalcrop
+      - name: globalcrop3d
       - name: gaussian_blur
         p: 0.5
   - name: 3d_local_ld
     size: 56
     num_crops: 3
     embed_layer: patch3d
+    targets:
+      - 3d_global_ld
     transforms:
     - name: rotate
-    - name: localcrop
+    - name: localcrop3d
     - name: gaussian_blur
       p: 0.5
   - name: 2d_global_hd
     size: 224
     num_crops: 3
     embed_layer: patch2d
+    is_target: true
+    targets:
+      - 3d_global_ld
     transforms:
       - name: slice
-        channels: 1
+        n_slices: 1
       - name: rotate
-      - name: localcrop
+      - name: localcrop2d
       - name: gaussian_blur
         p: 0.5
   - name: 2d_local_hd
     size: 112
     num_crops: 2
     embed_layer: patch2d
+    targets:
+      - 2d_global_hd
+      - 3d_global_ld
     transforms:
       - name: rotate
-      - name: globalcrop
+      - name: globalcrop2d
       - name: gaussian_blur
         p: 0.5
 augmentations:
