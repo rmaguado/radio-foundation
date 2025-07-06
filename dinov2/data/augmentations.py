@@ -87,7 +87,10 @@ class DataAugmentationDINO(object):
         )
         return image_transforms
 
-    def _recursive_graph_process(self, image_views, groups) -> dict:
+    def _recursive_graph_process(self, image_views, groups, crop_dims=None) -> dict:
+        if crop_dims is None:
+            crop_dims = []
+
         output = {}
         for group in groups:
             group_name = group["name"]
@@ -98,20 +101,31 @@ class DataAugmentationDINO(object):
 
             group_views = []
             for prev_view in image_views:
-                group_views.extend([group_transforms(prev_view) for _ in range(num_crops)])
+                transformed = [group_transforms(prev_view) for _ in range(num_crops)]
+                group_views.extend(transformed)
 
-            stack = torch.stack(group_views)
+            stacked = torch.stack(group_views)
+            full_dims = crop_dims + [num_crops]
+            view_shape = full_dims  # [n0, n1, n2, ..., channels, height, width]
+
+            sample_view = group_views[0]
+            img_shape = sample_view.shape
+            full_shape = view_shape + list(img_shape)
+
+            stacked = stacked.view(*full_shape)
 
             output[group_name] = {
-                "images": stack,
+                "images": stacked,
                 **group_info
             }
-
-            subgroup_output = self._recursive_graph_process(group_views, subgroups)
+            subgroup_output = self._recursive_graph_process(
+                group_views, subgroups, crop_dims + [num_crops]
+            )
             output.update(subgroup_output)
 
         return output
 
+
     def __call__(self, image: torch.Tensor) -> dict[str, list[torch.Tensor]]:
-        output = self._recursive_graph_process([image], self.transforms_graph)
+        output = self._recursive_graph_process(image, self.transforms_graph, level=0)
         return output
