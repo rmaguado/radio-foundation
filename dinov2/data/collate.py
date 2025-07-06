@@ -6,6 +6,8 @@
 import torch
 import random
 import logging
+import numpy as np
+from einops import rearrange
 
 from typing import List, Tuple, Dict, Callable, Any
 
@@ -24,52 +26,53 @@ def collate_data_and_cast(
 
     for group_name in view_groups:
         is_target = samples_list[0][group_name]["is_target"]
-        group_images = []
 
-        for sample_idx, sample in enumerate(samples_list):
-            group_data = sample[group_name]["images"]
-
-            if is_target:
-                group_images.append(torch.stack(group_data))
-            else:
-                group_images.append(
-                    torch.stack([torch.stack(crop) for crop in group_data])
-                )
+        group_uncollated_images = [
+            samples_list[i][group_name]["images"]
+            for i in range(len(samples_list))
+        ]
 
         collated_views[group_name] = {
-            "images": torch.stack(group_images).to(dtype),
+            "images": torch.stack(group_uncollated_images).to(dtype),
             "is_target": is_target,
             "targets": samples_list[0][group_name]["targets"],
             "embed_layer": samples_list[0][group_name]["embed_layer"],
             "mask_shape": samples_list[0][group_name]["mask_shape"],
+            "view_shape": samples_list[0][group_name]["view_shape"],
         }
 
     target_group_names = [k for k, v in collated_views.items() if v["is_target"]]
+    batch_size = collated_views[target_group_names[0]]["images"].shape[0]
     total_views = sum(
-        sum(collated_views[k]["images"].shape[:2]) for k in target_group_names
-    )
+        np.prod(collated_views[k]["view_shape"]) for k in target_group_names
+    ) * batch_size
     n_samples_masked = int(total_views * mask_probability)
 
-    probs = torch.linspace(*mask_ratio_tuple, n_samples_masked + 1).tolist()
+    probs = torch.linspace(*mask_ratio_tuple, n_samples_masked).tolist()
     probs += [0] * (total_views - n_samples_masked)
     random.shuffle(probs)
 
     for group_name in target_group_names:
 
-        group_masks = []
-        batch_shape = collated_views[group_name]["images"].shape
+        batch_size = collated_views[group_name]["images"].shape[0]
         mask_shape = collated_views[group_name]["mask_shape"]
+        view_shape = collated_views[group_name]["view_shape"]
+        num_views = batch_size * np.prod(view_shape)
 
-        for i in range(batch_shape[0]):
+        masks = []
 
-            crop_masks = []
-            for j in range(batch_shape[1]):
-                mask_ratio = probs.pop(0)
-                crop_masks.append(
-                    torch.from_numpy(mask_generator(mask_shape, mask_ratio))
-                )
-            group_masks.append(torch.stack(crop_masks))
+        for i in range(num_views):
 
-        collated_views[group_name]["masks"] = torch.BoolTensor(torch.stack(group_masks))
+            mask_ratio = probs.pop(0)
+            masks.append(
+                torch.from_numpy(mask_generator(mask_shape, mask_ratio))
+            )
+        
+        stacked_masks = torch.stack(masks)
+        target_mask_shape = (batch_size, *view_shape, *mask_shape)
+
+        collated_views[group_name]["masks"] = stacked_masks.view(
+            *target_mask_shape
+        )
 
     return collated_views
