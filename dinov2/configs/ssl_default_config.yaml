@@ -84,61 +84,60 @@ crops:
   local_crop_scale:
   - 0.16
   - 0.30
-  crop_groups:
-    - name: 3d_global_ld
-      is_target: true
-      size: 112
-      num_crops: 1
-      embed_layer: patch3d
-    - name: 3d_local_ld
-      targets:
-      - 3d_global_ld
-      size: 56
-      num_crops: 3
-      embed_layer: patch3d
-    - name: 2d_global_hd
-      is_target: true
-      size: 224
-      num_crops: 3
-      embed_layer: patch2d
-    - name: 2d_local_hd
-      targets:
-      - 3d_global_ld
-      - 2d_global_hd
-      size: 112
-      num_crops: 2
-      embed_layer: patch2d
-augmentations:
-  default_ct:
-    3d_global_ld:
+transform_groups:
+  - name: 3d_global_ld
+    size: 112
+    num_crops: 1
+    embed_layer: patch3d
+    transforms:
       - name: rotate
       - name: globalcrop
       - name: gaussian_blur
         p: 0.5
-    3d_local_ld:
-      - name: rotate
-      - name: localcrop
-      - name: gaussian_blur
-        p: 0.5
-    2d_global_hd:
+  - name: 3d_local_ld
+    size: 56
+    num_crops: 3
+    embed_layer: patch3d
+    transforms:
+    - name: rotate
+    - name: localcrop
+    - name: gaussian_blur
+      p: 0.5
+  - name: 2d_global_hd
+    size: 224
+    num_crops: 3
+    embed_layer: patch2d
+    transforms:
       - name: slice
         channels: 1
       - name: rotate
       - name: localcrop
       - name: gaussian_blur
         p: 0.5
-    2d_local_hd:
+  - name: 2d_local_hd
+    size: 112
+    num_crops: 2
+    embed_layer: patch2d
+    transforms:
       - name: rotate
       - name: globalcrop
       - name: gaussian_blur
         p: 0.5
+augmentations:
+  default_3d:
+    - name: 3d_global_ld
+      subgroups:
+        - name: 3d_local_ld
+        - name: 2d_global_hd
+          subgroups: 
+            - name: 2d_local_hd
 datasets:
   - name: default_dataset
     weight: 1.0
     index_path: .
     type: ct
     storage: dicom
-    augmentation: default_ct
+    augmentation: default_3d
     channels: 1
     pixel_range:
       lower: -1000.0

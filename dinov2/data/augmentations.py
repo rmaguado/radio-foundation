@@ -8,6 +8,7 @@ import logging
 import torch
 from omegaconf import DictConfig
 import copy
+from einops import rearrange
 
 from .transforms import ImageTransforms
 
@@ -17,36 +18,24 @@ logger = logging.getLogger("dinov2")
 
 class DataAugmentationDINO(object):
     def __init__(self, config: DictConfig, dataset_config: DictConfig) -> None:
-        self.dataset_config = dataset_config
-        self.augmentations_config = config.augmentations[dataset_config.augmentation]
-        self.crops_config = config.crops
-        self.embed_config = config.student.embed_layers
+        self.dataset_config = dataset_config.copy()
+        self.transform_groups = config.transform_groups.copy()
+        self.crops_config = config.crops.copy()
+        self.embed_config = config.student.embed_layers.copy()
+
+        self.transforms_graph = config.augmentations[dataset_config.augmentation].copy()
 
         self.global_crop_scale = self.crops_config.global_crop_scale
         self.local_crop_scale = self.crops_config.local_crop_scale
 
-        self.crop_groups_config = {}
-        self.target_groups = []
-        self.nontarget_groups = []
-
-        for group_dict in self.crops_config.crop_groups:
-            group_dict_copy = group_dict.copy()
-            group_name = group_dict_copy.pop("name")
-            self.crop_groups_config[group_name] = group_dict_copy
-
-            is_target = group_dict_copy.get("is_target", False)
-            if is_target:
-                self.target_groups.append(group_name)
-            else:
-                self.nontarget_groups.append(group_name)
-
-        self.transforms = self.load_transforms_from_cfg()
-
         self.group_info = {}
-        for group_name, group_config in self.crop_groups_config.items():
-            is_target = group_config.get("is_target", False)
-            embed_layer = group_config["embed_layer"]
+        self.transforms = {}
+        for group_config in self.transform_groups:
+            group_name = group_config["name"]
             img_size = group_config["size"]
+            num_crops = group_config["num_crops"]
+            embed_layer = group_config["embed_layer"]
+            transforms_list = group_config["transforms"]
 
             patch_size_list = [
                 x["patch_size"] for x in self.embed_config if x["type"] == embed_layer
@@ -57,43 +46,39 @@ class DataAugmentationDINO(object):
                     f"Embed layer '{embed_layer}' not found in embed_config."
                 )
             patch_size = patch_size_list[0]
-
-            targets = group_config.get("targets", [group_name])
             patches_shape = img_size // patch_size
             if embed_layer == "patch2d":
                 mask_shape = (patches_shape,) * 2
-            elif embed_layer == "patch2d":
+            elif embed_layer == "patch3d":
                 mask_shape = (patches_shape,) * 3
             else:
                 raise ValueError(f"Embed layer {embed_layer} not recognized.")
 
             self.group_info[group_name] = {
-                "num_crops": group_config["num_crops"],
-                "output_template": {
-                    "is_target": is_target,
-                    "targets": targets,
-                    "embed_layer": embed_layer,
-                    "mask_shape": mask_shape,
-                },
+                "size": img_size,
+                "num_crops": num_crops,
+                "embed_layer": embed_layer,
+                "mask_shape": mask_shape,
             }
 
-    def build_transform_group(self, transform_key):
+            self.transforms[group_name] = self._build_transform_group(
+                transforms_list, img_size
+            )
+
+    def _build_transform_group(self, transforms_list, img_size):
         image_transforms = ImageTransforms(
             self.dataset_config.pixel_range.lower,
             self.dataset_config.pixel_range.upper,
             self.dataset_config.channels,
         )
-        group_config = self.crop_groups_config[transform_key]
-        augmentations_list = copy.deepcopy(self.augmentations_config[transform_key])
+        transforms_list_copy = copy.deepcopy(transforms_list)
 
-        for tc in augmentations_list:
+        for tc in transforms_list_copy:
             name = tc.pop("name")
             if name == "globalcrop":
-                crop_size = group_config["size"]
-                image_transforms.add_crop(crop_size, self.global_crop_scale)
+                image_transforms.add_crop(img_size, self.global_crop_scale)
             elif name == "localcrop":
-                crop_size = group_config["size"]
-                image_transforms.add_crop(crop_size, self.local_crop_scale)
+                image_transforms.add_crop(img_size, self.local_crop_scale)
             else:
                 image_transforms.add_transform(name, tc)
 
@@ -102,41 +87,31 @@ class DataAugmentationDINO(object):
         )
         return image_transforms
 
-    def load_transforms_from_cfg(self):
-        transform_groups = {
-            group: self.build_transform_group(group)
-            for group in self.crop_groups_config.keys()
-        }
-        return transform_groups
+    def _recursive_graph_process(self, image_views, groups) -> dict:
+        output = {}
+        for group in groups:
+            group_name = group["name"]
+            group_info = self.group_info[group_name]
+            num_crops = group_info["num_crops"]
+            group_transforms = self.transforms[group_name]
+            subgroups = group.get("subgroups", [])
+
+            group_views = []
+            for prev_view in image_views:
+                group_views.extend([group_transforms(prev_view) for _ in range(num_crops)])
+
+            stack = torch.stack(group_views)
+
+            output[group_name] = {
+                "images": stack,
+                **group_info
+            }
+
+            subgroup_output = self._recursive_graph_process(group_views, subgroups)
+            output.update(subgroup_output)
+
+        return output
 
     def __call__(self, image: torch.Tensor) -> dict[str, list[torch.Tensor]]:
-        output = {}
-
-        for target_group in self.target_groups:
-            info = self.group_info[target_group]
-            transform_group = self.transforms[target_group]
-
-            group_outputs = [transform_group(image) for _ in range(info["num_crops"])]
-
-            output_dict = info["output_template"].copy()
-            output_dict["images"] = group_outputs
-            output[target_group] = output_dict
-
-        for nontarget_group in self.nontarget_groups:
-            info = self.group_info[nontarget_group]
-            transform_group = self.transforms[nontarget_group]
-
-            main_target = info["output_template"]["targets"][0]
-            source_images = output[main_target]["images"]
-            group_outputs = []
-            for i, source_image in enumerate(source_images):
-                transformed_crops = [
-                    transform_group(source_image) for _ in range(info["num_crops"])
-                ]
-                group_outputs.append(transformed_crops)
-
-            output_dict = info["output_template"].copy()
-            output_dict["images"] = group_outputs
-            output[nontarget_group] = output_dict
-
+        output = self._recursive_graph_process([image], self.transforms_graph)
         return output
