@@ -8,7 +8,6 @@ import logging
 import torch
 from omegaconf import DictConfig
 import copy
-from einops import rearrange
 
 from .transforms import ImageTransforms
 
@@ -35,6 +34,8 @@ class DataAugmentationDINO(object):
             img_size = group_config["size"]
             num_crops = group_config["num_crops"]
             embed_layer = group_config["embed_layer"]
+            targets = group_config.get("targets", [])
+            is_target = group_config.get("is_target", False)
             transforms_list = group_config["transforms"]
 
             patch_size_list = [
@@ -59,6 +60,8 @@ class DataAugmentationDINO(object):
                 "num_crops": num_crops,
                 "embed_layer": embed_layer,
                 "mask_shape": mask_shape,
+                "targets": targets,
+                "is_target": is_target
             }
 
             self.transforms[group_name] = self._build_transform_group(
@@ -75,10 +78,14 @@ class DataAugmentationDINO(object):
 
         for tc in transforms_list_copy:
             name = tc.pop("name")
-            if name == "globalcrop":
-                image_transforms.add_crop(img_size, self.global_crop_scale)
-            elif name == "localcrop":
-                image_transforms.add_crop(img_size, self.local_crop_scale)
+            if name == "globalcrop2d":
+                image_transforms.add_crop(img_size, self.global_crop_scale, is_3d=False)
+            elif name == "localcrop2d":
+                image_transforms.add_crop(img_size, self.local_crop_scale, is_3d=False)
+            elif name == "globalcrop3d":
+                image_transforms.add_crop(img_size, self.global_crop_scale, is_3d=True)
+            elif name == "localcrop3d":
+                image_transforms.add_crop(img_size, self.local_crop_scale, is_3d=True)
             else:
                 image_transforms.add_transform(name, tc)
 
@@ -106,16 +113,17 @@ class DataAugmentationDINO(object):
 
             stacked = torch.stack(group_views)
             full_dims = crop_dims + [num_crops]
-            view_shape = full_dims  # [n0, n1, n2, ..., channels, height, width]
+            view_shape = full_dims  # [n0, n1, n2, ...]
 
             sample_view = group_views[0]
             img_shape = sample_view.shape
-            full_shape = view_shape + list(img_shape)
+            full_shape = view_shape + list(img_shape) # [n0, n1, n2, ..., channels, height, width]
 
             stacked = stacked.view(*full_shape)
 
             output[group_name] = {
                 "images": stacked,
+                "view_shape": view_shape,
                 **group_info
             }
             subgroup_output = self._recursive_graph_process(
@@ -126,6 +134,6 @@ class DataAugmentationDINO(object):
         return output
 
 
-    def __call__(self, image: torch.Tensor) -> dict[str, list[torch.Tensor]]:
-        output = self._recursive_graph_process(image, self.transforms_graph, level=0)
+    def __call__(self, image: torch.Tensor) -> dict:
+        output = self._recursive_graph_process([image], self.transforms_graph)
         return output
