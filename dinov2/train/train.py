@@ -17,7 +17,11 @@ from dinov2.logging import MetricLogger, setup_logging
 from dinov2.configs import get_cfg_from_path, write_config, validate_config
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
-from dinov2.train.setup import setup_training_components, setup_dataloader, fix_random_seeds
+from dinov2.train.setup import (
+    setup_training_components,
+    setup_dataloader,
+    fix_random_seeds,
+)
 
 torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")
@@ -142,9 +146,8 @@ def train(
     return iteration
 
 
-def do_train(cfg, model, resume=False):
+def do_train(cfg, model, dtype, resume=False):
     model.train()
-    inputs_dtype = torch.half
 
     (
         optimizer,
@@ -163,7 +166,7 @@ def do_train(cfg, model, resume=False):
 
     train_components = [cfg, metric_logger, model, optimizer, schedulers, checkpointer]
 
-    data_loader = setup_dataloader(cfg, inputs_dtype)
+    data_loader = setup_dataloader(cfg, dtype)
     metric_logger.set_dataloader(data_loader)
 
     iteration = train(
@@ -221,10 +224,18 @@ def main(rank, world_size):
     validate_config(cfg)
     logger.info(OmegaConf.to_yaml(cfg))
 
-    model = SSLMetaArch(cfg, rank).to(rank)
+    dtype_str = cfg.compute_precision
+    if dtype_str == "fp16":
+        dtype = torch.half
+    elif dtype_str == "bf16":
+        dtype = torch.bfloat16
+    else:
+        dtype = torch.float
+
+    model = SSLMetaArch(cfg, rank, dtype).to(rank)
     model = DDP(model, device_ids=[rank])
 
-    do_train(cfg, model, resume=not args.no_resume)
+    do_train(cfg, model, dtype, resume=not args.no_resume)
 
 
 if __name__ == "__main__":

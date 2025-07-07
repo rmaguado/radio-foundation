@@ -33,7 +33,7 @@ class SSLMetaArch(nn.Module):
         device: Device to run the model on (e.g., 'cuda' or 'cpu').
     """
 
-    def __init__(self, cfg, device):
+    def __init__(self, cfg, device, dtype):
         super().__init__()
         self.cfg = cfg
         self.device = device
@@ -103,6 +103,10 @@ class SSLMetaArch(nn.Module):
         # there is no backpropagation through the teacher, so no need for gradients
         for p in self.teacher.parameters():
             p.requires_grad = False
+
+        self.autocast_ctx = partial(
+            torch.autocast, enabled=True, dtype=dtype, device_type="cuda"
+        )
 
     def _prepare_inputs(self, collated_views: Dict[str, Any]) -> None:
         """
@@ -378,8 +382,9 @@ class SSLMetaArch(nn.Module):
         """
         self._prepare_inputs(collated_views)
 
-        teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
-        student_outputs = self._run_student_pass(collated_views)
+        with self.autocast_ctx():
+            teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
+            student_outputs = self._run_student_pass(collated_views)
 
         dino_loss = self._calculate_dino_loss(
             student_outputs["dino"], teacher_outputs["dino"], collated_views
