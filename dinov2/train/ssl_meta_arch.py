@@ -286,7 +286,7 @@ class SSLMetaArch(nn.Module):
         collated_views: Dict[str, Any],
     ) -> torch.Tensor:
         """Calculates the total DINO loss across all student-teacher view pairs."""
-        total_loss = torch.tensor(0.0)
+        total_loss = torch.tensor(0.0, device=self.device)
         total_terms = 0
 
         for group_name, s_tokens in student_dino_tokens.items():
@@ -320,7 +320,7 @@ class SSLMetaArch(nn.Module):
 
         if total_terms == 0:
             logger.warning("No DINO comparisons were made. DINO loss is 0.")
-            return torch.tensor(0.0)
+            return torch.tensor(0.0, device=self.device)
 
         return total_loss / total_terms
 
@@ -330,9 +330,9 @@ class SSLMetaArch(nn.Module):
     ) -> torch.Tensor:
         """Calculates the total KoLeo loss among student target views within a batch."""
         if not self.do_koleo:
-            return torch.tensor(0.0)
+            return torch.tensor(0.0, device=self.device)
 
-        total_loss = torch.tensor(0.0)
+        total_loss = torch.tensor(0.0, device=self.device)
         total_terms = 0
 
         for group_name, s_tokens in student_global_dino_tokens.items():
@@ -344,7 +344,7 @@ class SSLMetaArch(nn.Module):
                 total_terms += 1
 
         if total_terms == 0:
-            return torch.tensor(0.0)
+            return torch.tensor(0.0, device=self.device)
 
         return total_loss / total_terms
 
@@ -356,9 +356,9 @@ class SSLMetaArch(nn.Module):
     ) -> torch.Tensor:
         """Calculates the total iBOT loss across all student-teacher view pairs."""
         if not self.do_ibot:
-            return torch.tensor(0.0)
+            return torch.tensor(0.0, device=self.device)
 
-        total_loss = torch.tensor(0.0)
+        total_loss = torch.tensor(0.0, device=self.device)
         total_terms = 0
 
         for group_name, s_tokens in student_ibot_tokens.items():
@@ -370,7 +370,7 @@ class SSLMetaArch(nn.Module):
             total_terms += 1
 
         if total_terms == 0:
-            return torch.tensor(0.0)
+            return torch.tensor(0.0, device=self.device)
 
         return total_loss / total_terms
 
