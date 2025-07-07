@@ -137,3 +137,15 @@ class PatchEmbed3D(PatchEmbed):
         )
         pos_embed_3d = rearrange(pos_embed_3d, "1 c d h w -> 1 (d h w) c")
         return pos_embed_3d
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.proj(x.unsqueeze(1))
+        B, E, *patch_dims = x.shape
+        x = self._rearrange_projection(x)
+        x = self.norm(x)
+
+        pos_embed = self.get_pos_embed(*patch_dims)
+
+        x = x + repeat(pos_embed, "1 n d -> b n d", b=B)
+
+        return x
