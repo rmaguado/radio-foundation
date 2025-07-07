@@ -228,7 +228,9 @@ class SSLMetaArch(nn.Module):
 
             if self.do_ibot and "ibot" in group_output:
                 student_outputs["ibot"][group_name] = group_output["ibot"]
-                student_outputs["mask_weights"][group_name] = group_output["group_name"]
+                student_outputs["mask_weights"][group_name] = group_output[
+                    "mask_weights"
+                ]
         return student_outputs
 
     def _calculate_dino_loss(
