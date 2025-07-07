@@ -72,7 +72,6 @@ class DataAugmentationDINO(object):
         image_transforms = ImageTransforms(
             self.dataset_config.pixel_range.lower,
             self.dataset_config.pixel_range.upper,
-            self.dataset_config.channels,
         )
         transforms_list_copy = copy.deepcopy(transforms_list)
 
@@ -117,7 +116,7 @@ class DataAugmentationDINO(object):
 
             sample_view = group_views[0]
             img_shape = sample_view.shape
-            full_shape = view_shape + list(img_shape) # [n0, n1, n2, ..., channels, height, width]
+            full_shape = view_shape + list(img_shape) # [n0, n1, n2, ..., slices, height, width]
 
             stacked = stacked.view(*full_shape)
 
