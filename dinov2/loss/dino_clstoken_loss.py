@@ -10,6 +10,8 @@ import torch.distributed as dist
 import torch.nn.functional as F
 from torch import nn
 
+from einops import rearrange
+
 
 class DINOLoss(nn.Module):
     def __init__(
@@ -72,9 +74,11 @@ class DINOLoss(nn.Module):
 
         B, num_student_views, head_dim = student_outputs.shape
 
-        student_flat = student_outputs.view(-1, head_dim)
+        #student_flat = student_outputs.view(-1, head_dim)
+        student_flat = rearrange(student_outputs, "b v d -> (b v) d")
         lsm = F.log_softmax(student_flat / self.student_temp, dim=-1)
-        lsm = lsm.view(B, num_student_views, head_dim)
+        #lsm = lsm.view(B, num_student_views, head_dim)
+        lsm = rearrange(lsm, "(b v) d -> b v d", b=B, v=num_student_views)
 
         for s_idx in range(num_student_views):
             student_output = lsm[:, s_idx, :]
