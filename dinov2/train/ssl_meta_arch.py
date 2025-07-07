@@ -147,6 +147,22 @@ class SSLMetaArch(nn.Module):
 
         return output
 
+    def _update_teacher_centers(self, uncentered_views: Dict[str, Dict[str, torch.Tensor]]) -> None:
+        """Updates the teacher's DINO and iBOT token centers."""
+
+        combined_dino_views = [
+            rearrange(tokens, "... e -> (...) e") for tokens in uncentered_views["dino"].values()
+        ]
+        combined_dino_views = torch.cat(combined_dino_views, dim=0)
+        self.dino_loss.softmax_center_teacher.update_center(combined_dino_views)
+
+        if self.do_ibot:
+            combined_ibot_views = [
+                tokens for tokens in uncentered_views["ibot"].values()
+            ]
+            combined_ibot_views = torch.cat(combined_ibot_views, dim=0)
+            self.ibot_patch_loss.softmax_center_teacher.update_center(combined_ibot_views)
+
     def _run_teacher_pass(
         self,
         collated_views: Dict[str, Any],
@@ -154,6 +170,7 @@ class SSLMetaArch(nn.Module):
     ) -> Dict[str, Dict[str, torch.Tensor]]:
         """Runs the teacher model and computes centered tokens."""
         teacher_outputs = {"dino": {}, "ibot": {}}
+        uncentered_views = {"dino": {}, "ibot": {}}
         with torch.no_grad():
             for group_name, view_info in collated_views.items():
                 if not view_info.get("is_target", False):
@@ -167,6 +184,7 @@ class SSLMetaArch(nn.Module):
                     is_target=True,
                     mask_inputs=False,
                 )
+                uncentered_views["dino"][group_name] = group_output["dino"]
 
                 # Center DINO tokens
                 dino_tokens_centered = self.dino_loss.softmax_center_teacher(
@@ -179,7 +197,11 @@ class SSLMetaArch(nn.Module):
                     ibot_tokens_centered = self.ibot_patch_loss.softmax_center_teacher(
                         group_output["ibot"], teacher_temp
                     )
+                    uncentered_views["ibot"][group_name] = group_output["ibot"]
                     teacher_outputs["ibot"][group_name] = ibot_tokens_centered
+
+        self._update_teacher_centers(uncentered_views)
+
         return teacher_outputs
 
     def _run_student_pass(
