@@ -9,7 +9,7 @@ from typing import Dict, Any, Tuple, Optional
 
 import torch
 from torch import nn
-from einops import rearrange
+from einops import rearrange, repeat
 
 from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
 from dinov2.models import build_model_from_cfg
@@ -141,6 +141,10 @@ class SSLMetaArch(nn.Module):
             ibot_head = model.ibot_head if self.ibot_separate_head else model.dino_head
             output["ibot"] = ibot_head(masked_patch_tokens)
 
+            mask_weights = 1 / (masks.sum(-1).clamp(min=1.0))
+            mask_weights = mask_weights.unsqueeze(-1).expand_as(masks).view(-1)
+            output["mask_weights"] = mask_weights[masks.view(-1)]
+
         return output
 
     def _run_teacher_pass(
@@ -183,7 +187,7 @@ class SSLMetaArch(nn.Module):
         collated_views: Dict[str, Any],
     ) -> Dict[str, Dict[str, torch.Tensor]]:
         """Runs the student model across all view groups."""
-        student_outputs = {"dino": {}, "ibot": {}}
+        student_outputs = {"dino": {}, "ibot": {}, "mask_weights": {}}
         for group_name, view_info in collated_views.items():
             group_output = self._process_group(
                 model=self.student,
@@ -198,8 +202,9 @@ class SSLMetaArch(nn.Module):
 
             if self.do_ibot and "ibot" in group_output:
                 student_outputs["ibot"][group_name] = group_output["ibot"]
+                student_outputs["mask_weights"][group_name] = group_output["group_name"]
         return student_outputs
-        
+
 
     def _calculate_dino_loss(
         self,
@@ -271,6 +276,7 @@ class SSLMetaArch(nn.Module):
         self,
         student_ibot_tokens: Dict[str, torch.Tensor],
         teacher_ibot_tokens: Dict[str, torch.Tensor],
+        mask_weights: Dict[str, torch.Tensor],
     ) -> torch.Tensor:
         """Calculates the total iBOT loss across all student-teacher view pairs."""
         if not self.do_ibot:
@@ -279,15 +285,12 @@ class SSLMetaArch(nn.Module):
         total_loss = torch.tensor(0.0)
         total_terms = 0
 
-        # iBOT loss is a direct comparison between student and teacher tokens from the same group
         for group_name, s_tokens in student_ibot_tokens.items():
-            if group_name in teacher_ibot_tokens:
-                t_tokens = teacher_ibot_tokens[group_name]
-                loss_term = self.ibot_patch_loss(s_tokens, t_tokens)
+            t_tokens = teacher_ibot_tokens[group_name]
+            loss_term = self.ibot_patch_loss(s_tokens, t_tokens, mask_weights)
 
-                # Here we assume the loss is already averaged; if not, adjust accordingly
-                total_loss += loss_term
-                total_terms += 1
+            total_loss += loss_term
+            total_terms += 1
 
         if total_terms == 0:
             return torch.tensor(0.0)
@@ -311,7 +314,7 @@ class SSLMetaArch(nn.Module):
             student_outputs["dino"], teacher_outputs["dino"], collated_views
         )
         ibot_loss = self._calculate_ibot_loss(
-            student_outputs["ibot"], teacher_outputs["ibot"]
+            student_outputs["ibot"], teacher_outputs["ibot"], student_outputs["mask_weights"]
         )
         student_target_dino_tokens = {
             group_name: tokens

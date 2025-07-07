@@ -51,39 +51,25 @@ class iBOTPatchLoss(nn.Module):
 
         return F.softmax((teacher_patch_tokens - self.center) / teacher_temp, dim=-1)
 
-    def forward(self, student_patch_tokens, teacher_patch_tokens):
+    def forward(
+            self,
+            student_patch_tokens: torch.Tensor,
+            teacher_patch_tokens: torch.Tensor,
+            mask_weights: torch.Tensor
+        ) -> torch.Tensor:
         """
         Cross-entropy between softmax outputs of the teacher and student networks.
-        student_patch_tokens: (B, N, D) tensor
-        teacher_patch_tokens: (B, N, D) tensor
+        student_patch_tokens: (N, D) tensor
+        teacher_patch_tokens: (N, D) tensor
+        mask_weights: (N,) tensor, weights for each sample
         """
-        t = teacher_patch_tokens
-        s = student_patch_tokens
-        loss = torch.sum(t * F.log_softmax(s / self.student_temp, dim=-1), dim=-1).clamp(min=1.0)
-        return -loss.mean()
-
-    def forward_masked(
-        self,
-        student_patch_tokens_masked,
-        teacher_patch_tokens_masked,
-        student_masks_flat,
-        n_masked_patches=None,
-        masks_weight=None,
-    ):
-        t = teacher_patch_tokens_masked
-        s = student_patch_tokens_masked
+        t = student_patch_tokens
+        s = teacher_patch_tokens
 
         loss = lossfunc(t, s, self.student_temp)
-        if masks_weight is None:
-            masks_weight = (
-                (1 / student_masks_flat.sum(-1).clamp(min=1.0))
-                .unsqueeze(-1)
-                .expand_as(student_masks_flat)[student_masks_flat]
-            )
-        if n_masked_patches is not None:
-            loss = loss[:n_masked_patches]
-        loss = loss * masks_weight
-        return -loss.sum() / student_masks_flat.shape[0]
+        loss = loss * mask_weights
+
+        return -loss.sum()
 
     @torch.no_grad()
     def update_center(self, teacher_patch_tokens):
