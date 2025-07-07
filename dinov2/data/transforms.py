@@ -19,7 +19,7 @@ class RandomApply:
 
 class ImageTransforms:
 
-    def __init__(self, lower_bound: float, upper_bound: float, channels: int) -> None:
+    def __init__(self, lower_bound: float, upper_bound: float) -> None:
         """
         Initializes a Transform object.
         Contains a list of transformations to be applied to an image.
@@ -27,11 +27,9 @@ class ImageTransforms:
         Args:
             lower_bound (float): The minimum value of the image pixel.
             upper_bound (float): The maximum value of the image pixel.
-            channels (int): The number of channels in the image.
         """
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
-        self.channels = channels
 
         self.transform_list = []
 
@@ -94,7 +92,7 @@ class ImageTransforms:
     def _random_resized_crop_3d(self, img: torch.Tensor, crop_size: int, scale: Tuple) -> torch.Tensor:
         crop_shape = (crop_size, crop_size, crop_size)
 
-        _, d, h, w = img.shape  # Expecting [C, D, H, W]
+        d, h, w = img.shape  # Expecting [D, H, W]
 
         scale_factor = random.uniform(*scale)
         target_d = min(d, int(d * scale_factor))
@@ -105,10 +103,10 @@ class ImageTransforms:
         start_h = random.randint(0, h - target_h) if h > target_h else 0
         start_w = random.randint(0, w - target_w) if w > target_w else 0
 
-        cropped = img[:, start_d:start_d+target_d, start_h:start_h+target_h, start_w:start_w+target_w]
+        cropped = img[start_d:start_d+target_d, start_h:start_h+target_h, start_w:start_w+target_w]
         resized = torch.nn.functional.interpolate(
-            cropped.unsqueeze(0), size=crop_shape, mode='trilinear', align_corners=False
-        ).squeeze(0)
+            cropped.unsqueeze(0).unsqueeze(0), size=crop_shape, mode='trilinear', align_corners=False
+        ).squeeze(0).squeeze(0)
 
         return resized
     
@@ -150,17 +148,17 @@ class ImageTransforms:
 
     def _slice(self, img: torch.Tensor, n_slices: int = 1) -> torch.Tensor:
         shape = img.shape # Expecting [C, D, H, W]
-        axis = random.randint(1, 3)
+        axis = random.randint(0, 2)
         idx = random.randint(0, shape[axis] - n_slices - 1)
 
-        if axis == 1:
-            img = img[:,idx : idx + n_slices, :, :]
-        elif axis == 2:
-            img = img[:,:, idx : idx + n_slices, :]
+        if axis == 0:
+            img = img[idx : idx + n_slices, :, :]
+        elif axis == 1:
+            img = img[:, idx : idx + n_slices, :]
         else:
-            img = img[:,:, :, idx : idx + n_slices]
+            img = img[:, :, idx : idx + n_slices]
 
-        img = img.permute(*([0, axis] + [i for i in [1,2,3] if i != axis]))
+        img = img.permute(*([axis] + [i for i in [0,1,2] if i != axis]))
         return img
 
     def _sharpness(self, img: torch.Tensor, bounds: Tuple = (0.9, 1.5)) -> torch.Tensor:
