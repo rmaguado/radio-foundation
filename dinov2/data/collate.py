@@ -69,7 +69,7 @@ def collate_data_and_cast(
             )
         
         stacked_masks = torch.stack(masks)
-        target_mask_shape = (batch_size, *view_shape, *mask_shape)
+        target_mask_shape = (batch_size, *view_shape, np.prod(mask_shape))
 
         collated_views[group_name]["masks"] = stacked_masks.view(
             *target_mask_shape
