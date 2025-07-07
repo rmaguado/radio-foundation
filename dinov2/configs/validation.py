@@ -1,6 +1,6 @@
 from omegaconf import OmegaConf, DictConfig
 from pydantic import BaseModel, field_validator, model_validator
-from typing import List, Optional, Literal, Tuple
+from typing import List, Dict, Optional, Literal, Tuple
 
 
 class DinoConfig(BaseModel):
@@ -147,12 +147,20 @@ class EmbedLayerConfig(BaseModel):
     type: Literal["patch2d", "patch3d"]
     patch_size: int
     img_size: int
+    in_channels: Optional[int] = None
 
     @field_validator("patch_size", "img_size", mode="before")
     @classmethod
     def validate_positive_integers(cls, v):
         if v <= 0:
             raise ValueError("Value must be a positive integer")
+        return v
+
+    @field_validator("in_channels", mode="before")
+    @classmethod
+    def validate_in_channels(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("in_channels must be a positive integer")
         return v
 
 
@@ -272,27 +280,9 @@ class OptimConfig(BaseModel):
         return v
 
 
-class CropGroup(BaseModel):
-    name: str
-    is_target: bool = False
-    targets: Optional[List[str]] = None  # Updated from target_groups
-    size: int
-    num_crops: int
-    embed_layer: Literal["patch2d", "patch3d"]
-
-    @field_validator("size", "num_crops", mode="before")
-    @classmethod
-    def validate_positive_integers(cls, v):
-        if v <= 0:
-            raise ValueError("Value must be a positive integer")
-        return v
-
-
 class CropsConfig(BaseModel):
     global_crop_scale: Tuple[float, float]
     local_crop_scale: Tuple[float, float]
-
-    crop_groups: List[CropGroup]
 
     @field_validator("global_crop_scale", "local_crop_scale", mode="before")
     @classmethod
@@ -303,16 +293,34 @@ class CropsConfig(BaseModel):
             )
         return v
 
-    @model_validator(mode="after")
-    def validate_crop_groups(self):
-        group_names = {group.name for group in self.crop_groups}
-        for crop_group in self.crop_groups:
-            if crop_group.targets:
-                if not all(target in group_names for target in crop_group.targets):
-                    raise ValueError(
-                        f"Crop group '{crop_group.name}' has invalid target groups: {crop_group.targets}"
-                    )
-        return self
+
+class TransformConfig(BaseModel):
+    name: str
+    p: Optional[float] = None
+    mean: Optional[float] = None
+    std: Optional[float] = None
+
+
+class TransformGroup(BaseModel):
+    name: str
+    size: int
+    num_crops: int
+    embed_layer: Literal["patch2d", "patch3d"]
+    is_target: bool = False
+    targets: Optional[List[str]] = None
+    transforms: List[TransformConfig]
+
+    @field_validator("size", "num_crops", mode="before")
+    @classmethod
+    def validate_positive_integers(cls, v):
+        if v <= 0:
+            raise ValueError("Value must be a positive integer")
+        return v
+
+
+class AugmentationsNode(BaseModel):
+    name: str
+    subgroups: Optional[List["AugmentationsNode"]] = None
 
 
 class PixelRangeConfig(BaseModel):
@@ -338,7 +346,6 @@ class DatasetConfig(BaseModel):
     type: Literal["ct", "mri"]
     storage: Literal["dicom", "nifti"]
     augmentation: str
-    channels: int
     pixel_range: PixelRangeConfig
     norm: NormConfig
 
@@ -357,30 +364,6 @@ class DatasetConfig(BaseModel):
         return v
 
 
-class AugmentationStepConfig(BaseModel):
-    name: str
-    p: Optional[float] = None
-    mean: Optional[float] = None
-    std: Optional[float] = None
-
-
-class AugmentationCollection(BaseModel):
-    @model_validator(mode="after")
-    def validate_all_lists_of_augmentation_steps(self):
-        for key, value in self.__dict__.items():
-            if not isinstance(value, list) or not all(
-                isinstance(item, AugmentationStepConfig) for item in value
-            ):
-                raise ValueError(
-                    f"Augmentation collection '{key}' must be a list of AugmentationStepConfig objects."
-                )
-        return self
-
-
-class AugmentationsConfig(BaseModel):
-    default_ct: AugmentationCollection
-
-
 class MainConfig(BaseModel):
     compute_precision: Literal["fp16", "fp32", "bf16"]
     dino: DinoConfig
@@ -391,8 +374,9 @@ class MainConfig(BaseModel):
     teacher: TeacherConfig
     optim: OptimConfig
     crops: CropsConfig
+    transform_groups: List[TransformGroup]
+    augmentations: Dict[str, AugmentationsNode]
     datasets: List[DatasetConfig]
-    augmentations: AugmentationsConfig
 
 
 def validate_config(conf: DictConfig) -> bool:
