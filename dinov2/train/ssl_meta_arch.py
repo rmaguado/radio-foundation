@@ -92,32 +92,20 @@ class SSLMetaArch(nn.Module):
         for p in self.teacher.parameters():
             p.requires_grad = False
 
-        self.view_metadata = {}
-        self.target_group_names = []
-        self.student_group_names = []
-        for group_cfg in self.cfg.crops.crop_groups:
-            group_cfg_copy = group_cfg.copy()
-            name = group_cfg_copy.pop("name")
-            self.view_metadata[name] = group_cfg_copy
-            self.student_group_names.append(name)
-            if group_cfg_copy.get("is_target", False):
-                self.target_group_names.append(name)
-
     def _prepare_inputs(
         self, collated_views: Dict[str, Any]
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, Optional[torch.Tensor]]]:
+    ) -> None:
         """Moves images and masks to the appropriate device."""
-        images = {
-            k: v["images"].to(self.device, non_blocking=True)
-            for k, v in collated_views.items()
-        }
-        masks = {
-            k: v["masks"].to(self.device, non_blocking=True)
-            if "masks" in v and v["masks"] is not None
-            else None
-            for k, v in collated_views.items()
-        }
-        return images, masks
+        for group_name, view_info in collated_views.items():
+            images = view_info["images"]
+            masks = view_info.get("masks", None)
+
+            images = images.to(self.device, non_blocking=True)
+            collated_views[group_name]["images"] = images
+
+            if masks is not None:
+                masks = masks.to(self.device, non_blocking=True)
+                collated_views[group_name]["masks"] = masks
 
     def _process_group(
         self,
@@ -126,47 +114,28 @@ class SSLMetaArch(nn.Module):
         masks: torch.Tensor,
         embed_layer: int,
         is_target: bool,
+        mask_inputs: bool,
     ) -> Dict[str, torch.Tensor]:
-        """
-        Processes a single group of views through a model (student or teacher).
-        Handles different tensor shapes for target vs. non-target views.
-        """
-        if is_target:
-            B, V = images.shape[:2]
-            V_target = None
-            flat_images = rearrange(images, "b v ... -> (b v) ...")
-            flat_masks = (
-                rearrange(masks, "b v ... -> (b v) (...)")
-                if masks is not None
-                else None
-            )
-            backbone_masks = flat_masks
-        else:
-            B, V_target, V = images.shape[:3]
-            flat_images = rearrange(images, "b t v ... -> (b t v) ...")
-            backbone_masks = None
+        view_shape = images.shape[:-3]
+        flat_images = rearrange(images, "... d w h -> (...) d w h")
+        flat_masks = rearrange(masks, "... m -> (...) m") if masks is not None else None
 
         backbone_output = model.backbone(
             flat_images,
             embed_layer=embed_layer,
-            masks=backbone_masks,
+            masks=flat_masks if mask_inputs else None,
         )
 
-        student_cls_tokens = backbone_output["clstoken"]
-        dino_tokens_flat = model.dino_head(student_cls_tokens)
+        cls_tokens = backbone_output["clstoken"]
+        dino_tokens_flat = model.dino_head(cls_tokens)
 
-        if is_target:
-            dino_tokens = rearrange(dino_tokens_flat, "(b v) d -> b v d", b=B, v=V)
-        else:
-            dino_tokens = rearrange(
-                dino_tokens_flat, "(b t v) d -> b t v d", b=B, t=V_target, v=V
-            )
+        dino_tokens = dino_tokens_flat.view(*view_shape, -1)
 
         output = {"dino": dino_tokens}
 
         if self.do_ibot and is_target:
             patch_tokens = backbone_output["patchtokens"]
-            patch_tokens = rearrange(patch_tokens, "(b v) p d -> (b v p) d", b=B, v=V)
+            patch_tokens = rearrange(patch_tokens, "a p d -> (a p) d")
             masked_patch_tokens = patch_tokens[masks.view(-1)]
 
             ibot_head = model.ibot_head if self.ibot_separate_head else model.dino_head
@@ -176,22 +145,23 @@ class SSLMetaArch(nn.Module):
 
     def _run_teacher_pass(
         self,
-        images: Dict[str, torch.Tensor],
-        masks: Dict[str, torch.Tensor],
         collated_views: Dict[str, Any],
         teacher_temp: float,
     ) -> Dict[str, Dict[str, torch.Tensor]]:
         """Runs the teacher model and computes centered tokens."""
         teacher_outputs = {"dino": {}, "ibot": {}}
         with torch.no_grad():
-            for group_name in self.target_group_names:
-                # Process the group to get raw tokens
+            for group_name, view_info in collated_views.items():
+                if not view_info.get("is_target", False):
+                    continue
+                
                 group_output = self._process_group(
                     model=self.teacher,
-                    images=images[group_name],
-                    masks=masks[group_name],
+                    images=view_info["images"],
+                    masks=view_info["masks"],
                     embed_layer=collated_views[group_name]["embed_layer"],
-                    is_target=True,  # Teacher only sees target views
+                    is_target=True,
+                    mask_inputs=False,
                 )
 
                 # Center DINO tokens
@@ -210,24 +180,26 @@ class SSLMetaArch(nn.Module):
 
     def _run_student_pass(
         self,
-        images: Dict[str, torch.Tensor],
-        masks: Dict[str, torch.Tensor],
         collated_views: Dict[str, Any],
     ) -> Dict[str, Dict[str, torch.Tensor]]:
         """Runs the student model across all view groups."""
         student_outputs = {"dino": {}, "ibot": {}}
-        for group_name in images.keys():
+        for group_name, view_info in collated_views.items():
             group_output = self._process_group(
                 model=self.student,
-                images=images[group_name],
-                masks=masks[group_name],
-                embed_layer=collated_views[group_name]["embed_layer"],
-                is_target=collated_views[group_name]["is_target"],
+                images=view_info["images"],
+                masks=view_info.get("masks", None),
+                embed_layer=view_info["embed_layer"],
+                is_target=view_info["is_target"],
+                mask_inputs=True,
             )
+
             student_outputs["dino"][group_name] = group_output["dino"]
+
             if self.do_ibot and "ibot" in group_output:
                 student_outputs["ibot"][group_name] = group_output["ibot"]
         return student_outputs
+        
 
     def _calculate_dino_loss(
         self,
@@ -240,19 +212,27 @@ class SSLMetaArch(nn.Module):
         total_terms = 0
 
         for group_name, s_tokens in student_dino_tokens.items():
-            is_target = collated_views[group_name]["is_target"]
+
             targets = collated_views[group_name]["targets"]
 
             for i, target_group_name in enumerate(targets):
-                s_tokens_for_comparison = s_tokens if is_target else s_tokens[:, i, ...]
+
+                view_dim = i + 1
+                num_teacher_views = s_tokens.shape[view_dim]
+
                 t_tokens = teacher_dino_tokens[target_group_name]
 
-                loss_term: torch.Tensor = self.dino_loss(
-                    s_tokens_for_comparison, t_tokens
-                )
-                num_comparisons: int = (
-                    s_tokens_for_comparison.shape[1] * t_tokens.shape[1]
-                )
+                for view_idx in range(num_teacher_views):
+                
+                    s_tokens_view = s_tokens.select(view_dim, view_idx).unsqueeze(view_dim)
+                    t_tokens_view = t_tokens.select(view_dim, view_idx).unsqueeze(view_dim)
+
+                    s_tokens_view = rearrange(s_tokens_view, "b ... d -> b (...) d")
+                    t_tokens_view = rearrange(t_tokens_view, "b ... d -> b (...) d")
+
+                    loss_term = self.dino_loss(s_tokens_view, t_tokens_view)
+                    num_comparisons = s_tokens_view.shape[1] * t_tokens.shape[1]
+                    
 
                 total_loss += loss_term
                 total_terms += num_comparisons
@@ -265,7 +245,7 @@ class SSLMetaArch(nn.Module):
 
     def _calculate_koleo_loss(
         self,
-        student_dino_tokens: Dict[str, torch.Tensor],
+        student_global_dino_tokens: Dict[str, torch.Tensor],
     ) -> torch.Tensor:
         """Calculates the total KoLeo loss among student target views within a batch."""
         if not self.do_koleo:
@@ -274,17 +254,13 @@ class SSLMetaArch(nn.Module):
         total_loss = torch.tensor(0.0)
         total_terms = 0
 
-        # KoLeo loss is computed only on target views
-        for group_name, s_tokens in student_dino_tokens.items():
-            if not self.view_metadata[group_name].get("is_target", False):
-                continue
+        for group_name, s_tokens in student_global_dino_tokens.items():
 
-            # Flatten the tokens to compute pairwise distances
-            flat_s_tokens = rearrange(s_tokens, "b v d -> (b v) d")
-            loss_term = self.koleo_loss(flat_s_tokens)
-
-            total_loss += loss_term
-            total_terms += 1
+            flat_s_tokens = rearrange(s_tokens, "b ... d -> (...) b d")
+            
+            for i in range(flat_s_tokens.shape[0]):
+                total_loss += self.koleo_loss(flat_s_tokens[i])
+                total_terms += 1
 
         if total_terms == 0:
             return torch.tensor(0.0)
@@ -324,24 +300,25 @@ class SSLMetaArch(nn.Module):
         """
         Main forward pass for DINOv2 training.
         """
-        images, masks = self._prepare_inputs(collated_views)
+        self._prepare_inputs(collated_views)
 
-        # Teacher forward pass (with no_grad)
         teacher_outputs = self._run_teacher_pass(
-            images, masks, collated_views, teacher_temp
+            collated_views, teacher_temp
         )
+        student_outputs = self._run_student_pass(collated_views)
 
-        # Student forward pass
-        student_outputs = self._run_student_pass(images, masks, collated_views)
-
-        # Calculate losses
         dino_loss = self._calculate_dino_loss(
             student_outputs["dino"], teacher_outputs["dino"], collated_views
         )
         ibot_loss = self._calculate_ibot_loss(
             student_outputs["ibot"], teacher_outputs["ibot"]
         )
-        koleo_loss = self._calculate_koleo_loss(student_outputs["dino"])
+        student_target_dino_tokens = {
+            group_name: tokens
+            for group_name, tokens in student_outputs["dino"].items()
+            if collated_views[group_name]["is_target"]
+        }
+        koleo_loss = self._calculate_koleo_loss(student_target_dino_tokens)
 
         total_loss = (
             (self.dino_loss_weight * dino_loss)
