@@ -156,16 +156,14 @@ class SSLMetaArch(nn.Module):
             for tokens in uncentered_views["dino"].values()
         ]
         combined_dino_views = torch.cat(combined_dino_views, dim=0)
-        self.dino_loss.softmax_center_teacher.update_center(combined_dino_views)
+        self.dino_loss.update_center(combined_dino_views)
 
         if self.do_ibot:
             combined_ibot_views = [
                 tokens for tokens in uncentered_views["ibot"].values()
             ]
             combined_ibot_views = torch.cat(combined_ibot_views, dim=0)
-            self.ibot_patch_loss.softmax_center_teacher.update_center(
-                combined_ibot_views
-            )
+            self.ibot_patch_loss.update_center(combined_ibot_views)
 
     def _run_teacher_pass(
         self,
