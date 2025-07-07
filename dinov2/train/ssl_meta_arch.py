@@ -285,44 +285,57 @@ class SSLMetaArch(nn.Module):
         teacher_dino_tokens: Dict[str, torch.Tensor],
         collated_views: Dict[str, Any],
     ) -> torch.Tensor:
-        """Calculates the total DINO loss across all student-teacher view pairs."""
+        """
+        Calculates the total DINO loss, handling both self-comparison and hierarchical comparison.
+        """
         total_loss = torch.tensor(0.0, device=self.device)
-        total_terms = 0
+        n_loss_terms = 0
 
         for group_name, s_tokens in student_dino_tokens.items():
+            target_group_names = collated_views[group_name]["targets"]
 
-            targets = collated_views[group_name]["targets"]
-
-            for i, target_group_name in enumerate(targets):
-
-                view_dim = i + 1
-                num_teacher_views = s_tokens.shape[view_dim]
+            for target_idx, target_group_name in enumerate(target_group_names):
 
                 t_tokens = teacher_dino_tokens[target_group_name]
 
-                for view_idx in range(num_teacher_views):
+                if target_group_name == group_name:
 
-                    s_tokens_view = s_tokens.select(view_dim, view_idx).unsqueeze(
-                        view_dim
-                    )
-                    t_tokens_view = t_tokens.select(view_dim, view_idx).unsqueeze(
-                        view_dim
-                    )
+                    student_views_flat = rearrange(s_tokens, "b ... e -> b (...) e")
+                    teacher_views_flat = rearrange(t_tokens, "b ... e -> b (...) e")
 
-                    s_tokens_view = rearrange(s_tokens_view, "b ... d -> b (...) d")
-                    t_tokens_view = rearrange(t_tokens_view, "b ... d -> b (...) d")
+                    num_views = student_views_flat.shape[1]
 
-                    loss_term = self.dino_loss(s_tokens_view, t_tokens_view)
-                    num_comparisons = s_tokens_view.shape[1] * t_tokens.shape[1]
+                    for i in range(num_views):
+                        student_view = student_views_flat[:, i, :].unsqueeze(1)
+                        teacher_view = teacher_views_flat[:, i, :].unsqueeze(1)
 
-                total_loss += loss_term
-                total_terms += num_comparisons
+                        loss = self.dino_loss(student_view, teacher_view)
+                        total_loss += loss
+                        n_loss_terms += 1
 
-        if total_terms == 0:
-            logger.warning("No DINO comparisons were made. DINO loss is 0.")
+                else:
+                    t_tokens_grouped = rearrange(t_tokens, "b ... d -> b (...) d")
+                    num_teacher_lineages = t_tokens_grouped.shape[1]
+
+                    B = s_tokens.shape[0]
+                    H = s_tokens.shape[-1]
+
+                    s_tokens_grouped = s_tokens.view(B, num_teacher_lineages, -1, H)
+
+                    for i in range(num_teacher_lineages):
+                        student_views_for_teacher_i = s_tokens_grouped[:, i, :, :]
+                        teacher_view_i = t_tokens_grouped[:, i, :].unsqueeze(1)
+
+                        loss = self.dino_loss(
+                            student_views_for_teacher_i, teacher_view_i
+                        )
+                        total_loss += loss
+                        n_loss_terms += 1
+
+        if n_loss_terms == 0:
             return torch.tensor(0.0, device=self.device)
 
-        return total_loss / total_terms
+        return total_loss / n_loss_terms
 
     def _calculate_koleo_loss(
         self,
