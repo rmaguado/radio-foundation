@@ -92,9 +92,7 @@ class SSLMetaArch(nn.Module):
         for p in self.teacher.parameters():
             p.requires_grad = False
 
-    def _prepare_inputs(
-        self, collated_views: Dict[str, Any]
-    ) -> None:
+    def _prepare_inputs(self, collated_views: Dict[str, Any]) -> None:
         """Moves images and masks to the appropriate device."""
         for group_name, view_info in collated_views.items():
             images = view_info["images"]
@@ -142,16 +140,20 @@ class SSLMetaArch(nn.Module):
             output["ibot"] = ibot_head(masked_patch_tokens)
 
             mask_weights = 1 / (masks.sum(-1).clamp(min=1.0))
-            mask_weights = mask_weights.unsqueeze(-1).expand_as(masks).view(-1)
+            mask_weights = mask_weights.unsqueeze(-1).expand_as(masks)
+            mask_weights = rearrange(mask_weights, "... -> (...)")
             output["mask_weights"] = mask_weights[masks.view(-1)]
 
         return output
 
-    def _update_teacher_centers(self, uncentered_views: Dict[str, Dict[str, torch.Tensor]]) -> None:
+    def _update_teacher_centers(
+        self, uncentered_views: Dict[str, Dict[str, torch.Tensor]]
+    ) -> None:
         """Updates the teacher's DINO and iBOT token centers."""
 
         combined_dino_views = [
-            rearrange(tokens, "... e -> (...) e") for tokens in uncentered_views["dino"].values()
+            rearrange(tokens, "... e -> (...) e")
+            for tokens in uncentered_views["dino"].values()
         ]
         combined_dino_views = torch.cat(combined_dino_views, dim=0)
         self.dino_loss.softmax_center_teacher.update_center(combined_dino_views)
@@ -161,7 +163,9 @@ class SSLMetaArch(nn.Module):
                 tokens for tokens in uncentered_views["ibot"].values()
             ]
             combined_ibot_views = torch.cat(combined_ibot_views, dim=0)
-            self.ibot_patch_loss.softmax_center_teacher.update_center(combined_ibot_views)
+            self.ibot_patch_loss.softmax_center_teacher.update_center(
+                combined_ibot_views
+            )
 
     def _run_teacher_pass(
         self,
@@ -175,7 +179,7 @@ class SSLMetaArch(nn.Module):
             for group_name, view_info in collated_views.items():
                 if not view_info.get("is_target", False):
                     continue
-                
+
                 group_output = self._process_group(
                     model=self.teacher,
                     images=view_info["images"],
@@ -227,7 +231,6 @@ class SSLMetaArch(nn.Module):
                 student_outputs["mask_weights"][group_name] = group_output["group_name"]
         return student_outputs
 
-
     def _calculate_dino_loss(
         self,
         student_dino_tokens: Dict[str, torch.Tensor],
@@ -250,16 +253,19 @@ class SSLMetaArch(nn.Module):
                 t_tokens = teacher_dino_tokens[target_group_name]
 
                 for view_idx in range(num_teacher_views):
-                
-                    s_tokens_view = s_tokens.select(view_dim, view_idx).unsqueeze(view_dim)
-                    t_tokens_view = t_tokens.select(view_dim, view_idx).unsqueeze(view_dim)
+
+                    s_tokens_view = s_tokens.select(view_dim, view_idx).unsqueeze(
+                        view_dim
+                    )
+                    t_tokens_view = t_tokens.select(view_dim, view_idx).unsqueeze(
+                        view_dim
+                    )
 
                     s_tokens_view = rearrange(s_tokens_view, "b ... d -> b (...) d")
                     t_tokens_view = rearrange(t_tokens_view, "b ... d -> b (...) d")
 
                     loss_term = self.dino_loss(s_tokens_view, t_tokens_view)
                     num_comparisons = s_tokens_view.shape[1] * t_tokens.shape[1]
-                    
 
                 total_loss += loss_term
                 total_terms += num_comparisons
@@ -284,7 +290,7 @@ class SSLMetaArch(nn.Module):
         for group_name, s_tokens in student_global_dino_tokens.items():
 
             flat_s_tokens = rearrange(s_tokens, "b ... d -> (...) b d")
-            
+
             for i in range(flat_s_tokens.shape[0]):
                 total_loss += self.koleo_loss(flat_s_tokens[i])
                 total_terms += 1
@@ -327,16 +333,16 @@ class SSLMetaArch(nn.Module):
         """
         self._prepare_inputs(collated_views)
 
-        teacher_outputs = self._run_teacher_pass(
-            collated_views, teacher_temp
-        )
+        teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
         student_outputs = self._run_student_pass(collated_views)
 
         dino_loss = self._calculate_dino_loss(
             student_outputs["dino"], teacher_outputs["dino"], collated_views
         )
         ibot_loss = self._calculate_ibot_loss(
-            student_outputs["ibot"], teacher_outputs["ibot"], student_outputs["mask_weights"]
+            student_outputs["ibot"],
+            teacher_outputs["ibot"],
+            student_outputs["mask_weights"],
         )
         student_target_dino_tokens = {
             group_name: tokens
