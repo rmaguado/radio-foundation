@@ -91,6 +91,8 @@ transform_groups:
     num_crops: 1
     embed_layer: patch3d
     is_target: true
+    targets:
+      - 3d_global_ld
     transforms:
       - name: rotate
       - name: globalcrop3d
@@ -114,6 +116,7 @@ transform_groups:
     is_target: true
     targets:
       - 3d_global_ld
+      - 2d_global_hd
     transforms:
       - name: slice
         n_slices: 1
