@@ -52,11 +52,11 @@ class iBOTPatchLoss(nn.Module):
         return F.softmax((teacher_patch_tokens - self.center) / teacher_temp, dim=-1)
 
     def forward(
-            self,
-            student_patch_tokens: torch.Tensor,
-            teacher_patch_tokens: torch.Tensor,
-            mask_weights: torch.Tensor
-        ) -> torch.Tensor:
+        self,
+        student_patch_tokens: torch.Tensor,
+        teacher_patch_tokens: torch.Tensor,
+        mask_weights: torch.Tensor,
+    ) -> torch.Tensor:
         """
         Cross-entropy between softmax outputs of the teacher and student networks.
         student_patch_tokens: (N, D) tensor
@@ -69,7 +69,7 @@ class iBOTPatchLoss(nn.Module):
         loss = lossfunc(t, s, self.student_temp)
         loss = loss * mask_weights
 
-        return -loss.sum()
+        return -loss.mean()
 
     @torch.no_grad()
     def update_center(self, teacher_patch_tokens):
