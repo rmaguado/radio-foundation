@@ -7,7 +7,7 @@ def dummy_batch():
     return [
         {
             "3d_global_ld": {
-                "images": torch.rand(1, 1, 112, 112, 112),
+                "images": torch.rand(1, 112, 112, 112),
                 "is_target": True,
                 "targets": [],
                 "embed_layer": "patch3d",
@@ -15,7 +15,7 @@ def dummy_batch():
                 "view_shape": (1,),
             },
             "2d_global_hd": {
-                "images": torch.rand(1, 3, 1, 1, 224, 224),
+                "images": torch.rand(1, 3, 1, 224, 224),
                 "is_target": True,
                 "targets": ["3d_global_ld"],
                 "embed_layer": "patch2d",
@@ -23,7 +23,7 @@ def dummy_batch():
                 "view_shape": (1, 3),
             },
             "2d_local_hd": {
-                "images": torch.rand(1, 3, 2, 1, 1, 112, 112),
+                "images": torch.rand(1, 3, 2, 1, 112, 112),
                 "is_target": False,
                 "targets": ["3d_global_ld", "2d_global_hd"],
                 "embed_layer": "patch2d",
@@ -57,6 +57,6 @@ def test_collate(dummy_batch):
     assert collated_data["3d_global_ld"]["images"].dtype == dtype
     assert collated_data["2d_global_hd"]["images"].dtype == dtype
     assert collated_data["2d_local_hd"]["images"].dtype == dtype
-    assert collated_data["3d_global_ld"]["masks"].shape == (5, 1, 8, 8, 8)
-    assert collated_data["2d_global_hd"]["masks"].shape == (5, 1, 3, 16, 16)
+    assert collated_data["3d_global_ld"]["masks"].shape == (5, 1, 512)
+    assert collated_data["2d_global_hd"]["masks"].shape == (5, 1, 3, 256)
     
