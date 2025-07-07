@@ -13,18 +13,39 @@ def arch():
 @pytest.fixture
 def collated_views():
     return {
-        "2d_global_hd": {
-            "images": torch.zeros(8, 3, 1, 224, 224),
-            "masks": torch.rand(8, 3, 16, 16) > 0.5,
-            "embed_layer": "patch2d",
+        "3d_global_ld": {
+            "images": torch.rand(8, 1, 112, 112, 112),
             "is_target": True,
-            "targets": ["2d_global_hd"],
+            "targets": ["3d_global_ld"],
+            "embed_layer": "patch3d",
+            "mask_shape": (8, 8, 8),
+            "view_shape": (1,),
+            "masks": torch.rand(8, 1, 512) > 0.5,
+        },
+        "3d_local_ld": {
+            "images": torch.rand(8, 1, 3, 56, 56, 56),
+            "is_target": False,
+            "targets": ["3d_global_ld"],
+            "embed_layer": "patch3d",
+            "mask_shape": (4, 4, 4),
+            "view_shape": (1, 3),
+        },
+        "2d_global_hd": {
+            "images": torch.rand(8, 1, 3, 1, 224, 224),
+            "is_target": True,
+            "targets": ["3d_global_ld", "2d_global_hd"],
+            "embed_layer": "patch2d",
+            "mask_shape": (16, 16),
+            "view_shape": (1, 3),
+            "masks": torch.rand(8, 1, 3, 256) > 0.5,
         },
         "2d_local_hd": {
-            "images": torch.zeros(8, 3, 2, 1, 112, 112),
-            "embed_layer": "patch2d",
+            "images": torch.rand(8, 1, 3, 2, 1, 112, 112),
             "is_target": False,
-            "targets": ["2d_global_hd"],
+            "targets": ["3d_global_ld", "2d_global_hd"],
+            "embed_layer": "patch2d",
+            "mask_shape": (8, 8),
+            "view_shape": (1, 3, 2),
         },
     }
 
@@ -33,28 +54,15 @@ def test_ssl_meta_arch_intermediate_steps(arch, collated_views):
     teacher_temp = 1.0
 
     # _prepare_inputs
-    images, masks = arch._prepare_inputs(collated_views)
-    assert set(images.keys()) == set(collated_views.keys())
-    assert set(masks.keys()) == set(collated_views.keys())
-    for k in images:
-        assert isinstance(images[k], torch.Tensor)
-        assert isinstance(masks[k], torch.Tensor)
+    arch._prepare_inputs(collated_views)
 
     # _run_teacher_pass
     teacher_outputs = arch._run_teacher_pass(
-        images, masks, collated_views, teacher_temp
+        collated_views, teacher_temp
     )
-    assert "dino" in teacher_outputs and "ibot" in teacher_outputs
-    for group in arch.target_group_names:
-        assert group in teacher_outputs["dino"]
-        assert isinstance(teacher_outputs["dino"][group], torch.Tensor)
 
     # _run_student_pass
-    student_outputs = arch._run_student_pass(images, masks, collated_views)
-    assert "dino" in student_outputs and "ibot" in student_outputs
-    for group in images:
-        assert group in student_outputs["dino"]
-        assert isinstance(student_outputs["dino"][group], torch.Tensor)
+    student_outputs = arch._run_student_pass(collated_views)
 
     # _calculate_dino_loss
     dino_loss = arch._calculate_dino_loss(
@@ -63,7 +71,12 @@ def test_ssl_meta_arch_intermediate_steps(arch, collated_views):
     assert isinstance(dino_loss, torch.Tensor)
 
     # _calculate_koleo_loss
-    koleo_loss = arch._calculate_koleo_loss(student_outputs["dino"])
+    student_target_dino_tokens = {
+        group_name: tokens
+        for group_name, tokens in student_outputs["dino"].items()
+        if collated_views[group_name]["is_target"]
+    }
+    koleo_loss = arch._calculate_koleo_loss(student_target_dino_tokens)
     assert isinstance(koleo_loss, torch.Tensor)
 
     # _calculate_ibot_loss
