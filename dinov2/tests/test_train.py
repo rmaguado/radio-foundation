@@ -57,9 +57,7 @@ def test_ssl_meta_arch_intermediate_steps(arch, collated_views):
     arch._prepare_inputs(collated_views)
 
     # _run_teacher_pass
-    teacher_outputs = arch._run_teacher_pass(
-        collated_views, teacher_temp
-    )
+    teacher_outputs = arch._run_teacher_pass(collated_views, teacher_temp)
 
     # _run_student_pass
     student_outputs = arch._run_student_pass(collated_views)
@@ -81,6 +79,8 @@ def test_ssl_meta_arch_intermediate_steps(arch, collated_views):
 
     # _calculate_ibot_loss
     ibot_loss = arch._calculate_ibot_loss(
-        student_outputs["ibot"], teacher_outputs["ibot"]
+        student_outputs["ibot"],
+        teacher_outputs["ibot"],
+        student_outputs["mask_weights"],
     )
     assert isinstance(ibot_loss, torch.Tensor)
