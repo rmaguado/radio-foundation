@@ -323,6 +323,9 @@ class AugmentationsNode(BaseModel):
     subgroups: Optional[List["AugmentationsNode"]] = None
 
 
+AugmentationsNode.update_forward_refs()
+
+
 class PixelRangeConfig(BaseModel):
     lower: float
     upper: float
@@ -356,13 +359,6 @@ class DatasetConfig(BaseModel):
             raise ValueError("Dataset weight must be between 0.0 and 1.0")
         return v
 
-    @field_validator("channels", mode="before")
-    @classmethod
-    def validate_channels(cls, v):
-        if v <= 0:
-            raise ValueError("Number of channels must be a positive integer")
-        return v
-
 
 class MainConfig(BaseModel):
     compute_precision: Literal["fp16", "fp32", "bf16"]
@@ -375,7 +371,7 @@ class MainConfig(BaseModel):
     optim: OptimConfig
     crops: CropsConfig
     transform_groups: List[TransformGroup]
-    augmentations: Dict[str, AugmentationsNode]
+    augmentations: Dict[str, List[AugmentationsNode]]
     datasets: List[DatasetConfig]
 
 
