@@ -38,8 +38,8 @@ class SSLMetaArch(nn.Module):
         self.cfg = cfg
         self.device = device
 
-        student_model_dict = dict()
-        teacher_model_dict = dict()
+        student_model_dict = nn.ModuleDict()
+        teacher_model_dict = nn.ModuleDict()
 
         student_backbone, teacher_backbone = build_model_from_cfg(cfg)
         if student_backbone is None:
