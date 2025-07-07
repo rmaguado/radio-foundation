@@ -47,6 +47,7 @@ student:
   - type: patch2d
     patch_size: 14
     img_size: 448
+    in_channels: 1
   - type: patch3d
     patch_size: 14
     img_size: 224
@@ -147,7 +148,6 @@ datasets:
     type: ct
     storage: dicom
     augmentation: default_3d
-    channels: 1
     pixel_range:
       lower: -1000.0
       upper: 1900.0
