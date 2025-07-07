@@ -16,6 +16,18 @@ logger = logging.getLogger("dinov2")
 
 
 class DataAugmentationDINO(object):
+    """
+    Data augmentation pipeline for DINO self-supervised learning.
+
+    This class builds and applies a set of image transformation groups, each with its own
+    cropping, normalization, and augmentation strategy, as specified by the configuration.
+    It supports both 2D and 3D crops, and can recursively apply subgroups of transformations.
+
+    Args:
+        config (DictConfig): Main configuration object specifying augmentation and crop settings.
+        dataset_config (DictConfig): Dataset-specific configuration (pixel range, normalization, etc).
+    """
+
     def __init__(self, config: DictConfig, dataset_config: DictConfig) -> None:
         self.dataset_config = dataset_config.copy()
         self.transform_groups = config.transform_groups.copy()
@@ -61,7 +73,7 @@ class DataAugmentationDINO(object):
                 "embed_layer": embed_layer,
                 "mask_shape": mask_shape,
                 "targets": targets,
-                "is_target": is_target
+                "is_target": is_target,
             }
 
             self.transforms[group_name] = self._build_transform_group(
@@ -69,6 +81,16 @@ class DataAugmentationDINO(object):
             )
 
     def _build_transform_group(self, transforms_list, img_size):
+        """
+        Constructs a transformation pipeline for a group.
+
+        Args:
+            transforms_list (list): List of transformation configs for this group.
+            img_size (int): Target image size for cropping.
+
+        Returns:
+            ImageTransforms: Composed transformation pipeline.
+        """
         image_transforms = ImageTransforms(
             self.dataset_config.pixel_range.lower,
             self.dataset_config.pixel_range.upper,
@@ -94,6 +116,17 @@ class DataAugmentationDINO(object):
         return image_transforms
 
     def _recursive_graph_process(self, image_views, groups, crop_dims=None) -> dict:
+        """
+        Recursively applies transformation groups and their subgroups to the input image views.
+
+        Args:
+            image_views (list): List of input image tensors to transform.
+            groups (list): List of group configs to apply.
+            crop_dims (list, optional): Dimensions of crops at each recursion level.
+
+        Returns:
+            dict: Dictionary mapping group names to transformed images and metadata.
+        """
         if crop_dims is None:
             crop_dims = []
 
@@ -116,14 +149,16 @@ class DataAugmentationDINO(object):
 
             sample_view = group_views[0]
             img_shape = sample_view.shape
-            full_shape = view_shape + list(img_shape) # [n0, n1, n2, ..., slices, height, width]
+            full_shape = view_shape + list(
+                img_shape
+            )  # [n0, n1, n2, ..., slices, height, width]
 
             stacked = stacked.view(*full_shape)
 
             output[group_name] = {
                 "images": stacked,
                 "view_shape": view_shape,
-                **group_info
+                **group_info,
             }
             subgroup_output = self._recursive_graph_process(
                 group_views, subgroups, crop_dims + [num_crops]
@@ -132,7 +167,15 @@ class DataAugmentationDINO(object):
 
         return output
 
-
     def __call__(self, image: torch.Tensor) -> dict:
+        """
+        Applies the full augmentation graph to an input image tensor.
+
+        Args:
+            image (torch.Tensor): Input image tensor.
+
+        Returns:
+            dict: Dictionary of transformed image views and associated metadata for each group.
+        """
         output = self._recursive_graph_process([image], self.transforms_graph)
         return output

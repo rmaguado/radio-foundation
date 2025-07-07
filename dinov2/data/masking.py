@@ -10,6 +10,10 @@ class MaskingGenerator:
 
     This generator gives control over both the total percentage of the area
     to be masked and the size of the individual blocks used to create the mask.
+
+    Args:
+        min_aspect (float): Minimum aspect ratio for the mask blocks.
+        max_aspect (Optional[float]): Maximum aspect ratio for the mask blocks. If None, set to 1/min_aspect.
     """
 
     def __init__(
@@ -29,10 +33,11 @@ class MaskingGenerator:
         Generates the mask by iteratively adding small blocks.
 
         Args:
-            input_shape: The shape of the input to be masked (e.g., [14, 14]).
+            input_shape (Sequence[int]): The shape of the input to be masked (e.g., [14, 14]).
+            mask_ratio (float): The fraction of the total area to be masked (default: 0.5).
 
         Returns:
-            A boolean numpy array with multiple masked blocks.
+            np.ndarray: A boolean numpy array with multiple masked blocks.
         """
         num_total_patches = int(np.prod(input_shape))
 
@@ -62,8 +67,16 @@ class MaskingGenerator:
     def _generate_single_block(
         self, input_shape: Sequence[int], num_total_patches: int
     ) -> np.ndarray:
-        """Helper function to generate one small mask block."""
+        """
+        Helper function to generate one small mask block.
 
+        Args:
+            input_shape (Sequence[int]): The shape of the input to be masked.
+            num_total_patches (int): Total number of patches in the input.
+
+        Returns:
+            np.ndarray: A boolean numpy array representing a single mask block.
+        """
         block_target_volume = num_total_patches * random.uniform(0, 0.5)
 
         aspect_ratio = math.exp(random.uniform(*self.log_aspect_ratio))

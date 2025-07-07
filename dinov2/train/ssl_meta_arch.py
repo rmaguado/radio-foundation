@@ -21,6 +21,18 @@ logger = logging.getLogger("dinov2")
 
 
 class SSLMetaArch(nn.Module):
+    """
+    Self-supervised learning meta-architecture for DINO/iBOT-style training.
+
+    This class manages the student and teacher networks, their heads, and the computation
+    of DINO, iBOT, and KoLeo losses. It supports loading pretrained weights, updating teacher
+    parameters, and orchestrating the forward pass for self-supervised learning.
+
+    Args:
+        cfg: Configuration object with all model and loss settings.
+        device: Device to run the model on (e.g., 'cuda' or 'cpu').
+    """
+
     def __init__(self, cfg, device):
         super().__init__()
         self.cfg = cfg
@@ -93,7 +105,12 @@ class SSLMetaArch(nn.Module):
             p.requires_grad = False
 
     def _prepare_inputs(self, collated_views: Dict[str, Any]) -> None:
-        """Moves images and masks to the appropriate device."""
+        """
+        Moves images and masks in the collated views dictionary to the correct device.
+
+        Args:
+            collated_views (Dict[str, Any]): Dictionary of collated batch data.
+        """
         for group_name, view_info in collated_views.items():
             images = view_info["images"]
             masks = view_info.get("masks", None)
@@ -114,6 +131,20 @@ class SSLMetaArch(nn.Module):
         is_target: bool,
         mask_inputs: bool,
     ) -> Dict[str, torch.Tensor]:
+        """
+        Runs a model (student or teacher) on a group of images and masks, returning DINO/iBOT tokens.
+
+        Args:
+            model (nn.Module): Model containing backbone and heads.
+            images (torch.Tensor): Batch of images.
+            masks (torch.Tensor): Batch of masks.
+            embed_layer (int): Which embedding layer to use.
+            is_target (bool): Whether this group is a target for loss computation.
+            mask_inputs (bool): Whether to apply masks to the input.
+
+        Returns:
+            Dict[str, torch.Tensor]: Output tokens for DINO/iBOT heads and mask weights if applicable.
+        """
         view_shape = images.shape[:-3]
         flat_images = rearrange(images, "... d w h -> (...) d w h")
         flat_masks = rearrange(masks, "... m -> (...) m") if masks is not None else None
@@ -149,8 +180,12 @@ class SSLMetaArch(nn.Module):
     def _update_teacher_centers(
         self, uncentered_views: Dict[str, Dict[str, torch.Tensor]]
     ) -> None:
-        """Updates the teacher's DINO and iBOT token centers."""
+        """
+        Updates the teacher's DINO and iBOT token centers for centering softmax outputs.
 
+        Args:
+            uncentered_views (Dict[str, Dict[str, torch.Tensor]]): Uncentered output tokens from teacher.
+        """
         combined_dino_views = [
             rearrange(tokens, "... e -> (...) e")
             for tokens in uncentered_views["dino"].values()
@@ -170,7 +205,16 @@ class SSLMetaArch(nn.Module):
         collated_views: Dict[str, Any],
         teacher_temp: float,
     ) -> Dict[str, Dict[str, torch.Tensor]]:
-        """Runs the teacher model and computes centered tokens."""
+        """
+        Runs the teacher model on the collated batch and computes centered tokens for DINO/iBOT.
+
+        Args:
+            collated_views (Dict[str, Any]): Collated batch data.
+            teacher_temp (float): Temperature for teacher softmax centering.
+
+        Returns:
+            Dict[str, Dict[str, torch.Tensor]]: Centered DINO and iBOT tokens for each group.
+        """
         teacher_outputs = {"dino": {}, "ibot": {}}
         uncentered_views = {"dino": {}, "ibot": {}}
         with torch.no_grad():

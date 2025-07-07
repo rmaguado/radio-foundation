@@ -48,6 +48,14 @@ def get_embedding_layers(
 ) -> nn.ModuleDict:
     """
     Creates a ModuleDict of embedding layers from a list of configurations.
+
+    Args:
+        embed_configs (List[Dict]): List of embedding layer configuration dictionaries.
+        embed_dim (int): Output embedding dimension for each layer.
+        norm_layer (Callable): Normalization layer constructor.
+
+    Returns:
+        nn.ModuleDict: Dictionary of embedding layers keyed by type.
     """
     embed_layers = nn.ModuleDict()
     for config in embed_configs:
@@ -72,6 +80,19 @@ def get_embedding_layers(
 def named_apply(
     fn: Callable, module: nn.Module, name="", depth_first=True, include_root=False
 ) -> nn.Module:
+    """
+    Recursively applies a function to all submodules of a given module.
+
+    Args:
+        fn (Callable): Function to apply. Should accept (module, name) as arguments.
+        module (nn.Module): The root module to traverse.
+        name (str, optional): Name prefix for submodules.
+        depth_first (bool): Whether to apply function in depth-first order.
+        include_root (bool): Whether to include the root module itself.
+
+    Returns:
+        nn.Module: The original module (for chaining).
+    """
     if not depth_first and include_root:
         fn(module=module, name=name)
     for child_name, child_module in module.named_children():
@@ -89,7 +110,13 @@ def named_apply(
 
 
 def init_weights_vit_timm(module: nn.Module, name: str = ""):
-    """ViT weight initialization, original timm impl (for reproducibility)"""
+    """
+    Initializes weights for Vision Transformer modules using the timm (PyTorch Image Models) scheme.
+
+    Args:
+        module (nn.Module): Module to initialize.
+        name (str, optional): Name of the module (unused).
+    """
     if isinstance(module, nn.Linear):
         trunc_normal_(module.weight, std=0.02)
         if module.bias is not None:
@@ -97,6 +124,29 @@ def init_weights_vit_timm(module: nn.Module, name: str = ""):
 
 
 class DinoVisionTransformer(nn.Module):
+    """
+    Vision Transformer (ViT) backbone for DINO self-supervised learning.
+
+    Supports both 2D and 3D patch embedding, register tokens, masking, and flexible FFN layers.
+
+    Args:
+        embed_dim (int): Embedding dimension for transformer.
+        depth (int): Number of transformer blocks.
+        num_heads (int): Number of attention heads.
+        mlp_ratio (float): Ratio of MLP hidden dim to embed dim.
+        qkv_bias (bool): If True, add bias to QKV projections.
+        ffn_bias (bool): If True, add bias to FFN layers.
+        proj_bias (bool): If True, add bias to projection layers.
+        ffn_layer (str): Type of feed-forward network layer to use.
+        num_register_tokens (int): Number of register tokens to use.
+        embed_configs (List[Dict]): List of embedding layer configurations.
+        drop_path_rate (float): Drop path rate for stochastic depth.
+        drop_path_uniform (bool): If True, use uniform drop path rate.
+        init_values (Optional[float]): Initial value for LayerScale.
+        act_layer (Callable): Activation function constructor.
+        block_fn (Callable): Transformer block constructor.
+    """
+
     def __init__(
         self,
         embed_dim: int,
@@ -164,7 +214,7 @@ class DinoVisionTransformer(nn.Module):
                     act_layer=act_layer,
                     ffn_layer=ffn_layer_class,
                     init_values=init_values,
-                    # attn_class=MemEffAttention,
+                    attn_class=MemEffAttention,
                 )
                 for i in range(depth)
             ]
@@ -176,6 +226,9 @@ class DinoVisionTransformer(nn.Module):
         self.init_weights()
 
     def init_weights(self):
+        """
+        Initializes all learnable parameters in the transformer, including tokens and embeddings.
+        """
         nn.init.normal_(self.cls_token, std=1e-6)
         nn.init.normal_(self.cls_pos_embed, std=0.02)
         if self.register_tokens is not None:
@@ -191,6 +244,14 @@ class DinoVisionTransformer(nn.Module):
     ) -> torch.Tensor:
         """
         Handles patch embedding, token masking, and concatenation of CLS and register tokens.
+
+        Args:
+            x (torch.Tensor): Input image tensor.
+            embed_layer (str): Key for which embedding layer to use.
+            masks (Optional[torch.Tensor]): Optional mask tensor for patch masking.
+
+        Returns:
+            torch.Tensor: Embedded and tokenized input ready for transformer blocks.
         """
         B = x.shape[0]
 
