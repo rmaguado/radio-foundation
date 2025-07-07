@@ -5,6 +5,7 @@ from functools import partial
 from dinov2.configs import get_cfg_from_path
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.data import collate_data_and_cast, MaskingGenerator, DataAugmentationDINO
+from dinov2.logging.helpers import custom_repr_nested
 
 
 @pytest.fixture
@@ -13,17 +14,35 @@ def cfg():
 
 
 @pytest.fixture
-def arch(cfg):
-    return SSLMetaArch(cfg, device=torch.device("cpu"), dtype=torch.float32)
+def device():
+    return torch.device(0)
 
 
 @pytest.fixture
-def collated_views(cfg):
+def input_dtype(cfg):
+    dtype_str = cfg.compute_precision
+    if dtype_str == "fp16":
+        return torch.half
+    elif dtype_str == "bf16":
+        return torch.bfloat16
+    else:
+        return torch.float
+
+
+@pytest.fixture
+def arch(cfg, device, input_dtype):
+    arch = SSLMetaArch(cfg, device=device, dtype=input_dtype)
+    arch.to(device)
+    return arch
+
+
+@pytest.fixture
+def collated_views(cfg, input_dtype):
 
     dataset_config = cfg.datasets[0]
 
     augmentation_module = DataAugmentationDINO(
-        config=cfg.augmentations.default_ct,
+        config=cfg,
         dataset_config=dataset_config,
     )
 
@@ -33,7 +52,7 @@ def collated_views(cfg):
         collate_data_and_cast,
         mask_ratio_tuple=(0.1, 0.5),
         mask_probability=0.5,
-        dtype=torch.float32,
+        dtype=input_dtype,
         mask_generator=mask_generator,
     )
 
@@ -43,11 +62,6 @@ def collated_views(cfg):
     ]
 
     return collator(samples)
-
-
-def test_e2e(arch, collated_views):
-
-    total_loss, loss_dict = arch.train_model(collated_views, teacher_temp=1.0)
 
 
 def test_forward(arch, collated_views):
