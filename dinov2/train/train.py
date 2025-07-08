@@ -35,8 +35,12 @@ def should_apply_training_step(grad_accum_counter, accum_steps):
     return (grad_accum_counter + 1) % accum_steps == 0
 
 
-def should_eval_model(iteration, save_teacher_iterations):
-    return (save_teacher_iterations > 0) and (iteration % save_teacher_iterations == 0)
+def should_eval_model(iteration, max_iter, save_teacher_iterations):
+    return (
+        (save_teacher_iterations > 0)
+        and (iteration % save_teacher_iterations == 0)
+        and (iteration < max_iter)
+    )
 
 
 def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
@@ -133,7 +137,9 @@ def train(
 
             checkpointer.step(iteration)
 
-            if should_eval_model(iteration, cfg.checkpoints.save_teacher_iterations):
+            if should_eval_model(
+                iteration, max_iter, cfg.checkpoints.save_teacher_iterations
+            ):
                 do_test(cfg, model, f"training_{iteration}")
                 torch.cuda.synchronize()
 
@@ -200,7 +206,6 @@ def do_test(cfg, model, iteration):
 
 def main():
     rank = int(os.environ["RANK"])
-    world_size = int(os.environ["WORLD_SIZE"])
     local_rank = int(os.environ["LOCAL_RANK"])
 
     torch.cuda.set_device(local_rank)

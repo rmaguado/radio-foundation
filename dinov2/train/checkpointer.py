@@ -116,7 +116,7 @@ class DDPPeriodicCheckpointer(PeriodicCheckpointer):
         additional_state = {"iteration": iteration}
         additional_state.update(kwargs)
 
-        if (iteration + 1) % self.period == 0:
+        if iteration % self.period == 0:
             if is_main_process():
                 self.checkpointer.save(
                     "{}_{:07d}".format(self.file_prefix, iteration),
@@ -140,7 +140,7 @@ class DDPPeriodicCheckpointer(PeriodicCheckpointer):
                                 pass
 
         if self.max_iter is not None:
-            if iteration >= self.max_iter - 1:
+            if iteration >= self.max_iter:
                 if is_main_process():
                     self.checkpointer.save(
                         f"{self.file_prefix}_final", **additional_state
