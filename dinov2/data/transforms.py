@@ -76,20 +76,18 @@ class ImageTransforms:
 
     def add_crop(self, crop_size: int, crop_scale: Tuple, is_3d: bool = False):
         if is_3d:
-            self.transform_list.append(
-                RandomApply(self._random_resized_crop_3d, p=1.0, kwargs={"crop_size": crop_size, "scale": crop_scale})
-            )
+            crop_fnc = self._random_resized_crop_3d
         else:
-            self.transform_list.append(
-                transforms.RandomResizedCrop(
-                    crop_size,
-                    scale=crop_scale,
-                    interpolation=transforms.InterpolationMode.BICUBIC,
-                    antialias=True,
-                )
+            crop_fnc = self._random_resized_crop_2d
+        self.transform_list.append(
+            RandomApply(
+                crop_fnc, p=1.0, kwargs={"crop_size": crop_size, "scale": crop_scale}
             )
+        )
 
-    def _random_resized_crop_3d(self, img: torch.Tensor, crop_size: int, scale: Tuple) -> torch.Tensor:
+    def _random_resized_crop_3d(
+        self, img: torch.Tensor, crop_size: int, scale: Tuple
+    ) -> torch.Tensor:
         crop_shape = (crop_size, crop_size, crop_size)
 
         d, h, w = img.shape  # Expecting [D, H, W]
@@ -103,14 +101,27 @@ class ImageTransforms:
         start_h = random.randint(0, h - target_h) if h > target_h else 0
         start_w = random.randint(0, w - target_w) if w > target_w else 0
 
-        cropped = img[start_d:start_d+target_d, start_h:start_h+target_h, start_w:start_w+target_w]
-        resized = torch.nn.functional.interpolate(
-            cropped.unsqueeze(0).unsqueeze(0), size=crop_shape, mode='trilinear', align_corners=False
-        ).squeeze(0).squeeze(0)
+        cropped = img[
+            start_d : start_d + target_d,
+            start_h : start_h + target_h,
+            start_w : start_w + target_w,
+        ]
+        resized = (
+            torch.nn.functional.interpolate(
+                cropped.unsqueeze(0).unsqueeze(0),
+                size=crop_shape,
+                mode="trilinear",
+                align_corners=False,
+            )
+            .squeeze(0)
+            .squeeze(0)
+        )
 
         return resized
-    
-    def _random_resized_crop_2d(self, img: torch.Tensor, crop_size: int, scale: Tuple) -> torch.Tensor:
+
+    def _random_resized_crop_2d(
+        self, img: torch.Tensor, crop_size: int, scale: Tuple
+    ) -> torch.Tensor:
         crop_shape = (crop_size, crop_size)
 
         _, h, w = img.shape  # [C, H, W]
@@ -122,9 +133,9 @@ class ImageTransforms:
         start_h = random.randint(0, h - target_h) if h > target_h else 0
         start_w = random.randint(0, w - target_w) if w > target_w else 0
 
-        cropped = img[:, start_h:start_h+target_h, start_w:start_w+target_w]
+        cropped = img[:, start_h : start_h + target_h, start_w : start_w + target_w]
         resized = torch.nn.functional.interpolate(
-            cropped.unsqueeze(0), size=crop_shape, mode='bicubic', align_corners=False
+            cropped.unsqueeze(0), size=crop_shape, mode="bilinear", align_corners=False
         ).squeeze(0)
 
         return resized
@@ -147,7 +158,7 @@ class ImageTransforms:
         return RandomApply(transform_function, p, kwargs)
 
     def _slice(self, img: torch.Tensor, n_slices: int = 1) -> torch.Tensor:
-        shape = img.shape # Expecting [C, D, H, W]
+        shape = img.shape  # Expecting [C, D, H, W]
         axis = random.randint(0, 2)
         idx = random.randint(0, shape[axis] - n_slices - 1)
 
@@ -158,7 +169,7 @@ class ImageTransforms:
         else:
             img = img[:, :, idx : idx + n_slices]
 
-        img = img.permute(*([axis] + [i for i in [0,1,2] if i != axis]))
+        img = img.permute(*([axis] + [i for i in [0, 1, 2] if i != axis]))
         return img
 
     def _sharpness(self, img: torch.Tensor, bounds: Tuple = (0.9, 1.5)) -> torch.Tensor:
