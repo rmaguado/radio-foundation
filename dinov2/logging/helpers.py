@@ -163,7 +163,7 @@ class MetricLogger(object):
                 iter_end = time.time()
             grad_accum_counter += 1
             data_end = time.time()
-            if i >= n_iterations:
+            if i > n_iterations:
                 break
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
