@@ -323,7 +323,7 @@ class AugmentationsNode(BaseModel):
     subgroups: Optional[List["AugmentationsNode"]] = None
 
 
-AugmentationsNode.update_forward_refs()
+AugmentationsNode.model_rebuild()
 
 
 class PixelRangeConfig(BaseModel):
