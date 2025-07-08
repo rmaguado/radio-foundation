@@ -59,7 +59,7 @@ class iBOTPatchLoss(nn.Module):
         t = student_patch_tokens
         s = teacher_patch_tokens
 
-        loss = torch.sum(t * F.log_softmax(s / self.student_temp, dim=-1), dim=-1)
+        loss = -torch.sum(t * F.log_softmax(s / self.student_temp, dim=-1), dim=-1)
         loss = loss * mask_weights
 
         if torch.isnan(loss).any() or torch.isinf(loss).any():
