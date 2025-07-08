@@ -4,7 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import os
-from typing import Any
+from typing import Any, Dict
 
 import torch
 from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
@@ -39,6 +39,13 @@ class DDPCheckpointer(Checkpointer):
         with self.path_manager.open(save_file, "wb") as f:
             torch.save(data, f)
         self.tag_last_checkpoint(basename)
+
+    def resume(self) -> Dict[str, Any]:
+        if self.has_checkpoint():
+            path = self.get_checkpoint_file()
+            return self.load(path)
+        else:
+            return {}
 
     def has_checkpoint(self) -> bool:
         """

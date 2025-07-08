@@ -154,9 +154,10 @@ def setup_training_components(cfg, model, resume) -> Tuple[
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
-    start_iter = checkpointer.resume_or_load(cfg.train.output_dir, resume=resume).get(
-        "iteration", 0
-    )
+    if resume:
+        start_iter = checkpointer.resume().get("iteration", 0)
+    else:
+        start_iter = 0
     max_iter = total_epochs * epoch_len
 
     periodic_checkpointer = DDPPeriodicCheckpointer(
