@@ -377,6 +377,8 @@ class SSLMetaArch(nn.Module):
         for group_name, s_tokens in student_ibot_tokens.items():
             t_tokens = teacher_ibot_tokens[group_name]
             m_weights = mask_weights[group_name]
+            if m_weights.numel() == 0:
+                continue
             loss_term = self.ibot_patch_loss(s_tokens, t_tokens, m_weights)
 
             total_loss += loss_term
