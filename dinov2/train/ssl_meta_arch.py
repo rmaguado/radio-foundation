@@ -49,10 +49,6 @@ class SSLMetaArch(nn.Module):
         student_model_dict["backbone"] = student_backbone
         teacher_model_dict["backbone"] = teacher_backbone
 
-        if cfg.student.pretrained_weights:
-            chkpt = torch.load(cfg.student.pretrained_weights)
-            student_backbone.load_state_dict(chkpt["model"], strict=False)
-
         self.embed_dim = student_backbone.embed_dim
         self.dino_out_dim = cfg.dino.head_n_prototypes
 
