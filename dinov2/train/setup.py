@@ -151,7 +151,7 @@ def setup_training_components(cfg, model, resume) -> Tuple[
     epoch_len = cfg.train.iterations_per_epoch
 
     checkpointer = DDPCheckpointer(
-        model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
+        model.module, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
     if resume:

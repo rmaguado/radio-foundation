@@ -25,7 +25,7 @@ class DDPCheckpointer(Checkpointer):
             return
 
         data = {}
-        data["model"] = self.model.module.state_dict()
+        data["model"] = self.model.state_dict()
 
         for key, obj in self.checkpointables.items():
             data[key] = obj.state_dict()
@@ -54,7 +54,7 @@ class DDPCheckpointer(Checkpointer):
         incompatible = self._load_model({"model": checkpoint["model"]})
         if incompatible is not None:
             self._log_incompatible_keys(incompatible)
-        self.model.module.load_state_dict(checkpoint.pop("model"))
+        self.model.load_state_dict(checkpoint.pop("model"))
 
         for key in self.checkpointables if checkpointables is None else checkpointables:
             if key in checkpoint:
