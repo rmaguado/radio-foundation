@@ -4,7 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import torch
 from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
@@ -25,7 +25,7 @@ class DDPCheckpointer(Checkpointer):
             return
 
         data = {}
-        data["model"] = self.model.state_dict()
+        data["model"] = self.model.module.state_dict()
 
         for key, obj in self.checkpointables.items():
             data[key] = obj.state_dict()
@@ -39,6 +39,30 @@ class DDPCheckpointer(Checkpointer):
         with self.path_manager.open(save_file, "wb") as f:
             torch.save(data, f)
         self.tag_last_checkpoint(basename)
+
+    def load(
+        self, path: str, checkpointables: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        if not path:
+            return {}
+
+        if not os.path.isfile(path):
+            path = self.path_manager.get_local_path(path)
+            assert os.path.isfile(path), "Checkpoint {} not found!".format(path)
+
+        checkpoint = self._load_file(path)
+        incompatible = self._load_model({"model": checkpoint["model"]})
+        if incompatible is not None:
+            self._log_incompatible_keys(incompatible)
+        self.model.module.load_state_dict(checkpoint.pop("model"))
+
+        for key in self.checkpointables if checkpointables is None else checkpointables:
+            if key in checkpoint:
+                self.logger.info("Loading {} from {} ...".format(key, path))
+                obj = self.checkpointables[key]
+                obj.load_state_dict(checkpoint.pop(key))
+
+        return checkpoint
 
     def resume(self) -> Dict[str, Any]:
         if self.has_checkpoint():
