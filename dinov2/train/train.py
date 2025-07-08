@@ -93,7 +93,7 @@ def log_training_step(metric_logger, loss_dict, schedulers, iteration):
     metric_logger.update(wd=schedulers["wd"][iteration])
     metric_logger.update(mom=schedulers["momentum"][iteration])
     metric_logger.update(last_layer_lr=schedulers["last_layer_lr"][iteration])
-    metric_logger.update(total_loss=losses_reduced, **loss_dict_reduced)
+    metric_logger.update(**loss_dict_reduced)
 
 
 def train(
