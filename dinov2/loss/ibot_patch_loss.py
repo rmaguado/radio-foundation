@@ -44,8 +44,8 @@ class iBOTPatchLoss(nn.Module):
         teacher_patch_tokens: (N, D) tensor
         mask_weights: (N,) tensor, weights for each sample
         """
-        t = student_patch_tokens
-        s = teacher_patch_tokens
+        t = teacher_patch_tokens
+        s = student_patch_tokens
 
         loss = -torch.sum(t * F.log_softmax(s / self.student_temp, dim=-1), dim=-1)
         loss = loss * mask_weights
