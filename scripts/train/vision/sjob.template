@@ -19,7 +19,7 @@ cd $HOME/projects/radio-foundation
 
 export PYTHONPATH=$PWD
 
-python3 ${PYTHONPATH}/dinov2/train/train.py \
+torchrun --nproc-per-node=$GPUS --master_port=12345 dinov2/train/train.py \
     --config_path="$CONF" \
     --output_path="$OUT" \
     --debug

@@ -115,7 +115,7 @@ def train(
         start_iter,
         accum_steps,
     ):
-        if iteration > max_iter:
+        if iteration >= max_iter:
             return
 
         if should_reset_grad(grad_accum_counter, accum_steps):
@@ -197,11 +197,13 @@ def do_test(cfg, model, iteration):
         torch.save({"teacher": new_state_dict}, teacher_ckp_path)
 
 
-def main(rank, world_size):
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    torch.cuda.set_device(rank)
+def main():
+    rank = int(os.environ["RANK"])
+    world_size = int(os.environ["WORLD_SIZE"])
+    local_rank = int(os.environ["LOCAL_RANK"])
+
+    torch.cuda.set_device(local_rank)
+    dist.init_process_group("nccl")
 
     args = get_args_parser(add_help=True).parse_args()
     cfg = get_cfg_from_path(args.config_path)
@@ -237,15 +239,14 @@ def main(rank, world_size):
     model = SSLMetaArch(cfg, rank, dtype).to(rank)
     model = DDP(model, device_ids=[rank])
 
-    do_train(cfg, model, dtype)
-
-    dist.barrier()
-    dist.destroy_process_group()
+    try:
+        do_train(cfg, model, dtype)
+    finally:
+        dist.destroy_process_group()
 
 
 if __name__ == "__main__":
     if os.environ.get("PYTHONPATH") is not None and not os.path.exists("dinov2"):
         os.chdir(os.environ["PYTHONPATH"])
 
-    world_size = torch.cuda.device_count()
-    mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)
+    main()
