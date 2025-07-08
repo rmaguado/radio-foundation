@@ -433,8 +433,8 @@ class SSLMetaArch(nn.Module):
         with torch.no_grad():
             for k in self.student.keys():
                 for ms, mt in zip(self.student[k].modules(), self.teacher[k].modules()):
-                    student_param_list += ms.params
-                    teacher_param_list += mt.params
+                    student_param_list += list(ms.parameters())
+                    teacher_param_list += list(mt.parameters())
             torch._foreach_mul_(teacher_param_list, m)
             torch._foreach_add_(teacher_param_list, student_param_list, alpha=1 - m)
 
