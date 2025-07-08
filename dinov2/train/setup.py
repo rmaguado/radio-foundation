@@ -150,8 +150,9 @@ def setup_training_components(cfg, model, resume) -> Tuple[
     total_epochs = cfg.train.stage1.epochs
     epoch_len = cfg.train.iterations_per_epoch
 
-    # start_iter = checkpointer.resume_or_load(cfg.train.output_dir, resume=resume).get("iteration", -1) + 1
-    start_iter = 0
+    start_iter = checkpointer.resume_or_load(cfg.train.output_dir, resume=resume).get(
+        "iteration", 0
+    )
     max_iter = total_epochs * epoch_len
 
     checkpointer = get_checkpointer(cfg, model, optimizer, max_iter=max_iter)

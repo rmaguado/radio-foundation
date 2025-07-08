@@ -12,20 +12,16 @@ from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 import torch.distributed as dist
 
 
-def rankstr():
-    return f"rank_{dist.get_rank()}"
+def is_main_process():
+    return not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0
 
 
 class DDPCheckpointer(Checkpointer):
     def save(self, name: str, **kwargs: Any) -> None:
         """
-        Dump model and checkpointables to a file.
-
-        Args:
-            name (str): name of the file.
-            kwargs (dict): extra arbitrary data to save.
+        Dump model and checkpointables to a file. Only on rank 0.
         """
-        if not self.save_dir or not self.save_to_disk:
+        if not self.save_dir or not self.save_to_disk or not is_main_process():
             return
 
         data = {}
@@ -35,10 +31,11 @@ class DDPCheckpointer(Checkpointer):
             data[key] = obj.state_dict()
         data.update(kwargs)
 
-        basename = f"{name}.{rankstr()}.pth"
+        basename = f"{name}.pth"
         save_file = os.path.join(self.save_dir, basename)
         assert os.path.basename(save_file) == basename, basename
-        self.logger.info("Saving checkpoint to {}".format(save_file))
+        if hasattr(self, "logger"):
+            self.logger.info(f"Saving checkpoint to {save_file}")
         with self.path_manager.open(save_file, "wb") as f:
             torch.save(data, f)
         self.tag_last_checkpoint(basename)
@@ -48,7 +45,7 @@ class DDPCheckpointer(Checkpointer):
         Returns:
             bool: whether a checkpoint exists in the target directory.
         """
-        save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
+        save_file = os.path.join(self.save_dir, "last_checkpoint")
         return self.path_manager.exists(save_file)
 
     def get_checkpoint_file(self) -> str:
@@ -56,7 +53,7 @@ class DDPCheckpointer(Checkpointer):
         Returns:
             str: The latest checkpoint file in target directory.
         """
-        save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
+        save_file = os.path.join(self.save_dir, "last_checkpoint")
         try:
             with self.path_manager.open(save_file, "r") as f:
                 last_saved = f.read().strip()
@@ -68,13 +65,11 @@ class DDPCheckpointer(Checkpointer):
 
     def tag_last_checkpoint(self, last_filename_basename: str) -> None:
         """
-        Tag the last checkpoint.
-
-        Args:
-            last_filename_basename (str): the basename of the last filename.
+        Tag the last checkpoint. Only on rank 0.
         """
-        torch.distributed.barrier()
-        save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
+        if not is_main_process():
+            return
+        save_file = os.path.join(self.save_dir, "last_checkpoint")
         with self.path_manager.open(save_file, "w") as f:
             f.write(last_filename_basename)
 
@@ -86,25 +81,34 @@ class DDPPeriodicCheckpointer(PeriodicCheckpointer):
         additional_state.update(kwargs)
 
         if (iteration + 1) % self.period == 0:
-            self.checkpointer.save(
-                "{}_{:07d}".format(self.file_prefix, iteration), **additional_state
-            )
+            if is_main_process():
+                self.checkpointer.save(
+                    "{}_{:07d}".format(self.file_prefix, iteration + 1),
+                    **additional_state,
+                )
 
-            if self.max_to_keep is not None:
-                self.recent_checkpoints.append(self.checkpointer.get_checkpoint_file())
-                if len(self.recent_checkpoints) > self.max_to_keep:
-                    file_to_delete = self.recent_checkpoints.pop(0)
-                    if self.path_manager.exists(
-                        file_to_delete
-                    ) and not file_to_delete.endswith(f"{self.file_prefix}_final.pth"):
-                        try:
-                            self.path_manager.rm(file_to_delete)
-                        except FileNotFoundError:
-                            pass
+                if self.max_to_keep is not None:
+                    self.recent_checkpoints.append(
+                        self.checkpointer.get_checkpoint_file()
+                    )
+                    if len(self.recent_checkpoints) > self.max_to_keep:
+                        file_to_delete = self.recent_checkpoints.pop(0)
+                        if self.path_manager.exists(
+                            file_to_delete
+                        ) and not file_to_delete.endswith(
+                            f"{self.file_prefix}_final.pth"
+                        ):
+                            try:
+                                self.path_manager.rm(file_to_delete)
+                            except FileNotFoundError:
+                                pass
 
         if self.max_iter is not None:
             if iteration >= self.max_iter - 1:
-                self.checkpointer.save(f"{self.file_prefix}_final", **additional_state)
+                if is_main_process():
+                    self.checkpointer.save(
+                        f"{self.file_prefix}_final", **additional_state
+                    )
 
 
 def get_checkpointer(cfg, model, optimizer, max_iter: int) -> "DDPPeriodicCheckpointer":
