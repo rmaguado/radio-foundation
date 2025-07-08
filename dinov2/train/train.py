@@ -68,7 +68,7 @@ def apply_gradient_operations(cfg, model, optimizer, accum_steps):
                 param.grad.data.div_(accum_steps)
 
     if cfg.optim.clip_grad:
-        for v in model.student.values():
+        for v in model.module.student.values():
             v.clip_grad_norm_(cfg.optim.clip_grad)
 
     optimizer.step()
