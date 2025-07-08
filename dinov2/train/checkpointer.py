@@ -64,16 +64,14 @@ class DDPCheckpointer(Checkpointer):
 
         return checkpoint
 
-    def resume_or_load(self, path: Optional[str] = None) -> Dict[str, Any]:
+    def resume_or_load(self, path: Optional[str] = None) -> int:
         if self.has_checkpoint():
             path = self.get_checkpoint_file()
-            return self.load(path)
+            return self.load(path).get("iteration", 1)
         else:
             if path is not None:
-                pretrained_model = self.load(path)
-                pretrained_model["iteration"] = 0
-                return pretrained_model
-        return {}
+                self.load(path)
+        return 1
 
     def has_checkpoint(self) -> bool:
         """

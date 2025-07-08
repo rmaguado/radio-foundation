@@ -36,9 +36,7 @@ def should_apply_training_step(grad_accum_counter, accum_steps):
 
 
 def should_eval_model(iteration, save_teacher_iterations):
-    return (
-        save_teacher_iterations > 0 and (iteration + 1) % save_teacher_iterations == 0
-    )
+    return (save_teacher_iterations > 0) and (iteration % save_teacher_iterations == 0)
 
 
 def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
@@ -115,7 +113,7 @@ def train(
         start_iter,
         accum_steps,
     ):
-        if iteration >= max_iter:
+        if iteration > max_iter:
             return
 
         if should_reset_grad(grad_accum_counter, accum_steps):
@@ -135,11 +133,11 @@ def train(
 
             checkpointer.step(iteration)
 
-            iteration += 1
-
             if should_eval_model(iteration, cfg.checkpoints.save_teacher_iterations):
                 do_test(cfg, model, f"training_{iteration}")
                 torch.cuda.synchronize()
+
+            iteration += 1
 
         grad_accum_counter += 1
 
@@ -164,13 +162,16 @@ def do_train(cfg, model, dtype):
         output_file=os.path.join(cfg.train.output_dir, "training_metrics.json"),
     )
 
-    train_components = [cfg, metric_logger, model, optimizer, schedulers, checkpointer]
-
     data_loader = setup_dataloader(cfg, dtype)
     metric_logger.set_dataloader(data_loader)
 
     iteration = train(
-        *train_components,
+        cfg,
+        metric_logger,
+        model,
+        optimizer,
+        schedulers,
+        checkpointer,
         start_iter=start_iter,
         max_iter=max_iter,
     )

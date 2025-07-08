@@ -156,9 +156,7 @@ def setup_training_components(cfg, model) -> Tuple[
 
     pretrained_weights = cfg.student.pretrained_weights
 
-    start_iter = (
-        checkpointer.resume_or_load(pretrained_weights).get("iteration", -1) + 1
-    )
+    start_iter = checkpointer.resume_or_load(pretrained_weights)
 
     max_iter = total_epochs * epoch_len
 
