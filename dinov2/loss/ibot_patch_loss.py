@@ -63,13 +63,30 @@ class iBOTPatchLoss(nn.Module):
         teacher_patch_tokens: (N, D) tensor
         mask_weights: (N,) tensor, weights for each sample
         """
+        if (
+            torch.isnan(student_patch_tokens).any()
+            or torch.isinf(student_patch_tokens).any()
+        ):
+            logger.error("NaN or Inf detected in iBOTPatchLoss student_patch_tokens")
+        if (
+            torch.isnan(teacher_patch_tokens).any()
+            or torch.isinf(teacher_patch_tokens).any()
+        ):
+            logger.error("NaN or Inf detected in iBOTPatchLoss teacher_patch_tokens")
+        if torch.isnan(mask_weights).any() or torch.isinf(mask_weights).any():
+            logger.error("NaN or Inf detected in iBOTPatchLoss mask_weights")
         t = student_patch_tokens
         s = teacher_patch_tokens
 
         loss = lossfunc(t, s, self.student_temp)
         loss = loss * mask_weights
 
-        return -loss.mean()
+        if torch.isnan(loss).any() or torch.isinf(loss).any():
+            logger.error("NaN or Inf detected in iBOTPatchLoss loss value before mean")
+        result = -loss.mean()
+        if torch.isnan(result).any() or torch.isinf(result).any():
+            logger.error("NaN or Inf detected in iBOTPatchLoss final loss value")
+        return result
 
     @torch.no_grad()
     def update_center(self, teacher_patch_tokens):

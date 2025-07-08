@@ -399,26 +399,56 @@ class SSLMetaArch(nn.Module):
             teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
             student_outputs = self._run_student_pass(collated_views)
 
+        # Check for NaNs/Infs in model outputs
+        for name, output_dict in [
+            ("student_dino", student_outputs["dino"]),
+            ("teacher_dino", teacher_outputs["dino"]),
+        ]:
+            for group, tensor in output_dict.items():
+                if torch.isnan(tensor).any() or torch.isinf(tensor).any():
+                    logger.error(
+                        f"NaN or Inf detected in {name} output for group {group}"
+                    )
+
+        if self.do_ibot:
+            for name, output_dict in [
+                ("student_ibot", student_outputs["ibot"]),
+                ("teacher_ibot", teacher_outputs["ibot"]),
+            ]:
+                for group, tensor in output_dict.items():
+                    if torch.isnan(tensor).any() or torch.isinf(tensor).any():
+                        logger.error(
+                            f"NaN or Inf detected in {name} output for group {group}"
+                        )
+
         dino_loss = self._calculate_dino_loss(
             student_outputs["dino"], teacher_outputs["dino"], collated_views
         )
+        if torch.isnan(dino_loss).any() or torch.isinf(dino_loss).any():
+            logger.error("NaN or Inf detected in dino_loss")
         ibot_loss = self._calculate_ibot_loss(
             student_outputs["ibot"],
             teacher_outputs["ibot"],
             student_outputs["mask_weights"],
         )
+        if torch.isnan(ibot_loss).any() or torch.isinf(ibot_loss).any():
+            logger.error("NaN or Inf detected in ibot_loss")
         student_target_dino_tokens = {
             group_name: tokens
             for group_name, tokens in student_outputs["dino"].items()
             if collated_views[group_name]["is_target"]
         }
         koleo_loss = self._calculate_koleo_loss(student_target_dino_tokens)
+        if torch.isnan(koleo_loss).any() or torch.isinf(koleo_loss).any():
+            logger.error("NaN or Inf detected in koleo_loss")
 
         total_loss = (
             (self.dino_loss_weight * dino_loss)
             + (self.ibot_loss_weight * ibot_loss)
             + (self.koleo_loss_weight * koleo_loss)
         )
+        if torch.isnan(total_loss).any() or torch.isinf(total_loss).any():
+            logger.error("NaN or Inf detected in total_loss")
         loss_dict = {
             "dino_loss": dino_loss.detach(),
             "ibot_loss": ibot_loss.detach(),

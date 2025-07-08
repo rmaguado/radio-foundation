@@ -66,18 +66,22 @@ class DINOLoss(nn.Module):
         Q *= B  # the columns must sum to 1 so that Q is an assignment
         return Q.t()
 
-    def forward(self, student_outputs: torch.Tensor, teacher_output: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, student_outputs: torch.Tensor, teacher_output: torch.Tensor
+    ) -> torch.Tensor:
         """
         Cross-entropy between softmax a single teacher target and possibly several student embeddings.
         """
+        if torch.isnan(student_outputs).any() or torch.isinf(student_outputs).any():
+            print("NaN or Inf detected in DINOLoss student_outputs")
+        if torch.isnan(teacher_output).any() or torch.isinf(teacher_output).any():
+            print("NaN or Inf detected in DINOLoss teacher_output")
         total_loss = torch.tensor(0.0, device=student_outputs.device)
 
         B, num_student_views, head_dim = student_outputs.shape
 
-        #student_flat = student_outputs.view(-1, head_dim)
         student_flat = rearrange(student_outputs, "b v d -> (b v) d")
         lsm = F.log_softmax(student_flat / self.student_temp, dim=-1)
-        #lsm = lsm.view(B, num_student_views, head_dim)
         lsm = rearrange(lsm, "(b v) d -> b v d", b=B, v=num_student_views)
 
         for s_idx in range(num_student_views):
@@ -87,6 +91,8 @@ class DINOLoss(nn.Module):
 
             total_loss -= loss_per_student_view.mean()
 
+        if torch.isnan(total_loss).any() or torch.isinf(total_loss).any():
+            print("NaN or Inf detected in DINOLoss total_loss")
         return total_loss
 
     @torch.no_grad()

@@ -39,8 +39,14 @@ class KoLeoLoss(nn.Module):
             student_output (BxD): backbone output of student
         """
         with torch.autocast(device_type="cuda", enabled=False):
+            if torch.isnan(student_output).any() or torch.isinf(student_output).any():
+                logger.error("NaN or Inf detected in KoLeoLoss input student_output")
             student_output = F.normalize(student_output, eps=eps, p=2, dim=-1)
             I = self.pairwise_NNs_inner(student_output)  # noqa: E741
             distances = self.pdist(student_output, student_output[I])  # BxD, BxD -> B
+            if torch.isnan(distances).any() or torch.isinf(distances).any():
+                logger.error("NaN or Inf detected in KoLeoLoss distances")
             loss = -torch.log(distances + eps).mean()
+            if torch.isnan(loss).any() or torch.isinf(loss).any():
+                logger.error("NaN or Inf detected in KoLeoLoss loss value")
         return loss

@@ -87,4 +87,17 @@ def collate_data_and_cast(
 
         collated_views[group_name]["masks"] = stacked_masks.view(*target_mask_shape)
 
+    # Check for NaNs/Infs in collated images and masks
+    for group_name, group in collated_views.items():
+        if torch.isnan(group["images"]).any() or torch.isinf(group["images"]).any():
+            logger.error(
+                f"NaN or Inf detected in collated images for group {group_name}"
+            )
+        if "masks" in group and (
+            torch.isnan(group["masks"]).any() or torch.isinf(group["masks"]).any()
+        ):
+            logger.error(
+                f"NaN or Inf detected in collated masks for group {group_name}"
+            )
+
     return collated_views
