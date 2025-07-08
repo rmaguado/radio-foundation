@@ -85,8 +85,7 @@ def log_training_step(metric_logger, loss_dict, schedulers, iteration):
 
     if math.isnan(sum(loss_dict_reduced.values())):
         logger.error(f"NaN detected in reduced loss at iteration {iteration}")
-        logger.info(f"Reduced loss dict: {loss_dict_reduced}")
-        raise AssertionError
+        raise ValueError("NaN detected in reduced loss")
 
     losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
