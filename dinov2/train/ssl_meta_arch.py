@@ -425,6 +425,7 @@ class SSLMetaArch(nn.Module):
         loss_dict = {
             "dino_loss": dino_loss.detach(),
             "ibot_loss": ibot_loss.detach(),
+            "koleo_loss": koleo_loss.detach(),
             "total_loss": total_loss.detach(),
         }
 
