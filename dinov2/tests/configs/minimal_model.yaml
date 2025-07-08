@@ -4,16 +4,10 @@ train:
   num_workers: 0
   iterations_per_epoch: 100
   centering: "centering"
-  stage1:
-    epochs: 100
-    batch_size_total: 8
-    batch_size_per_gpu: 8
-    grad_accum_steps: 2
-  stage2:
-    epochs: 10
-    batch_size_total: 8
-    batch_size_per_gpu: 8
-    grad_accum_steps: 2
+  epochs: 100
+  batch_size_total: 8
+  batch_size_per_gpu: 8
+  grad_accum_steps: 2
 student:
   model_name: vitl14_2d3d
   embed_dim: 512
