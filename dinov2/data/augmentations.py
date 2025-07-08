@@ -177,11 +177,5 @@ class DataAugmentationDINO(object):
         Returns:
             dict: Dictionary of transformed image views and associated metadata for each group.
         """
-        output = self._recursive_graph_process([image], self.transforms_graph)
-        # Check for NaNs/Infs in augmented images
-        for group_name, group in output.items():
-            if torch.isnan(group["images"]).any() or torch.isinf(group["images"]).any():
-                logger.error(
-                    f"NaN or Inf detected in augmented images for group {group_name}"
-                )
-        return output
+
+        return self._recursive_graph_process([image], self.transforms_graph)

@@ -30,7 +30,7 @@ class KoLeoLoss(nn.Module):
         n = x.shape[0]
         dots.view(-1)[:: (n + 1)].fill_(-1)  # Trick to fill diagonal with -1
         # max inner prod -> min distance
-        _, I = torch.max(dots, dim=1)  # noqa: E741
+        _, I = torch.max(dots, dim=1)
         return I
 
     def forward(self, student_output, eps=1e-8):
@@ -39,14 +39,10 @@ class KoLeoLoss(nn.Module):
             student_output (BxD): backbone output of student
         """
         with torch.autocast(device_type="cuda", enabled=False):
-            if torch.isnan(student_output).any() or torch.isinf(student_output).any():
-                logger.error("NaN or Inf detected in KoLeoLoss input student_output")
+
             student_output = F.normalize(student_output, eps=eps, p=2, dim=-1)
-            I = self.pairwise_NNs_inner(student_output)  # noqa: E741
-            distances = self.pdist(student_output, student_output[I])  # BxD, BxD -> B
-            if torch.isnan(distances).any() or torch.isinf(distances).any():
-                logger.error("NaN or Inf detected in KoLeoLoss distances")
+            I = self.pairwise_NNs_inner(student_output)
+            distances = self.pdist(student_output, student_output[I])
+
             loss = -torch.log(distances + eps).mean()
-            if torch.isnan(loss).any() or torch.isinf(loss).any():
-                logger.error("NaN or Inf detected in KoLeoLoss loss value")
         return loss

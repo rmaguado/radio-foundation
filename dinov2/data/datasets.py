@@ -111,19 +111,7 @@ class VolumeDataset:
         volume = sitk.GetArrayFromImage(image)  # (slices, height, width)
         volume_tensor = torch.tensor(volume, dtype=torch.float32)
 
-        if torch.isnan(volume_tensor).any() or torch.isinf(volume_tensor).any():
-            logger.error(f"NaN or Inf detected in loaded volume_tensor for index {idx}")
-
-        augmentations = self.transform(volume_tensor)
-
-        # Check for NaNs/Infs in augmentations
-        for group_name, group in augmentations.items():
-            if torch.isnan(group["images"]).any() or torch.isinf(group["images"]).any():
-                logger.error(
-                    f"NaN or Inf detected in augmentations for group {group_name} at index {idx}"
-                )
-
-        return augmentations
+        return self.transform(volume_tensor)
 
 
 class DicomVolumeDataset(VolumeDataset):
