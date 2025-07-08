@@ -106,7 +106,7 @@ def train(
 ):
     grad_accum_counter = 0
     iteration = start_iter
-    accum_steps = cfg.train.stage1.grad_accum_steps
+    accum_steps = cfg.train.grad_accum_steps
 
     for data in metric_logger.log_every(
         cfg.checkpoints.print_iterations,
@@ -146,7 +146,7 @@ def train(
     return iteration
 
 
-def do_train(cfg, model, dtype, resume=True):
+def do_train(cfg, model, dtype):
     model.train()
 
     (
@@ -155,7 +155,7 @@ def do_train(cfg, model, dtype, resume=True):
         checkpointer,
         start_iter,
         max_iter,
-    ) = setup_training_components(cfg, model, resume)
+    ) = setup_training_components(cfg, model)
 
     iteration = start_iter
 
@@ -175,9 +175,8 @@ def do_train(cfg, model, dtype, resume=True):
         max_iter=max_iter,
     )
 
-    logger.info("Finished training stage 1.")
+    logger.info("Finished training.")
     do_test(cfg, model, f"training_{iteration}")
-    logger.info("Finished training on full-size images")
 
 
 def do_test(cfg, model, iteration):
@@ -236,7 +235,7 @@ def main(rank, world_size):
     model = SSLMetaArch(cfg, rank, dtype).to(rank)
     model = DDP(model, device_ids=[rank])
 
-    do_train(cfg, model, dtype, resume=not args.no_resume)
+    do_train(cfg, model, dtype)
 
     dist.destroy_process_group()
 

@@ -60,7 +60,7 @@ def build_optimizer(cfg, params_groups):
 
 def build_schedulers(cfg):
     epoch_len = cfg.train.iterations_per_epoch
-    total_epochs = cfg.train.stage1.epochs
+    total_epochs = cfg.train.epochs
     lr = dict(
         base_value=cfg.optim["base_lr"],
         final_value=cfg.optim["min_lr"],
@@ -118,7 +118,7 @@ def setup_dataloader(cfg, inputs_dtype):
 
     dataset, weights = make_train_dataset(cfg)
 
-    batch_size = cfg.train.stage1.batch_size_per_gpu
+    batch_size = cfg.train.batch_size_per_gpu
     if weights is not None:
         sampler_type = SamplerType.WEIGHTED_SHARDED_INFINITE
     else:
@@ -137,7 +137,7 @@ def setup_dataloader(cfg, inputs_dtype):
     return data_loader
 
 
-def setup_training_components(cfg, model, resume) -> Tuple[
+def setup_training_components(cfg, model) -> Tuple[
     torch.optim.Optimizer,
     Dict[str, CosineScheduler],
     DDPPeriodicCheckpointer,
@@ -147,17 +147,19 @@ def setup_training_components(cfg, model, resume) -> Tuple[
     optimizer = build_optimizer(cfg, model.module.get_params_groups())
     schedulers = build_schedulers(cfg)
 
-    total_epochs = cfg.train.stage1.epochs
+    total_epochs = cfg.train.epochs
     epoch_len = cfg.train.iterations_per_epoch
 
     checkpointer = DDPCheckpointer(
         model.module, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
-    if resume:
-        start_iter = checkpointer.resume().get("iteration", -1) + 1
-    else:
-        start_iter = 0
+    pretrained_weights = cfg.student.pretrained_weights
+
+    start_iter = (
+        checkpointer.resume_or_load(pretrained_weights).get("iteration", -1) + 1
+    )
+
     max_iter = total_epochs * epoch_len
 
     periodic_checkpointer = DDPPeriodicCheckpointer(
