@@ -77,7 +77,7 @@ def apply_gradient_operations(cfg, model, optimizer, accum_steps):
 def log_training_step(metric_logger, loss_dict, schedulers, iteration):
     if dist.get_world_size() > 1:
         for v in loss_dict.values():
-            torch.distributed.all_reduce(v)
+            dist.all_reduce(v)
     loss_dict_reduced = {
         k: v.item() / dist.get_world_size() for k, v in loss_dict.items()
     }
@@ -125,6 +125,8 @@ def train(
             optimizer.zero_grad(set_to_none=True)
 
         loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)
+        if dist.is_initialized() and dist.get_world_size() > 1:
+            dist.all_reduce(loss_accumulator)
         loss_accumulator.backward()
 
         if should_apply_training_step(grad_accum_counter, accum_steps):
