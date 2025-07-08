@@ -87,3 +87,11 @@ def test_forward(arch, collated_views):
         if collated_views[group_name]["is_target"]
     }
     koleo_loss = arch._calculate_koleo_loss(student_target_dino_tokens)
+
+    loss_accumulator = (
+        (arch.dino_loss_weight * dino_loss)
+        + (arch.ibot_loss_weight * ibot_loss)
+        + (arch.koleo_loss_weight * koleo_loss)
+    )
+
+    loss_accumulator.backward()
