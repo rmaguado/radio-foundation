@@ -178,6 +178,8 @@ def do_train(cfg, model, dtype):
     logger.info("Finished training.")
     do_test(cfg, model, f"training_{iteration}")
 
+    del data_loader
+
 
 def do_test(cfg, model, iteration):
     torch.cuda.synchronize()
@@ -237,6 +239,7 @@ def main(rank, world_size):
 
     do_train(cfg, model, dtype)
 
+    dist.barrier()
     dist.destroy_process_group()
 
 
