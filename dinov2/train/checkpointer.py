@@ -104,6 +104,9 @@ class DDPCheckpointer(Checkpointer):
         with self.path_manager.open(save_file, "w") as f:
             f.write(last_filename_basename)
 
+    def _load_file(self, f: str) -> Dict[str, Any]
+        return torch.load(f, map_location=torch.device("cpu"), weights_only=False)
+
 
 class DDPPeriodicCheckpointer(PeriodicCheckpointer):
     def step(self, iteration: int, **kwargs: Any) -> None:
