@@ -152,7 +152,7 @@ def make_data_loader(
     weights: Optional[List[float]] = None,
     sampler_type: Optional[SamplerType] = SamplerType.INFINITE,
     drop_last: bool = True,
-    persistent_workers: bool = False,
+    persistent_workers: bool = True,
     collate_fn: Optional[Callable[[List[T]], Any]] = None,
 ):
     """
