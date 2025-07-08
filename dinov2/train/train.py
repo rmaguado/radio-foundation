@@ -125,8 +125,8 @@ def train(
             optimizer.zero_grad(set_to_none=True)
 
         loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)
-        if dist.is_initialized() and dist.get_world_size() > 1:
-            dist.all_reduce(loss_accumulator)
+        # if dist.is_initialized() and dist.get_world_size() > 1:
+        #    dist.all_reduce(loss_accumulator)
         loss_accumulator.backward()
 
         if should_apply_training_step(grad_accum_counter, accum_steps):
