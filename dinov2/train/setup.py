@@ -155,7 +155,7 @@ def setup_training_components(cfg, model, resume) -> Tuple[
     )
 
     if resume:
-        start_iter = checkpointer.resume().get("iteration", 0)
+        start_iter = checkpointer.resume().get("iteration", -1) + 1
     else:
         start_iter = 0
     max_iter = total_epochs * epoch_len
