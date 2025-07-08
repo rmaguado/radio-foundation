@@ -146,7 +146,7 @@ def train(
     return iteration
 
 
-def do_train(cfg, model, dtype, resume=False):
+def do_train(cfg, model, dtype, resume=True):
     model.train()
 
     (
