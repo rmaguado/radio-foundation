@@ -88,13 +88,19 @@ class IbotConfig(BaseModel):
         return v
 
 
-class TrainStageConfig(BaseModel):
+class TrainConfig(BaseModel):
+    output_dir: str
+    seed: int
+    num_workers: int
+    iterations_per_epoch: int
+    centering: Literal["centering", "sinkhorn_knopp"]
     epochs: int
     batch_size_total: int
     batch_size_per_gpu: int
     grad_accum_steps: int
 
     @field_validator(
+        "iterations_per_epoch",
         "epochs",
         "batch_size_total",
         "batch_size_per_gpu",
@@ -105,23 +111,6 @@ class TrainStageConfig(BaseModel):
     def validate_positive_integers(cls, v):
         if v <= 0:
             raise ValueError("Value must be a positive integer")
-        return v
-
-
-class TrainConfig(BaseModel):
-    output_dir: str
-    seed: int
-    num_workers: int
-    iterations_per_epoch: int
-    centering: Literal["centering", "sinkhorn_knopp"]
-    stage1: TrainStageConfig
-    stage2: TrainStageConfig
-
-    @field_validator("iterations_per_epoch", mode="before")
-    @classmethod
-    def validate_epoch_length(cls, v):
-        if v <= 0:
-            raise ValueError("iterations_per_epoch must be a positive integer")
         return v
 
 
