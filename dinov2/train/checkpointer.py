@@ -109,16 +109,3 @@ class DDPPeriodicCheckpointer(PeriodicCheckpointer):
                     self.checkpointer.save(
                         f"{self.file_prefix}_final", **additional_state
                     )
-
-
-def get_checkpointer(cfg, model, optimizer, max_iter: int) -> "DDPPeriodicCheckpointer":
-    checkpointer = DDPCheckpointer(
-        model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
-    )
-    checkpointer = DDPPeriodicCheckpointer(
-        checkpointer,
-        period=cfg.checkpoints.save_checkpoint_iterations,
-        max_iter=max_iter,
-        max_to_keep=3,
-    )
-    return checkpointer

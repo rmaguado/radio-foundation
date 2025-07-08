@@ -4,7 +4,7 @@ import random
 from functools import partial
 from typing import Dict, Tuple
 
-from dinov2.train.checkpointer import get_checkpointer, DDPPeriodicCheckpointer
+from dinov2.train.checkpointer import DDPCheckpointer, DDPPeriodicCheckpointer
 from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
 
@@ -150,17 +150,26 @@ def setup_training_components(cfg, model, resume) -> Tuple[
     total_epochs = cfg.train.stage1.epochs
     epoch_len = cfg.train.iterations_per_epoch
 
+    checkpointer = DDPCheckpointer(
+        model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
+    )
+
     start_iter = checkpointer.resume_or_load(cfg.train.output_dir, resume=resume).get(
         "iteration", 0
     )
     max_iter = total_epochs * epoch_len
 
-    checkpointer = get_checkpointer(cfg, model, optimizer, max_iter=max_iter)
+    periodic_checkpointer = DDPPeriodicCheckpointer(
+        checkpointer,
+        period=cfg.checkpoints.save_checkpoint_iterations,
+        max_iter=max_iter,
+        max_to_keep=3,
+    )
 
     return (
         optimizer,
         schedulers,
-        checkpointer,
+        periodic_checkpointer,
         start_iter,
         max_iter,
     )
