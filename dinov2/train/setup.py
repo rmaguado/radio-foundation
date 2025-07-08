@@ -120,9 +120,9 @@ def setup_dataloader(cfg, inputs_dtype):
 
     batch_size = cfg.train.batch_size_per_gpu
     if weights is not None:
-        sampler_type = SamplerType.WEIGHTED_SHARDED_INFINITE
+        sampler_type = SamplerType.WEIGHTED_INFINITE
     else:
-        sampler_type = SamplerType.SHARDED_INFINITE
+        sampler_type = SamplerType.INFINITE
     data_loader = make_data_loader(
         dataset=dataset,
         batch_size=batch_size,

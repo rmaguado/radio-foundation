@@ -22,9 +22,7 @@ logger = logging.getLogger("dinov2")
 
 class SamplerType(Enum):
     INFINITE = 0
-    SHARDED_INFINITE = 1
     WEIGHTED_INFINITE = 2
-    WEIGHTED_SHARDED_INFINITE = 3
 
 
 def make_train_dataset(config: DictConfig):
@@ -190,8 +188,4 @@ def make_data_loader(
         collate_fn=collate_fn,
     )
 
-    try:
-        logger.info(f"# of batches: {len(data_loader):,d}")
-    except TypeError:
-        logger.info("infinite data loader")
     return data_loader
