@@ -207,6 +207,7 @@ def main(rank, world_size):
     args = get_args_parser(add_help=True).parse_args()
     cfg = get_cfg_from_path(args.config_path)
     os.makedirs(args.output_path, exist_ok=True)
+    cfg.train.output_dir = args.output_path
 
     seed = getattr(args, "seed", 0)
     rank = dist.get_rank()
