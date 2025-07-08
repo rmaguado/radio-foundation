@@ -238,13 +238,12 @@ def main(rank, world_size):
 
     do_train(cfg, model, dtype, resume=not args.no_resume)
 
+    dist.destroy_process_group()
+
 
 if __name__ == "__main__":
     if os.environ.get("PYTHONPATH") is not None and not os.path.exists("dinov2"):
         os.chdir(os.environ["PYTHONPATH"])
 
     world_size = torch.cuda.device_count()
-    try:
-        mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)
-    finally:
-        dist.destroy_process_group()
+    mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)
