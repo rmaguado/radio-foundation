@@ -132,7 +132,7 @@ def train(
 
         if should_apply_training_step(grad_accum_counter, accum_steps):
             apply_gradient_operations(cfg, model, optimizer, accum_steps)
-            model.update_teacher(mom)
+            model.module.update_teacher(mom)
 
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
 
@@ -186,7 +186,7 @@ def do_train(cfg, model, dtype, resume=False):
 def do_test(cfg, model, iteration):
     torch.cuda.synchronize()
 
-    new_state_dict = {k: v.cpu() for k, v in model.teacher.state_dict().items()}
+    new_state_dict = {k: v.cpu() for k, v in model.module.teacher.state_dict().items()}
 
     if dist.get_rank() == 0:
         iterstring = str(iteration)
