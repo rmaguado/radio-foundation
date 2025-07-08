@@ -87,8 +87,6 @@ def log_training_step(metric_logger, loss_dict, schedulers, iteration):
         logger.error(f"NaN detected in reduced loss at iteration {iteration}")
         raise ValueError("NaN detected in reduced loss")
 
-    losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-
     metric_logger.update(lr=schedulers["lr"][iteration])
     metric_logger.update(wd=schedulers["wd"][iteration])
     metric_logger.update(mom=schedulers["momentum"][iteration])
