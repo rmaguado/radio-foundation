@@ -18,6 +18,8 @@ conda activate radio
 cd $HOME/projects/radio-foundation
 
 export PYTHONPATH=$PWD
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export CUDA_LAUNCH_BLOCKING=0
 
 torchrun --nproc-per-node=$GPUS --master_port=$(find_port) dinov2/train/train.py \
     --config_path="$CONF" \

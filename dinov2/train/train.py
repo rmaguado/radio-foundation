@@ -4,7 +4,6 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import logging
-import time
 from omegaconf import OmegaConf
 from typing import Tuple
 import os
@@ -24,6 +23,10 @@ from dinov2.train.setup import (
 )
 
 torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.deterministic = False
+
 logger = logging.getLogger("dinov2")
 
 
