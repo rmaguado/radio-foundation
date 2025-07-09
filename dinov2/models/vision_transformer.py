@@ -277,33 +277,10 @@ class DinoVisionTransformer(nn.Module):
         embed_layer: str = "patch2d",
         masks: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
-        start_time = time.time()
-
-        # Time token preparation
-        prep_start = time.time()
         x = self._prepare_tokens(x, embed_layer, masks)
-        prep_time = time.time() - prep_start
-        logger.debug(f"ViT forward - Token preparation: {prep_time:.4f}s")
-
-        # Time block processing
-        blocks_start = time.time()
-        for i, blk in enumerate(self.blocks):
-            blk_start = time.time()
+        for blk in self.blocks:
             x = blk(x)
-            blk_time = time.time() - blk_start
-            logger.debug(f"ViT forward - Block {i} processing: {blk_time:.4f}s")
-        blocks_time = time.time() - blocks_start
-        logger.debug(f"ViT forward - All blocks processing: {blocks_time:.4f}s")
-
-        # Time normalization
-        norm_start = time.time()
         x_norm = self.norm(x)
-        norm_time = time.time() - norm_start
-        logger.debug(f"ViT forward - Normalization: {norm_time:.4f}s")
-
-        total_time = time.time() - start_time
-        logger.debug(f"ViT forward - Total forward time: {total_time:.4f}s")
-
         return {
             "clstoken": x_norm[:, 0],
             "regtokens": x_norm[:, 1 : self.num_register_tokens + 1],
