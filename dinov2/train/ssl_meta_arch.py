@@ -161,7 +161,9 @@ class SSLMetaArch(nn.Module):
             masks=flat_masks if mask_inputs else None,
         )
         backbone_time = time.time() - backbone_start
-        logger.debug(f"Process group - Backbone forward pass: {backbone_time:.4f}s")
+        logger.debug(
+            f"Process group - Backbone forward pass: {backbone_time:.4f}s for images: {flat_images.shape} and masks: {masks.sum() if masks is not None else 0}"
+        )
 
         # Time DINO head processing
         dino_start = time.time()
