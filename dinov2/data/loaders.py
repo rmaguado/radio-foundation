@@ -130,6 +130,7 @@ def _make_sampler(
         return InfiniteSampler(sample_count=sample_count, seed=seed)
     elif sampler_type == SamplerType.WEIGHTED_INFINITE:
         logger.info("sampler: weighted infinite")
+        assert weights is not None, "Weights must be provided for weighted sampling"
         return WeightedInfiniteSampler(
             dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
         )
@@ -186,6 +187,7 @@ def make_data_loader(
         drop_last=drop_last,
         persistent_workers=persistent_workers,
         collate_fn=collate_fn,
+        prefetch_factor=3,
     )
 
     return data_loader
