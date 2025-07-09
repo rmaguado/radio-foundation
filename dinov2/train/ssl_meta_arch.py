@@ -552,7 +552,7 @@ class SSLMetaArch(nn.Module):
             torch._foreach_mul_(teacher_param_list, m)
             torch._foreach_add_(teacher_param_list, student_param_list, alpha=1 - m)
 
-    def train(self, mode):
+    def train(self, mode: bool = True):
         super().train(mode)
         self.teacher.eval()
 
