@@ -1,11 +1,16 @@
 import pytest
 import torch
+import logging
+import time
 from functools import partial
 
 from dinov2.configs import get_cfg_from_path
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.data import collate_data_and_cast, MaskingGenerator, DataAugmentationDINO
 from dinov2.logging.helpers import custom_repr_nested
+
+logger = logging.getLogger("test")
+logger.setLevel(logging.DEBUG)
 
 
 @pytest.fixture
@@ -56,7 +61,7 @@ def collated_views(cfg, input_dtype):
         mask_generator=mask_generator,
     )
 
-    batch_size = 8
+    batch_size = cfg.train.batch_size_per_gpu
     samples = [
         augmentation_module(torch.rand(512, 512, 512)) for _ in range(batch_size)
     ]
@@ -67,12 +72,25 @@ def collated_views(cfg, input_dtype):
 def test_forward(arch, collated_views):
     teacher_temp = 1.0
 
+    start_forward = time.time()
+
+    start_prepare = time.time()
     arch._prepare_inputs(collated_views)
+    time_prepare = time.time() - start_prepare
+    logger.debug(f"Prepare time: {time_prepare:.06f}")
 
     with arch.autocast_ctx():
+        start_teacher = time.time()
         teacher_outputs = arch._run_teacher_pass(collated_views, teacher_temp)
-        student_outputs = arch._run_student_pass(collated_views)
+        time_teacher = time.time() - start_teacher
+        logger.debug(f"Teacher time: {time_teacher:.06f}")
 
+        start_student = time.time()
+        student_outputs = arch._run_student_pass(collated_views)
+        time_student = time.time() - start_student
+        logger.debug(f"Student time: {time_student:.06f}")
+
+    start_loss = time.time()
     dino_loss = arch._calculate_dino_loss(
         student_outputs["dino"], teacher_outputs["dino"], collated_views
     )
@@ -93,5 +111,15 @@ def test_forward(arch, collated_views):
         + (arch.ibot_loss_weight * ibot_loss)
         + (arch.koleo_loss_weight * koleo_loss)
     )
+    time_loss = time.time() - start_loss
+    logger.debug(f"Backward Loss: {time_loss:.06f}")
 
+    start_backward = time.time()
     loss_accumulator.backward()
+    time_backward = time.time() - start_backward
+    logger.debug(f"Backward time: {time_backward:.06f}")
+
+    time_forward = time.time() - start_forward
+    logger.debug(f"Total foward time: {time_forward:.06f}")
+
+    start_forward = time.time()
