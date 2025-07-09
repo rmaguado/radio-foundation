@@ -5,19 +5,20 @@ train:
   iterations_per_epoch: 100
   centering: "centering"
   epochs: 100
-  batch_size_total: 8
-  batch_size_per_gpu: 8
-  grad_accum_steps: 2
+  batch_size_total: 32
+  batch_size_per_gpu: 32
+  grad_accum_steps: 1
 student:
   model_name: vitl14_2d3d
-  embed_dim: 512
-  depth: 4
-  num_heads: 8
+  embed_dim: 768
+  depth: 12
+  num_heads: 12
   mlp_ratio: 4
   embed_layers:
   - type: patch2d
     patch_size: 14
     img_size: 448
+    in_channels: 10
   - type: patch3d
     patch_size: 14
     img_size: 224
@@ -30,3 +31,84 @@ student:
   proj_bias: true
   ffn_bias: true
   num_register_tokens: 4
+crops:
+  global_crop_scale:
+  - 0.30
+  - 0.80
+  local_crop_scale:
+  - 0.16
+  - 0.30
+transform_groups:
+  - name: 3d_global_ld
+    size: 112
+    num_crops: 1
+    embed_layer: patch3d
+    is_target: true
+    targets:
+      - 3d_global_ld
+    transforms:
+      - name: globalcrop3d
+      - name: transpose3d
+      - name: flip3d
+      - name: gaussian_blur
+        p: 0.5
+  - name: 3d_local_ld
+    size: 56
+    num_crops: 3
+    embed_layer: patch3d
+    targets:
+      - 3d_global_ld
+    transforms:
+    - name: localcrop3d
+    - name: transpose3d
+    - name: flip3d
+    - name: gaussian_blur
+      p: 0.5
+  - name: 2d_global_hd
+    size: 224
+    num_crops: 3
+    embed_layer: patch2d
+    is_target: true
+    targets:
+      - 3d_global_ld
+      - 2d_global_hd
+    transforms:
+      - name: slice
+        n_slices: 10
+      - name: rotate
+      - name: localcrop2d
+      - name: gaussian_blur
+        p: 0.5
+  - name: 2d_local_hd
+    size: 112
+    num_crops: 2
+    embed_layer: patch2d
+    targets:
+      - 2d_global_hd
+      - 3d_global_ld
+    transforms:
+      - name: rotate
+      - name: globalcrop2d
+      - name: gaussian_blur
+        p: 0.5
+augmentations:
+  default_3d:
+    - name: 3d_global_ld
+      subgroups:
+        - name: 3d_local_ld
+        - name: 2d_global_hd
+          subgroups: 
+            - name: 2d_local_hd
+datasets:
+  - name: default_dataset
+    weight: 1.0
+    index_path: .
+    type: ct
+    storage: dicom
+    augmentation: default_3d
+    pixel_range:
+      lower: -1000.0
+      upper: 1900.0
+    norm:
+      mean: -573.8
+      std: 461.3
