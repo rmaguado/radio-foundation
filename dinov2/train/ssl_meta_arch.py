@@ -143,24 +143,39 @@ class SSLMetaArch(nn.Module):
         Returns:
             Dict[str, torch.Tensor]: Output tokens for DINO/iBOT heads and mask weights if applicable.
         """
+        process_start = time.time()
+
+        # Time tensor reshaping
+        reshape_start = time.time()
         view_shape = images.shape[:-3]
         flat_images = rearrange(images, "... d w h -> (...) d w h")
         flat_masks = rearrange(masks, "... m -> (...) m") if masks is not None else None
+        reshape_time = time.time() - reshape_start
+        logger.debug(f"Process group - Tensor reshaping: {reshape_time:.4f}s")
 
+        # Time backbone forward pass
+        backbone_start = time.time()
         backbone_output = model.backbone(
             flat_images,
             embed_layer=embed_layer,
             masks=flat_masks if mask_inputs else None,
         )
+        backbone_time = time.time() - backbone_start
+        logger.debug(f"Process group - Backbone forward pass: {backbone_time:.4f}s")
 
+        # Time DINO head processing
+        dino_start = time.time()
         cls_tokens = backbone_output["clstoken"]
         dino_tokens_flat = model.dino_head(cls_tokens)
-
         dino_tokens = dino_tokens_flat.view(*view_shape, -1)
+        dino_time = time.time() - dino_start
+        logger.debug(f"Process group - DINO head processing: {dino_time:.4f}s")
 
         output = {"dino": dino_tokens}
 
+        # Time iBOT processing if needed
         if self.do_ibot and is_target:
+            ibot_start = time.time()
             patch_tokens = backbone_output["patchtokens"]
             patch_tokens = rearrange(patch_tokens, "a p d -> (a p) d")
             masked_patch_tokens = patch_tokens[masks.view(-1)]
@@ -172,6 +187,13 @@ class SSLMetaArch(nn.Module):
             mask_weights = mask_weights.unsqueeze(-1).expand_as(masks)
             mask_weights = rearrange(mask_weights, "... -> (...)")
             output["mask_weights"] = mask_weights[masks.view(-1)]
+            ibot_time = time.time() - ibot_start
+            logger.debug(f"Process group - iBOT processing: {ibot_time:.4f}s")
+
+        total_process_time = time.time() - process_start
+        logger.debug(
+            f"Process group - Total processing time: {total_process_time:.4f}s"
+        )
 
         return output
 
@@ -184,19 +206,34 @@ class SSLMetaArch(nn.Module):
         Args:
             uncentered_views (Dict[str, Dict[str, torch.Tensor]]): Uncentered output tokens from teacher.
         """
+        center_update_start = time.time()
+
+        # Time DINO center update
+        dino_center_start = time.time()
         combined_dino_views = [
             rearrange(tokens, "... e -> (...) e")
             for tokens in uncentered_views["dino"].values()
         ]
         combined_dino_views = torch.cat(combined_dino_views, dim=0)
         self.dino_loss.update_center(combined_dino_views)
+        dino_center_time = time.time() - dino_center_start
+        logger.debug(f"Center update - DINO center update: {dino_center_time:.4f}s")
 
+        # Time iBOT center update
         if self.do_ibot:
+            ibot_center_start = time.time()
             combined_ibot_views = [
                 tokens for tokens in uncentered_views["ibot"].values()
             ]
             combined_ibot_views = torch.cat(combined_ibot_views, dim=0)
             self.ibot_patch_loss.update_center(combined_ibot_views)
+            ibot_center_time = time.time() - ibot_center_start
+            logger.debug(f"Center update - iBOT center update: {ibot_center_time:.4f}s")
+
+        total_center_update_time = time.time() - center_update_start
+        logger.debug(
+            f"Center update - Total center update time: {total_center_update_time:.4f}s"
+        )
 
     def _run_teacher_pass(
         self,
@@ -213,8 +250,12 @@ class SSLMetaArch(nn.Module):
         Returns:
             Dict[str, Dict[str, torch.Tensor]]: Centered DINO and iBOT tokens for each group.
         """
+        teacher_pass_start = time.time()
         teacher_outputs = {"dino": {}, "ibot": {}}
         uncentered_views = {"dino": {}, "ibot": {}}
+
+        # Time teacher forward pass
+        teacher_forward_start = time.time()
         with torch.no_grad():
             for group_name, view_info in collated_views.items():
                 if not view_info.get("is_target", False):
@@ -231,20 +272,44 @@ class SSLMetaArch(nn.Module):
                 uncentered_views["dino"][group_name] = group_output["dino"]
 
                 # Center DINO tokens
+                dino_center_start = time.time()
                 dino_tokens_centered = self.dino_loss.softmax_center_teacher(
                     group_output["dino"], teacher_temp
                 )
                 teacher_outputs["dino"][group_name] = dino_tokens_centered
+                dino_center_time = time.time() - dino_center_start
+                logger.debug(
+                    f"Teacher pass - DINO centering for {group_name}: {dino_center_time:.4f}s"
+                )
 
                 # Center iBOT tokens
                 if self.do_ibot:
+                    ibot_center_start = time.time()
                     ibot_tokens_centered = self.ibot_patch_loss.softmax_center_teacher(
                         group_output["ibot"], teacher_temp
                     )
                     uncentered_views["ibot"][group_name] = group_output["ibot"]
                     teacher_outputs["ibot"][group_name] = ibot_tokens_centered
+                    ibot_center_time = time.time() - ibot_center_start
+                    logger.debug(
+                        f"Teacher pass - iBOT centering for {group_name}: {ibot_center_time:.4f}s"
+                    )
 
+        teacher_forward_time = time.time() - teacher_forward_start
+        logger.debug(
+            f"Teacher pass - Total teacher forward pass: {teacher_forward_time:.4f}s"
+        )
+
+        # Time center updates
+        center_update_start = time.time()
         self._update_teacher_centers(uncentered_views)
+        center_update_time = time.time() - center_update_start
+        logger.debug(f"Teacher pass - Center updates: {center_update_time:.4f}s")
+
+        total_teacher_pass_time = time.time() - teacher_pass_start
+        logger.debug(
+            f"Teacher pass - Total teacher pass time: {total_teacher_pass_time:.4f}s"
+        )
 
         return teacher_outputs
 
@@ -253,8 +318,13 @@ class SSLMetaArch(nn.Module):
         collated_views: Dict[str, Any],
     ) -> Dict[str, Dict[str, torch.Tensor]]:
         """Runs the student model across all view groups."""
+        student_pass_start = time.time()
         student_outputs = {"dino": {}, "ibot": {}, "mask_weights": {}}
+
+        # Time student forward pass
+        student_forward_start = time.time()
         for group_name, view_info in collated_views.items():
+            group_start = time.time()
             group_output = self._process_group(
                 model=self.student,
                 images=view_info["images"],
@@ -271,6 +341,22 @@ class SSLMetaArch(nn.Module):
                 student_outputs["mask_weights"][group_name] = group_output[
                     "mask_weights"
                 ]
+
+            group_time = time.time() - group_start
+            logger.debug(
+                f"Student pass - Group {group_name} processing: {group_time:.4f}s"
+            )
+
+        student_forward_time = time.time() - student_forward_start
+        logger.debug(
+            f"Student pass - Total student forward pass: {student_forward_time:.4f}s"
+        )
+
+        total_student_pass_time = time.time() - student_pass_start
+        logger.debug(
+            f"Student pass - Total student pass time: {total_student_pass_time:.4f}s"
+        )
+
         return student_outputs
 
     def _calculate_dino_loss(
