@@ -204,6 +204,7 @@ def do_test(cfg, model, iteration):
 
 def main():
     rank = int(os.environ["RANK"])
+    world_size = int(os.environ["WORLD_SIZE"])
     local_rank = int(os.environ["LOCAL_RANK"])
 
     torch.cuda.set_device(local_rank)
@@ -231,6 +232,11 @@ def main():
     write_config(cfg, args.output_path)
     validate_config(cfg)
     logger.info(OmegaConf.to_yaml(cfg))
+
+    assert (
+        cfg.train.batch_size_per_gpu * cfg.train.grad_accum_steps * world_size
+        == cfg.train.batch_size_total
+    ), "batch_size_per_gpu x grad_accum_steps x world_size must be equal to batch_size_total"
 
     dtype_str = cfg.compute_precision
     if dtype_str == "fp16":
