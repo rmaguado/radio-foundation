@@ -305,7 +305,7 @@ class SSLMetaArch(nn.Module):
 
                         loss = self.dino_loss(student_view, teacher_view)
                         total_loss += loss
-                        n_loss_terms += 1
+                        n_loss_terms += student_views_flat.shape[1]
 
                 else:
                     t_tokens_grouped = rearrange(t_tokens, "b ... d -> b (...) d")
@@ -324,7 +324,7 @@ class SSLMetaArch(nn.Module):
                             student_views_for_teacher_i, teacher_view_i
                         )
                         total_loss += loss
-                        n_loss_terms += 1
+                        n_loss_terms += student_views_for_teacher_i.shape[1]
 
         if n_loss_terms == 0:
             return torch.tensor(0.0, device=self.device)
