@@ -5,6 +5,9 @@ import numpy as np
 import SimpleITK as sitk
 import logging
 
+import io
+from contextlib import redirect_stderr
+
 
 logger = logging.getLogger("dinov2")
 
@@ -96,20 +99,27 @@ class VolumeDataset:
         Returns:
             Dict[str, torch.Tensor]: Dictionary of transformed image views.
         """
-        image = self.get_image_data(idx)
+        stderr_buffer = io.StringIO()
+        with redirect_stderr(stderr_buffer):
+            image = self.get_image_data(idx)
 
-        original_spacing = image.GetSpacing()
-        ratio = max(original_spacing) / min(original_spacing)
+            original_spacing = image.GetSpacing()
+            ratio = max(original_spacing) / min(original_spacing)
 
-        if ratio > 3.0:
-            new_spacing = (max(original_spacing) / 2,) * 3
-        else:
-            new_spacing = (min(original_spacing),) * 3
+            if ratio > 3.0:
+                new_spacing = (max(original_spacing) / 2,) * 3
+            else:
+                new_spacing = (min(original_spacing),) * 3
 
-        image = self.resample_to_isotropic(image, new_spacing)
+            image = self.resample_to_isotropic(image, new_spacing)
 
-        volume = sitk.GetArrayFromImage(image)  # (slices, height, width)
-        volume_tensor = torch.tensor(volume, dtype=torch.float32)
+            volume = sitk.GetArrayFromImage(image)  # (slices, height, width)
+            volume_tensor = torch.tensor(volume, dtype=torch.float32)
+
+        stderr_output = stderr_buffer.getvalue()
+
+        if "vnl_svd.hxx" in stderr_output:
+            logger.warning(f"Image {idx} has a problematic header.")
 
         return self.transform(volume_tensor)
 
