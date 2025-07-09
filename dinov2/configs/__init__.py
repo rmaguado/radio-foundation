@@ -5,22 +5,22 @@
 
 import os
 
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 from dinov2.configs.validation import validate_config
 
 
 dinov2_default_config = OmegaConf.load("dinov2/configs/ssl_default_config.yaml")
 
 
-def write_config(cfg, output_dir, name="config.yaml"):
+def write_config(cfg, output_dir: str, name: str = "config.yaml") -> None:
     saved_cfg_path = os.path.join(output_dir, name)
     with open(saved_cfg_path, "w") as f:
         OmegaConf.save(config=cfg, f=f)
-    return saved_cfg_path
 
 
-def get_cfg_from_path(config_file):
+def get_cfg_from_path(config_file: str) -> DictConfig:
     default_cfg = OmegaConf.create(dinov2_default_config)
     cfg = OmegaConf.load(config_file)
     cfg = OmegaConf.merge(default_cfg, cfg)
+    assert isinstance(cfg, DictConfig), "cfg must be a DictConfig"
     return cfg
