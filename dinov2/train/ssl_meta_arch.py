@@ -555,6 +555,7 @@ class SSLMetaArch(nn.Module):
     def train(self, mode: bool = True):
         super().train(mode)
         self.teacher.eval()
+        logger.debug("Set SSLMetaArch to train.")
 
     def get_params_groups(self):
 
