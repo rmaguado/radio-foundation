@@ -39,16 +39,16 @@ class SSLMetaArch(nn.Module):
         self.cfg = cfg
         self.device = device
 
-        student_model_dict = nn.ModuleDict()
-        teacher_model_dict = nn.ModuleDict()
+        self.student = nn.ModuleDict()
+        self.teacher = nn.ModuleDict()
 
         student_backbone, teacher_backbone = build_model_from_cfg(cfg)
         if student_backbone is None:
             raise ValueError(
                 "student_backbone is None. Check build_model_from_cfg(cfg)."
             )
-        student_model_dict["backbone"] = student_backbone
-        teacher_model_dict["backbone"] = teacher_backbone
+        self.student["backbone"] = student_backbone
+        self.teacher["backbone"] = teacher_backbone
 
         self.embed_dim = student_backbone.embed_dim
         self.dino_out_dim = cfg.dino.head_n_prototypes
@@ -66,8 +66,8 @@ class SSLMetaArch(nn.Module):
             bottleneck_dim=cfg.dino.head_bottleneck_dim,
             nlayers=cfg.dino.head_nlayers,
         )
-        student_model_dict["dino_head"] = dino_head()
-        teacher_model_dict["dino_head"] = dino_head()
+        self.student["dino_head"] = dino_head()
+        self.teacher["dino_head"] = dino_head()
 
         self.dino_loss = DINOLoss(self.dino_out_dim)
         if self.do_koleo:
@@ -91,11 +91,8 @@ class SSLMetaArch(nn.Module):
                     bottleneck_dim=cfg.ibot.head_bottleneck_dim,
                     nlayers=cfg.ibot.head_nlayers,
                 )
-                student_model_dict["ibot_head"] = ibot_head()
-                teacher_model_dict["ibot_head"] = ibot_head()
-
-        self.student = nn.ModuleDict(student_model_dict)
-        self.teacher = nn.ModuleDict(teacher_model_dict)
+                self.student["ibot_head"] = ibot_head()
+                self.teacher["ibot_head"] = ibot_head()
 
         # there is no backpropagation through the teacher, so no need for gradients
         for p in self.teacher.parameters():
