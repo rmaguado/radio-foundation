@@ -19,4 +19,4 @@ conda activate radio
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
-pytest dinov2/tests/test_train.py --tb=long
+pytest dinov2/tests/test_train.py --tb=long --log-cli-level=DEBUG
