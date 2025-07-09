@@ -4,13 +4,13 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import logging
+import time
 from omegaconf import OmegaConf
 from typing import Tuple
 import os
 import math
 import torch
 import torch.distributed as dist
-import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from dinov2.logging import MetricLogger, setup_logging
@@ -109,6 +109,7 @@ def train(
     grad_accum_counter = 0
     iteration = start_iter
     accum_steps = cfg.train.grad_accum_steps
+    last_iteration_time = time.time()
 
     for data in metric_logger.log_every(
         cfg.checkpoints.print_iterations,
@@ -120,30 +121,75 @@ def train(
         if iteration > max_iter:
             return
 
+            # Time data loading (this is the time waiting for data to become available)
+        current_time = time.time()
+        data_load_time = current_time - last_iteration_time
+        logger.debug(f"Iteration {iteration} - Data loading: {data_load_time:.4f}s")
+
+        iteration_start_time = current_time
+
         if should_reset_grad(grad_accum_counter, accum_steps):
+            schedule_start = time.time()
             mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
             optimizer.zero_grad(set_to_none=True)
+            schedule_time = time.time() - schedule_start
+            logger.debug(
+                f"Iteration {iteration} - Schedule update: {schedule_time:.4f}s"
+            )
 
+        # Time forward pass
+        forward_start = time.time()
         loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)
+        forward_time = time.time() - forward_start
+        logger.debug(f"Iteration {iteration} - Forward pass: {forward_time:.4f}s")
+
+        # Time backward pass
+        backward_start = time.time()
         loss_accumulator.backward()
+        backward_time = time.time() - backward_start
+        logger.debug(f"Iteration {iteration} - Backward pass: {backward_time:.4f}s")
 
         if should_apply_training_step(grad_accum_counter, accum_steps):
+            # Time gradient operations
+            grad_start = time.time()
             apply_gradient_operations(cfg, model, optimizer, accum_steps)
             model.module.update_teacher(mom)
+            grad_time = time.time() - grad_start
+            logger.debug(
+                f"Iteration {iteration} - Gradient operations: {grad_time:.4f}s"
+            )
 
+            # Time logging and checkpointing
+            log_start = time.time()
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
-
             checkpointer.step(iteration)
+            log_time = time.time() - log_start
+            logger.debug(
+                f"Iteration {iteration} - Logging/checkpointing: {log_time:.4f}s"
+            )
 
+            # Time evaluation if needed
             if should_eval_model(
                 iteration, max_iter, cfg.checkpoints.save_teacher_iterations
             ):
+                eval_start = time.time()
                 do_test(cfg, model, f"training_{iteration}")
                 torch.cuda.synchronize()
+                eval_time = time.time() - eval_start
+                logger.debug(f"Iteration {iteration} - Evaluation: {eval_time:.4f}s")
 
             iteration += 1
 
         grad_accum_counter += 1
+
+        # Log total iteration time
+        total_iteration_time = time.time() - iteration_start_time
+        logger.debug(
+            f"Iteration {iteration} - Total iteration time: {total_iteration_time:.4f}s"
+        )
+
+        # Update last iteration time for next iteration's data loading measurement
+        last_iteration_time = time.time()
 
     return iteration
 

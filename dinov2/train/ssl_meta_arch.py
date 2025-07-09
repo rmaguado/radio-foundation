@@ -5,6 +5,7 @@
 
 from functools import partial
 import logging
+import time
 from typing import Dict, Any, Tuple, Optional
 
 import torch
@@ -391,28 +392,53 @@ class SSLMetaArch(nn.Module):
         """
         Main forward pass for DINOv2 training.
         """
-        self._prepare_inputs(collated_views)
+        start_time = time.time()
 
+        # Step 1: Prepare inputs
+        step_start = time.time()
+        self._prepare_inputs(collated_views)
+        prepare_time = time.time() - step_start
+        logger.debug(f"Forward step 1 - Prepare inputs: {prepare_time:.4f}s")
+
+        # Step 2: Run teacher and student passes
+        step_start = time.time()
         with self.autocast_ctx():
             teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
             student_outputs = self._run_student_pass(collated_views)
+        model_pass_time = time.time() - step_start
+        logger.debug(f"Forward step 2 - Model passes: {model_pass_time:.4f}s")
 
+        # Step 3: Calculate DINO loss
+        step_start = time.time()
         dino_loss = self._calculate_dino_loss(
             student_outputs["dino"], teacher_outputs["dino"], collated_views
         )
+        dino_loss_time = time.time() - step_start
+        logger.debug(f"Forward step 3 - DINO loss calculation: {dino_loss_time:.4f}s")
 
+        # Step 4: Calculate iBOT loss
+        step_start = time.time()
         ibot_loss = self._calculate_ibot_loss(
             student_outputs["ibot"],
             teacher_outputs["ibot"],
             student_outputs["mask_weights"],
         )
+        ibot_loss_time = time.time() - step_start
+        logger.debug(f"Forward step 4 - iBOT loss calculation: {ibot_loss_time:.4f}s")
+
+        # Step 5: Calculate KoLeo loss
+        step_start = time.time()
         student_target_dino_tokens = {
             group_name: tokens
             for group_name, tokens in student_outputs["dino"].items()
             if collated_views[group_name]["is_target"]
         }
         koleo_loss = self._calculate_koleo_loss(student_target_dino_tokens)
+        koleo_loss_time = time.time() - step_start
+        logger.debug(f"Forward step 5 - KoLeo loss calculation: {koleo_loss_time:.4f}s")
 
+        # Step 6: Combine losses and create loss dict
+        step_start = time.time()
         total_loss = (
             (self.dino_loss_weight * dino_loss)
             + (self.ibot_loss_weight * ibot_loss)
@@ -424,6 +450,11 @@ class SSLMetaArch(nn.Module):
             "koleo_loss": koleo_loss.detach(),
             "total_loss": total_loss.detach(),
         }
+        combine_time = time.time() - step_start
+        logger.debug(f"Forward step 6 - Combine losses: {combine_time:.4f}s")
+
+        total_forward_time = time.time() - start_time
+        logger.debug(f"Total forward pass time: {total_forward_time:.4f}s")
 
         return total_loss, loss_dict
 
