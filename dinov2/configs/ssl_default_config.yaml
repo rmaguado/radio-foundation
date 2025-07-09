@@ -88,8 +88,9 @@ transform_groups:
     targets:
       - 3d_global_ld
     transforms:
-      - name: rotate
       - name: globalcrop3d
+      - name: transpose3d
+      - name: flip3d
       - name: gaussian_blur
         p: 0.5
   - name: 3d_local_ld
@@ -99,8 +100,9 @@ transform_groups:
     targets:
       - 3d_global_ld
     transforms:
-    - name: rotate
     - name: localcrop3d
+    - name: transpose3d
+    - name: flip3d
     - name: gaussian_blur
       p: 0.5
   - name: 2d_global_hd

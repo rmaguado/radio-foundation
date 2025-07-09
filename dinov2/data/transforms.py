@@ -37,7 +37,9 @@ class ImageTransforms:
             "sharpness": self._sharpness,
             "slice": self._slice,
             "rotate": self._rotate,
-            "flip": self._flip,
+            "flip2d": self._flip2d,
+            "flip3d": self._flip3d,
+            "transpose3d": self._transpose3d,
             "gaussian_blur": self._gaussian_blur,
             "noise": self._noise,
             "window": self._window,
@@ -198,8 +200,18 @@ class ImageTransforms:
         angle = 180.0 * random.uniform(-1, 1)
         return transforms.functional.rotate(img, angle, fill=self.lower_bound)
 
-    def _flip(self, img: torch.Tensor) -> torch.Tensor:
-        return transforms.functional.hflip(img)
+    def _transpose3d(self, img: torch.Tensor) -> torch.Tensor:
+        dims = [0, 1, 2]
+        random.shuffle(dims)
+        return img.permute(*dims)
+
+    def _flip2d(self, img: torch.Tensor) -> torch.Tensor:
+        dim = random.randint(1, 2)
+        return img.flip(dim)
+
+    def _flip3d(self, img: torch.Tensor) -> torch.Tensor:
+        dim = random.randint(0, 2)
+        return img.flip(dim)
 
     def _gaussian_blur(
         self, img: torch.Tensor, bounds: Tuple = (0.1, 0.9)
