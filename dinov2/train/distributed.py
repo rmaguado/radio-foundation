@@ -1,7 +1,6 @@
 import torch
-
+import os
 import torch.distributed as dist
-from torch.distributed import init_process_group, destroy_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 
@@ -36,3 +35,24 @@ def barrier() -> None:
     if not is_enabled():
         return
     dist.barrier()
+
+
+def setup_distributed_slurm():
+    rank = int(os.environ["SLURM_PROCID"])
+    world_size = int(os.environ["SLURM_NPROCS"])
+    local_rank = int(os.environ["SLURM_LOCALID"])
+
+    torch.cuda.set_device(local_rank)
+    master_addr = os.environ["SLURM_SRUN_COMM_HOST"]
+    master_port = os.environ.get("MASTER_PORT", "29500")
+
+    dist.init_process_group(
+        backend="nccl",
+        init_method=f"tcp://{master_addr}:{master_port}",
+        world_size=world_size,
+        rank=rank,
+    )
+
+
+def cleanup_distributed():
+    dist.destroy_process_group()

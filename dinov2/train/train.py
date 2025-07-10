@@ -204,12 +204,8 @@ def do_test(cfg, model, iteration):
 
 
 def main():
-    rank = int(os.environ["RANK"])
-    world_size = int(os.environ["WORLD_SIZE"])
-    local_rank = int(os.environ["LOCAL_RANK"])
 
-    torch.cuda.set_device(local_rank)
-    dist.init_process_group("nccl")
+    dist.setup_distributed_slurm()
 
     args = get_args_parser(add_help=True).parse_args()
     cfg = get_cfg_from_path(args.config_path)
@@ -235,7 +231,9 @@ def main():
     logger.info(OmegaConf.to_yaml(cfg))
 
     assert (
-        cfg.train.batch_size_per_gpu * cfg.train.grad_accum_steps * world_size
+        cfg.train.batch_size_per_gpu
+        * cfg.train.grad_accum_steps
+        * dist.get_world_size()
         == cfg.train.batch_size_total
     ), "batch_size_per_gpu x grad_accum_steps x world_size must be equal to batch_size_total"
 
@@ -245,7 +243,7 @@ def main():
     try:
         do_train(cfg, model)
     finally:
-        dist.destroy_process_group()
+        dist.cleanup_distributed()
 
 
 if __name__ == "__main__":
