@@ -9,6 +9,7 @@ from typing import Tuple
 import os
 import math
 import torch
+from torch.profiler import profile, ProfilerActivity, record_function
 
 from dinov2.logging import MetricLogger, setup_logging
 from dinov2.configs import get_cfg_from_path, write_config, validate_config
@@ -116,11 +117,8 @@ def train(
         start_iter,
         accum_steps,
     ):
-        with torch.profiler.profile(
-            activities=[
-                torch.profiler.ProfilerActivity.CPU,
-                torch.profiler.ProfilerActivity.CUDA,
-            ],
+        with profile(
+            activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
             record_shapes=True,
         ) as p:
 
@@ -128,35 +126,46 @@ def train(
                 return
 
             if should_reset_grad(grad_accum_counter, accum_steps):
-                mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
-                optimizer.zero_grad(set_to_none=True)
+                with record_function("update-schedules"):
+                    mom, teacher_temp = update_schedules(
+                        optimizer, schedulers, iteration
+                    )
+                with record_function("zero-grad"):
+                    optimizer.zero_grad(set_to_none=True)
 
-            loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)
+            with record_function("model-forward"):
+                loss_accumulator, loss_dict = model.forward(
+                    data, teacher_temp=teacher_temp
+                )
 
-            loss_accumulator.backward()
+            with record_function("model-backward"):
+                loss_accumulator.backward()
 
             if should_apply_training_step(grad_accum_counter, accum_steps):
-                apply_gradient_operations(cfg, model, optimizer, accum_steps)
-                model.update_teacher(mom)
+                with record_function("apply-grad-operations"):
+                    apply_gradient_operations(cfg, model, optimizer, accum_steps)
+                with record_function("update-teacher"):
+                    model.update_teacher(mom)
 
                 # TODO: add a check to see if the teacher parameters are the same in all ranks
                 # print the first 100 parameters of the teacher
 
-                log_training_step(metric_logger, loss_dict, schedulers, iteration)
-                checkpointer.step(iteration)
+                with record_function("checkpointer"):
+                    log_training_step(metric_logger, loss_dict, schedulers, iteration)
+                    checkpointer.step(iteration)
 
                 if should_eval_model(
                     iteration, max_iter, cfg.checkpoints.save_teacher_iterations
                 ):
-                    do_test(cfg, model, f"training_{iteration}")
+                    with record_function("eval"):
+                        do_test(cfg, model, f"training_{iteration}")
 
                 iteration += 1
 
             grad_accum_counter += 1
 
-        logger.info(
-            p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1)
-        )
+        if dist.is_main_process():
+            p.export_chrome_trace(f"traces/trace_{iteration}_{grad_accum_counter}.json")
 
     return iteration
 

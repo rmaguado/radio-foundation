@@ -10,6 +10,7 @@ from typing import Dict, Any, Tuple, Optional
 
 import torch
 from torch import nn
+from torch.profiler import record_function
 from einops import rearrange, repeat
 
 from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
@@ -238,9 +239,10 @@ class SSLMetaArch(nn.Module):
                 )
                 uncentered_views["dino"][group_name] = group_output["dino"]
 
-                dino_tokens_centered = self.dino_loss.softmax_center_teacher(
-                    group_output["dino"], teacher_temp
-                )
+                with record_function("softmax-center-teacher"):
+                    dino_tokens_centered = self.dino_loss.softmax_center_teacher(
+                        group_output["dino"], teacher_temp
+                    )
                 teacher_outputs["dino"][group_name] = dino_tokens_centered
 
                 if self.do_ibot:
@@ -250,7 +252,8 @@ class SSLMetaArch(nn.Module):
                     uncentered_views["ibot"][group_name] = group_output["ibot"]
                     teacher_outputs["ibot"][group_name] = ibot_tokens_centered
 
-        self._update_teacher_centers(uncentered_views)
+        with record_function("update-teacher-centers"):
+            self._update_teacher_centers(uncentered_views)
 
         return teacher_outputs
 
@@ -397,28 +400,34 @@ class SSLMetaArch(nn.Module):
         """
         Main forward pass for DINOv2 training.
         """
-        self._prepare_inputs(collated_views)
+        with record_function("prepare-inputs"):
+            self._prepare_inputs(collated_views)
 
         with self.autocast_ctx():
-            teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
-            student_outputs = self._run_student_pass(collated_views)
+            with record_function("teacher-pass"):
+                teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
+            with record_function("student-pass"):
+                student_outputs = self._run_student_pass(collated_views)
 
-            dino_loss = self._calculate_dino_loss(
-                student_outputs["dino"], teacher_outputs["dino"], collated_views
-            )
+            with record_function("dino-loss"):
+                dino_loss = self._calculate_dino_loss(
+                    student_outputs["dino"], teacher_outputs["dino"], collated_views
+                )
 
-            ibot_loss = self._calculate_ibot_loss(
-                student_outputs["ibot"],
-                teacher_outputs["ibot"],
-                student_outputs["mask_weights"],
-            )
+            with record_function("ibot-loss"):
+                ibot_loss = self._calculate_ibot_loss(
+                    student_outputs["ibot"],
+                    teacher_outputs["ibot"],
+                    student_outputs["mask_weights"],
+                )
 
             student_target_dino_tokens = {
                 group_name: tokens
                 for group_name, tokens in student_outputs["dino"].items()
                 if collated_views[group_name]["is_target"]
             }
-            koleo_loss = self._calculate_koleo_loss(student_target_dino_tokens)
+            with record_function("koleo-loss"):
+                koleo_loss = self._calculate_koleo_loss(student_target_dino_tokens)
 
             total_loss = (
                 (self.dino_loss_weight * dino_loss)
