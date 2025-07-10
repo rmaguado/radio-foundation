@@ -131,6 +131,9 @@ def train(
             apply_gradient_operations(cfg, model, optimizer, accum_steps)
             model.update_teacher(mom)
 
+            # TODO: add a check to see if the teacher parameters are the same in all ranks
+            # print the first 100 parameters of the teacher
+
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
             checkpointer.step(iteration)
 
