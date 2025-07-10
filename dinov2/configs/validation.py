@@ -16,8 +16,8 @@ class ModuleMixedPrecisionConfig(BaseModel):
 
 
 class ComputePrecisionConfig(BaseModel):
-    teacher: Dict[str, ModuleMixedPrecisionConfig]
-    student: Dict[str, ModuleMixedPrecisionConfig]
+    teacher: ModuleMixedPrecisionConfig
+    student: ModuleMixedPrecisionConfig
 
 
 class DinoConfig(BaseModel):
