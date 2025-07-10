@@ -24,25 +24,14 @@ def device():
 
 
 @pytest.fixture
-def input_dtype(cfg):
-    dtype_str = cfg.compute_precision
-    if dtype_str == "fp16":
-        return torch.half
-    elif dtype_str == "bf16":
-        return torch.bfloat16
-    else:
-        return torch.float
-
-
-@pytest.fixture
-def arch(cfg, device, input_dtype):
-    arch = SSLMetaArch(cfg, device=device, dtype=input_dtype)
+def arch(cfg, device):
+    arch = SSLMetaArch(cfg, device=device)
     arch.to(device)
     return arch
 
 
 @pytest.fixture
-def collated_views(cfg, input_dtype):
+def collated_views(cfg):
 
     dataset_config = cfg.datasets[0]
 
@@ -57,7 +46,7 @@ def collated_views(cfg, input_dtype):
         collate_data_and_cast,
         mask_ratio_tuple=(0.1, 0.5),
         mask_probability=0.5,
-        dtype=input_dtype,
+        dtype=torch.half,
         mask_generator=mask_generator,
     )
 

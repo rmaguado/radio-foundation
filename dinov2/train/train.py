@@ -146,7 +146,7 @@ def train(
     return iteration
 
 
-def do_train(cfg, model, dtype):
+def do_train(cfg, model):
     model.train()
 
     (
@@ -161,7 +161,7 @@ def do_train(cfg, model, dtype):
 
     logger.info("Starting training from iteration {}".format(start_iter))
 
-    dataloader = setup_dataloader(cfg, dtype)
+    dataloader = setup_dataloader(cfg)
     metric_logger = MetricLogger(
         output_dir=cfg.train.output_dir,
         dataloader=dataloader,
@@ -236,19 +236,11 @@ def main():
         == cfg.train.batch_size_total
     ), "batch_size_per_gpu x grad_accum_steps x world_size must be equal to batch_size_total"
 
-    dtype_str = cfg.compute_precision
-    if dtype_str == "fp16":
-        dtype = torch.half
-    elif dtype_str == "bf16":
-        dtype = torch.bfloat16
-    else:
-        dtype = torch.float
-
-    model = SSLMetaArch(cfg, rank, dtype).to(rank)
+    model = SSLMetaArch(cfg, rank).to(rank)
     model.prepare_for_distributed_training()
 
     try:
-        do_train(cfg, model, dtype)
+        do_train(cfg, model)
     finally:
         dist.destroy_process_group()
 

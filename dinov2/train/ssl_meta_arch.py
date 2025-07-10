@@ -10,13 +10,13 @@ from typing import Dict, Any, Tuple, Optional
 
 import torch
 from torch import nn
-from torch.nn.parallel import DistributedDataParallel as DDP
 from einops import rearrange, repeat
 
 from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
 from dinov2.models import build_model_from_cfg
 from dinov2.layers import DINOHead
 from dinov2.train.param_groups import get_params_groups_with_decay
+from dinov2.train.distributed import wrap_module_with_mixed_precision
 
 
 logger = logging.getLogger("dinov2")
@@ -35,11 +35,10 @@ class SSLMetaArch(nn.Module):
         device: Device to run the model on (e.g., 'cuda' or 'cpu').
     """
 
-    def __init__(self, cfg, device, dtype):
+    def __init__(self, cfg, device):
         super().__init__()
         self.cfg = cfg
         self.device = device
-        self.dtype = dtype
 
         self.student = nn.ModuleDict()
         self.teacher = nn.ModuleDict()
@@ -458,9 +457,14 @@ class SSLMetaArch(nn.Module):
 
         for k, v in self.student.items():
             self.teacher[k].load_state_dict(self.student[k].state_dict())
-            self.student[k] = DDP(
-                self.student[k], mixed_precision=self.dtype, device_ids=[self.device]
+
+            self.student[k] = wrap_module_with_mixed_precision(
+                module=self.student[k],
+                mixed_precision_cfg=self.cfg.compute_precision.student[k],
+                rank=self.device,
             )
-            self.teacher[k] = DDP(
-                self.teacher[k], mixed_precision=self.dtype, device_ids=[self.device]
+            self.teacher[k] = wrap_module_with_mixed_precision(
+                module=self.teacher[k],
+                mixed_precision_cfg=self.cfg.compute_precision.teacher[k],
+                rank=self.device,
             )

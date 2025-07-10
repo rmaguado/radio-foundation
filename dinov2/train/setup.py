@@ -105,7 +105,8 @@ def build_schedulers(cfg):
     }
 
 
-def setup_dataloader(cfg, inputs_dtype):
+def setup_dataloader(cfg):
+    inputs_dtype = torch.half
     mask_generator = MaskingGenerator()
 
     collate_fn = partial(
