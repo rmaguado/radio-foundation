@@ -16,7 +16,7 @@ from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
 from dinov2.models import build_model_from_cfg
 from dinov2.layers import DINOHead
 from dinov2.train.param_groups import get_params_groups_with_decay
-from dinov2.train.distributed import wrap_module_with_mixed_precision
+from dinov2.train.distributed import DDP
 
 
 logger = logging.getLogger("dinov2")
@@ -98,6 +98,17 @@ class SSLMetaArch(nn.Module):
         # there is no backpropagation through the teacher, so no need for gradients
         for p in self.teacher.parameters():
             p.requires_grad = False
+
+        dtype_str = cfg.compute_precision
+        if dtype_str == "fp16":
+            autocast_dtype = torch.half
+        elif dtype_str == "bf16":
+            autocast_dtype = torch.bfloat16
+        else:
+            autocast_dtype = torch.float
+        self.autocast_ctx = partial(
+            torch.cuda.amp.autocast, enabled=True, dtype=autocast_dtype
+        )
 
     def _prepare_inputs(self, collated_views: Dict[str, Any]) -> None:
         """
@@ -388,31 +399,33 @@ class SSLMetaArch(nn.Module):
         """
         self._prepare_inputs(collated_views)
 
-        teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
-        student_outputs = self._run_student_pass(collated_views)
+        with self.autocast_ctx():
+            teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
+            student_outputs = self._run_student_pass(collated_views)
 
-        dino_loss = self._calculate_dino_loss(
-            student_outputs["dino"], teacher_outputs["dino"], collated_views
-        )
+            dino_loss = self._calculate_dino_loss(
+                student_outputs["dino"], teacher_outputs["dino"], collated_views
+            )
 
-        ibot_loss = self._calculate_ibot_loss(
-            student_outputs["ibot"],
-            teacher_outputs["ibot"],
-            student_outputs["mask_weights"],
-        )
+            ibot_loss = self._calculate_ibot_loss(
+                student_outputs["ibot"],
+                teacher_outputs["ibot"],
+                student_outputs["mask_weights"],
+            )
 
-        student_target_dino_tokens = {
-            group_name: tokens
-            for group_name, tokens in student_outputs["dino"].items()
-            if collated_views[group_name]["is_target"]
-        }
-        koleo_loss = self._calculate_koleo_loss(student_target_dino_tokens)
+            student_target_dino_tokens = {
+                group_name: tokens
+                for group_name, tokens in student_outputs["dino"].items()
+                if collated_views[group_name]["is_target"]
+            }
+            koleo_loss = self._calculate_koleo_loss(student_target_dino_tokens)
 
-        total_loss = (
-            (self.dino_loss_weight * dino_loss)
-            + (self.ibot_loss_weight * ibot_loss)
-            + (self.koleo_loss_weight * koleo_loss)
-        )
+            total_loss = (
+                (self.dino_loss_weight * dino_loss)
+                + (self.ibot_loss_weight * ibot_loss)
+                + (self.koleo_loss_weight * koleo_loss)
+            )
+
         loss_dict = {
             "dino_loss": dino_loss.detach(),
             "ibot_loss": ibot_loss.detach(),
@@ -458,13 +471,7 @@ class SSLMetaArch(nn.Module):
         for k, v in self.student.items():
             self.teacher[k].load_state_dict(self.student[k].state_dict())
 
-            self.student[k] = wrap_module_with_mixed_precision(
+            self.student[k] = DDP(
                 module=self.student[k],
-                mixed_precision_cfg=self.cfg.compute_precision.student[k],
-                rank=self.device,
-            )
-            self.teacher[k] = wrap_module_with_mixed_precision(
-                module=self.teacher[k],
-                mixed_precision_cfg=self.cfg.compute_precision.teacher[k],
-                rank=self.device,
+                device_ids=[self.device],
             )

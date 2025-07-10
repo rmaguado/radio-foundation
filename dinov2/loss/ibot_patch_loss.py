@@ -50,11 +50,13 @@ class iBOTPatchLoss(nn.Module):
         return loss.mean()
 
     @torch.no_grad()
+    @torch.cuda.amp.autocast(enabled=False)
     def update_center(self, teacher_patch_tokens):
         self.new_center += teacher_patch_tokens.mean(dim=0)
         self.update_counter += 1
 
     @torch.no_grad()
+    @torch.cuda.amp.autocast(enabled=False)
     def apply_center_update(self):
         _t = self.new_center / self.update_counter
         all_reduce(_t, op=ReduceOp.AVG)
