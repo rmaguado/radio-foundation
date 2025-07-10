@@ -116,35 +116,47 @@ def train(
         start_iter,
         accum_steps,
     ):
-        if iteration > max_iter:
-            return
+        with torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ],
+            record_shapes=True,
+        ) as p:
 
-        if should_reset_grad(grad_accum_counter, accum_steps):
-            mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
-            optimizer.zero_grad(set_to_none=True)
+            if iteration > max_iter:
+                return
 
-        loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)
+            if should_reset_grad(grad_accum_counter, accum_steps):
+                mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
+                optimizer.zero_grad(set_to_none=True)
 
-        loss_accumulator.backward()
+            loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)
 
-        if should_apply_training_step(grad_accum_counter, accum_steps):
-            apply_gradient_operations(cfg, model, optimizer, accum_steps)
-            model.update_teacher(mom)
+            loss_accumulator.backward()
 
-            # TODO: add a check to see if the teacher parameters are the same in all ranks
-            # print the first 100 parameters of the teacher
+            if should_apply_training_step(grad_accum_counter, accum_steps):
+                apply_gradient_operations(cfg, model, optimizer, accum_steps)
+                model.update_teacher(mom)
 
-            log_training_step(metric_logger, loss_dict, schedulers, iteration)
-            checkpointer.step(iteration)
+                # TODO: add a check to see if the teacher parameters are the same in all ranks
+                # print the first 100 parameters of the teacher
 
-            if should_eval_model(
-                iteration, max_iter, cfg.checkpoints.save_teacher_iterations
-            ):
-                do_test(cfg, model, f"training_{iteration}")
+                log_training_step(metric_logger, loss_dict, schedulers, iteration)
+                checkpointer.step(iteration)
 
-            iteration += 1
+                if should_eval_model(
+                    iteration, max_iter, cfg.checkpoints.save_teacher_iterations
+                ):
+                    do_test(cfg, model, f"training_{iteration}")
 
-        grad_accum_counter += 1
+                iteration += 1
+
+            grad_accum_counter += 1
+
+        logger.info(
+            p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1)
+        )
 
     return iteration
 
