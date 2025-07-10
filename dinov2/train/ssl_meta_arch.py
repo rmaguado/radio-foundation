@@ -10,6 +10,7 @@ from typing import Dict, Any, Tuple, Optional
 
 import torch
 from torch import nn
+from torch.nn.parallel import DistributedDataParallel as DDP
 from einops import rearrange, repeat
 
 from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
@@ -38,6 +39,7 @@ class SSLMetaArch(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.device = device
+        self.dtype = dtype
 
         self.student = nn.ModuleDict()
         self.teacher = nn.ModuleDict()
@@ -97,10 +99,6 @@ class SSLMetaArch(nn.Module):
         # there is no backpropagation through the teacher, so no need for gradients
         for p in self.teacher.parameters():
             p.requires_grad = False
-
-        self.autocast_ctx = partial(
-            torch.autocast, enabled=True, dtype=dtype, device_type="cuda"
-        )
 
     def _prepare_inputs(self, collated_views: Dict[str, Any]) -> None:
         """
@@ -391,9 +389,8 @@ class SSLMetaArch(nn.Module):
         """
         self._prepare_inputs(collated_views)
 
-        with self.autocast_ctx():
-            teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
-            student_outputs = self._run_student_pass(collated_views)
+        teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
+        student_outputs = self._run_student_pass(collated_views)
 
         dino_loss = self._calculate_dino_loss(
             student_outputs["dino"], teacher_outputs["dino"], collated_views
@@ -437,6 +434,9 @@ class SSLMetaArch(nn.Module):
             torch._foreach_mul_(teacher_param_list, m)
             torch._foreach_add_(teacher_param_list, student_param_list, alpha=1 - m)
 
+        self.dino_loss.apply_center_update()
+        self.ibot_patch_loss.apply_center_update()
+
     def train(self, mode: bool = True):
         super().train(mode)
         self.teacher.eval()
@@ -450,5 +450,17 @@ class SSLMetaArch(nn.Module):
                 m,
                 lr_decay_rate=self.cfg.optim.layerwise_decay,
                 patch_embed_lr_mult=self.cfg.optim.patch_embed_lr_mult,
+                num_layers=self.cfg.student.depth,
             )
         return all_params_groups
+
+    def prepare_for_distributed_training(self):
+
+        for k, v in self.student.items():
+            self.teacher[k].load_state_dict(self.student[k].state_dict())
+            self.student[k] = DDP(
+                self.student[k], mixed_precision=self.dtype, device_ids=[self.device]
+            )
+            self.teacher[k] = DDP(
+                self.teacher[k], mixed_precision=self.dtype, device_ids=[self.device]
+            )

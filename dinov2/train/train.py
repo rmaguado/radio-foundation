@@ -9,8 +9,6 @@ from typing import Tuple
 import os
 import math
 import torch
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
 
 from dinov2.logging import MetricLogger, setup_logging
 from dinov2.configs import get_cfg_from_path, write_config, validate_config
@@ -21,6 +19,7 @@ from dinov2.train.setup import (
     setup_dataloader,
     fix_random_seeds,
 )
+import dinov2.train.distributed as dist
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
@@ -73,17 +72,14 @@ def apply_gradient_operations(cfg, model, optimizer, accum_steps):
                 param.grad.data.div_(accum_steps)
 
     if cfg.optim.clip_grad:
-        torch.nn.utils.clip_grad_norm_(
-            model.module.student.parameters(), cfg.optim.clip_grad
-        )
+        torch.nn.utils.clip_grad_norm_(model.student.parameters(), cfg.optim.clip_grad)
 
     optimizer.step()
 
 
 def log_training_step(metric_logger, loss_dict, schedulers, iteration):
-    if dist.get_world_size() > 1:
-        for v in loss_dict.values():
-            dist.all_reduce(v)
+    for v in loss_dict.values():
+        dist.all_reduce(v)
     loss_dict_reduced = {
         k: v.item() / dist.get_world_size() for k, v in loss_dict.items()
     }
@@ -133,7 +129,7 @@ def train(
 
         if should_apply_training_step(grad_accum_counter, accum_steps):
             apply_gradient_operations(cfg, model, optimizer, accum_steps)
-            model.module.update_teacher(mom)
+            model.update_teacher(mom)
 
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
             checkpointer.step(iteration)
@@ -142,7 +138,6 @@ def train(
                 iteration, max_iter, cfg.checkpoints.save_teacher_iterations
             ):
                 do_test(cfg, model, f"training_{iteration}")
-                torch.cuda.synchronize()
 
             iteration += 1
 
@@ -152,7 +147,7 @@ def train(
 
 
 def do_train(cfg, model, dtype):
-    model.module.train()
+    model.train()
 
     (
         optimizer,
@@ -165,12 +160,12 @@ def do_train(cfg, model, dtype):
     iteration = start_iter
 
     logger.info("Starting training from iteration {}".format(start_iter))
-    metric_logger = MetricLogger(
-        output_file=os.path.join(cfg.train.output_dir, "training_metrics.json"),
-    )
 
-    data_loader = setup_dataloader(cfg, dtype)
-    metric_logger.set_dataloader(data_loader)
+    dataloader = setup_dataloader(cfg, dtype)
+    metric_logger = MetricLogger(
+        output_dir=cfg.train.output_dir,
+        dataloader=dataloader,
+    )
 
     iteration = train(
         cfg,
@@ -186,15 +181,13 @@ def do_train(cfg, model, dtype):
     logger.info("Finished training.")
     do_test(cfg, model, f"training_{iteration}")
 
-    del data_loader
-
 
 def do_test(cfg, model, iteration):
-    torch.cuda.synchronize()
+    dist.barrier()
 
-    new_state_dict = {k: v.cpu() for k, v in model.module.teacher.state_dict().items()}
+    new_state_dict = {k: v.cpu() for k, v in model.teacher.state_dict().items()}
 
-    if dist.get_rank() == 0:
+    if dist.is_main_process():
         iterstring = str(iteration)
         eval_dir = os.path.join(cfg.train.output_dir, "eval", iterstring)
         os.makedirs(eval_dir, exist_ok=True)
@@ -203,6 +196,8 @@ def do_test(cfg, model, iteration):
 
         teacher_ckp_path = os.path.join(eval_dir, "teacher_checkpoint.pth")
         torch.save({"teacher": new_state_dict}, teacher_ckp_path)
+
+    dist.barrier()
 
 
 def main():
@@ -250,7 +245,7 @@ def main():
         dtype = torch.float
 
     model = SSLMetaArch(cfg, rank, dtype).to(rank)
-    model = DDP(model, device_ids=[rank])
+    model.prepare_for_distributed_training()
 
     try:
         do_train(cfg, model, dtype)

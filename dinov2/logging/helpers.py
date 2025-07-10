@@ -3,9 +3,11 @@ import datetime
 import json
 import logging
 import time
+import os
 
 import torch
 import torch.distributed as dist
+from torch.utils.data import DataLoader
 
 logger = logging.getLogger("dinov2")
 
@@ -44,15 +46,18 @@ def custom_repr_nested(obj, indent=0):
 
 
 class MetricLogger(object):
-    def __init__(self, delimiter="    ", output_file=None, window_size=20):
-        self.meters = defaultdict(lambda: Metric(window_size))
-        self.delimiter = delimiter
-        self.output_file = output_file
-        self.dataloader = None
-        self.log_msg = None
+    delimiter = "    "
 
-    def set_dataloader(self, dataloader):
+    def __init__(
+        self,
+        output_dir: str,
+        dataloader: DataLoader,
+        window_size: int = 20,
+    ):
+        self.meters = defaultdict(lambda: Metric(window_size))
+        self.output_file = os.path.join(output_dir, "training_metrics.json")
         self.dataloader = dataloader
+        self.log_msg = ""
 
     def update(self, **kwargs):
         for k, v in kwargs.items():
@@ -91,7 +96,7 @@ class MetricLogger(object):
         with open(self.output_file, "a") as f:
             f.write(json.dumps(dict_to_dump) + "\n")
 
-    def build_log_msg(self, header, n_iterations):
+    def build_log_msg(self, header, n_iterations) -> str:
         space_fmt = ":" + str(len(str(n_iterations))) + "d"
 
         log_list = [

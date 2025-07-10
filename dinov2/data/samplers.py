@@ -11,7 +11,7 @@ import numpy as np
 import torch
 from torch.utils.data.sampler import Sampler
 
-import torch.distributed as dist
+from dinov2.train.distributed import get_rank, get_world_size
 
 
 logger = logging.getLogger("dinov2")
@@ -62,23 +62,6 @@ def _weighted_generate_randperm_indices(
             yield indices[idx].item()
 
 
-def _new_shuffle_tensor_slice(
-    *, tensor: torch.Tensor, start: int = 0, step: int = 1, generator: torch.Generator
-) -> np.ndarray:
-    stop = len(tensor)
-    count = stop // step
-    drop_count = stop - step * count
-    if drop_count:
-        logger.warning(f"# of dropped samples: {drop_count}")
-    indices = torch.randperm(count, dtype=torch.int64, generator=generator)
-    return tensor[start::step][indices].numpy()
-
-
-def _make_seed(seed: int, start: int, iter_count: int) -> int:
-    # NOTE: Tried a few variants (including iter_count << 32), this one worked best.
-    return seed + start + (iter_count << 24)
-
-
 def check_weighted_sampler_params(
     datasets: List[str], sizes: List[int], weights: List[float]
 ):
@@ -106,13 +89,11 @@ class InfiniteSampler(Sampler):
         *,
         sample_count: int,
         seed: int = 0,
-        start: Optional[int] = None,
-        step: Optional[int] = None,
     ):
         self._sample_count = sample_count
         self._seed = seed
-        self._start = dist.get_rank() if start is None else start
-        self._step = dist.get_world_size() if step is None else step
+        self._start = get_rank()
+        self._step = get_world_size()
 
     def __iter__(self):
         iterator = self._iterator()
@@ -140,14 +121,12 @@ class WeightedInfiniteSampler(Sampler):
         sizes: List[int],
         weights: List[float],
         seed: int = 0,
-        start: Optional[int] = None,
-        step: Optional[int] = None,
     ):
         self._dataset_sizes = sizes
         self._weights = weights
         self._seed = seed
-        self._start = dist.get_rank() if start is None else start
-        self._step = dist.get_world_size() if step is None else step
+        self._start = get_rank()
+        self._step = get_world_size()
 
         check_weighted_sampler_params(dataset_names, sizes, weights)
 

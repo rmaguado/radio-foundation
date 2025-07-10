@@ -144,14 +144,14 @@ def setup_training_components(cfg, model) -> Tuple[
     int,
     int,
 ]:
-    optimizer = build_optimizer(cfg, model.module.get_params_groups())
+    optimizer = build_optimizer(cfg, model.get_params_groups())
     schedulers = build_schedulers(cfg)
 
     total_epochs = cfg.train.epochs
     epoch_len = cfg.train.iterations_per_epoch
 
     checkpointer = DDPCheckpointer(
-        model.module, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
+        model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
     pretrained_weights = cfg.student.pretrained_weights

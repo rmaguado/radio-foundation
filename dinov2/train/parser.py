@@ -11,11 +11,6 @@ def get_args_parser(add_help: bool = True):
         help="Path to output directory to save logs and checkpoints",
     )
     parser.add_argument(
-        "--skip_validation",
-        action="store_true",
-        help="Skip config validation",
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Set logging level to DEBUG.",

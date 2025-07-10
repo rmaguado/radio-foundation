@@ -4,11 +4,13 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import torch
-import torch.distributed as dist
 import torch.nn.functional as F
 from torch import nn
+from torch.distributed import ReduceOp
 
 import logging
+
+from dinov2.train.distributed import all_reduce
 
 
 logger = logging.getLogger("dinov2")
@@ -19,17 +21,12 @@ class iBOTPatchLoss(nn.Module):
         super().__init__()
         self.student_temp = student_temp
         self.center_momentum = center_momentum
-        self.register_buffer("center", torch.zeros(1, 1, patch_out_dim))
-        self.updated = True
-        self.reduce_handle = None
-        self.len_teacher_patch_tokens = None
-        self.async_batch_center = None
+        self.register_buffer("center", torch.zeros(1, patch_out_dim))
+        self.register_buffer("new_center", torch.zeros(1, patch_out_dim))
+        self.update_counter = 0
 
     @torch.no_grad()
     def softmax_center_teacher(self, teacher_patch_tokens, teacher_temp):
-        self.apply_center_update()
-        # WARNING: as self.center is a float32, everything gets casted to float32 afterwards
-
         return F.softmax((teacher_patch_tokens - self.center) / teacher_temp, dim=-1)
 
     def forward(
@@ -54,33 +51,19 @@ class iBOTPatchLoss(nn.Module):
 
     @torch.no_grad()
     def update_center(self, teacher_patch_tokens):
-        self.reduce_center_update(teacher_patch_tokens)
-
-    @torch.no_grad()
-    def reduce_center_update(self, teacher_patch_tokens):
-        self.updated = False
-        self.len_teacher_patch_tokens = len(teacher_patch_tokens)
-        self.async_batch_center = torch.sum(
-            teacher_patch_tokens.mean(1), dim=0, keepdim=True
-        )
-        if dist.is_initialized():
-            self.reduce_handle = dist.all_reduce(self.async_batch_center, async_op=True)
+        self.new_center += teacher_patch_tokens.mean(dim=0)
+        self.update_counter += 1
 
     @torch.no_grad()
     def apply_center_update(self):
-        if self.updated is False:
-            world_size = dist.get_world_size() if dist.is_initialized() else 1
+        _t = self.new_center / self.update_counter
+        all_reduce(_t, op=ReduceOp.AVG)
 
-            if self.reduce_handle is not None:
-                self.reduce_handle.wait()
+        self.new_center = torch.zeros_like(
+            self.new_center, device=self.new_center.device
+        )
+        self.update_counter = 0
 
-            assert self.async_batch_center is not None
-            assert self.len_teacher_patch_tokens is not None
-
-            _t = self.async_batch_center / (self.len_teacher_patch_tokens * world_size)
-
-            self.center = self.center * self.center_momentum + _t * (
-                1 - self.center_momentum
-            )
-
-            self.updated = True
+        self.center = self.center * self.center_momentum + _t * (
+            1 - self.center_momentum
+        )
