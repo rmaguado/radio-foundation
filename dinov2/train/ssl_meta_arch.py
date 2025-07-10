@@ -107,7 +107,7 @@ class SSLMetaArch(nn.Module):
         else:
             autocast_dtype = torch.float
         self.autocast_ctx = partial(
-            torch.cuda.amp.autocast, enabled=True, dtype=autocast_dtype
+            torch.autocast, device_type="cuda", enabled=True, dtype=autocast_dtype
         )
 
     def _prepare_inputs(self, collated_views: Dict[str, Any]) -> None:

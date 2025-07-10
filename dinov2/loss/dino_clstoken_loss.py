@@ -57,13 +57,13 @@ class DINOLoss(nn.Module):
         return total_loss
 
     @torch.no_grad()
-    @torch.cuda.amp.autocast(enabled=False)
+    @torch.autocast(device_type="cuda", enabled=False)
     def update_center(self, teacher_output: torch.Tensor) -> None:
         self.new_center += teacher_output.mean(dim=0)
         self.update_counter += 1
 
     @torch.no_grad()
-    @torch.cuda.amp.autocast(enabled=False)
+    @torch.autocast(device_type="cuda", enabled=False)
     def apply_center_update(self) -> None:
         _t = self.new_center / self.update_counter
         all_reduce(_t, op=ReduceOp.AVG)
