@@ -440,7 +440,14 @@ class SSLMetaArch(nn.Module):
         teacher_param_list = []
         with torch.no_grad():
             for k in self.student.keys():
-                for ms, mt in zip(self.student[k].modules(), self.teacher[k].modules()):
+                student_module = (
+                    self.student[k].module
+                    if hasattr(self.student[k], "module")
+                    else self.student[k]
+                )
+                teacher_module = self.teacher[k]
+
+                for ms, mt in zip(student_module.modules(), teacher_module.modules()):
                     student_param_list += list(ms.parameters())
                     teacher_param_list += list(mt.parameters())
             torch._foreach_mul_(teacher_param_list, m)
