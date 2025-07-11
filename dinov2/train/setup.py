@@ -134,12 +134,7 @@ def setup_training_components(cfg, model, resume):
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
-    start_iter = (
-        checkpointer.resume_or_load(cfg.MODEL.WEIGHTS).get(
-            "iteration", -1
-        )
-        + 1
-    )
+    start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS)
 
     full_size_iter = get_full_size_iter(cfg)
     cropped_iter = get_cropped_iter(cfg)

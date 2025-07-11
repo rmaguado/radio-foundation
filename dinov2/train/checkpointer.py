@@ -67,11 +67,11 @@ class DDPCheckpointer(Checkpointer):
     def resume_or_load(self, path: Optional[str] = None) -> int:
         if self.has_checkpoint():
             path = self.get_checkpoint_file()
-            return self.load(path).get("iteration", 1)
+            return self.load(path).get("iteration", -1) + 1
         else:
             if path:
                 self.load(path)
-        return 1
+        return 0
 
     def has_checkpoint(self) -> bool:
         """
