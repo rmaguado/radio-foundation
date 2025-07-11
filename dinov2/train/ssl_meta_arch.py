@@ -138,9 +138,6 @@ class SSLMetaArch(nn.Module):
         # there is no backpropagation through the teacher, so no need for gradients
         for p in self.teacher.parameters():
             p.requires_grad = False
-        logger.debug(
-            f"Student and Teacher are built: they are both {cfg.student.arch} network."
-        )
 
     def forward(self, images, teacher_temp):
         n_global_crops = 2
