@@ -42,8 +42,8 @@ student:
   depth: 24
   num_heads: 16
   mlp_ratio: 4.0
-  full_image_size: 504
-  channels: 1
+  full_image_size: 448
+  channels: 10
   drop_path_rate: 0.4
   layerscale: 1.0e-05
   drop_path_uniform: true
@@ -95,7 +95,7 @@ datasets:
     type: ct
     storage: dicom
     augmentation: default_ct
-    channels: 1
+    channels: 10
     pixel_range:
       lower: -1000.0
       upper: 1900.0
