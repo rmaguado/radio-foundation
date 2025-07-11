@@ -75,7 +75,12 @@ def train(
             mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
             optimizer.zero_grad(set_to_none=True)
 
-        loss_dict, loss_accumulator = model.forward(data, teacher_temp=teacher_temp)
+        with torch.autocast(
+            device_type="cuda",
+            enabled=cfg.train.autocast,
+            dtype=torch.half,
+        ):
+            loss_dict, loss_accumulator = model.forward(data, teacher_temp=teacher_temp)
 
         loss_accumulator.backward()
 

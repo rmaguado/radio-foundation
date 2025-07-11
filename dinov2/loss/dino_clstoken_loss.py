@@ -76,10 +76,12 @@ class DINOLoss(nn.Module):
         return total_loss
 
     @torch.no_grad()
+    @torch.autocast(device_type="cuda", enabled=False)
     def update_center(self, teacher_output):
         self.reduce_center_update(teacher_output)
 
     @torch.no_grad()
+    @torch.autocast(device_type="cuda", enabled=False)
     def reduce_center_update(self, teacher_output):
         self.updated = False
         self.len_teacher_output = len(teacher_output)
@@ -88,6 +90,7 @@ class DINOLoss(nn.Module):
             self.reduce_handle = dist.all_reduce(self.async_batch_center, async_op=True)
 
     @torch.no_grad()
+    @torch.autocast(device_type="cuda", enabled=False)
     def apply_center_update(self):
         if self.updated is False:
             world_size = dist.get_world_size() if dist.is_initialized() else 1
