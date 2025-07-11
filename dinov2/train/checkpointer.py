@@ -69,7 +69,7 @@ class DDPCheckpointer(Checkpointer):
             path = self.get_checkpoint_file()
             return self.load(path).get("iteration", 1)
         else:
-            if path is not None:
+            if path:
                 self.load(path)
         return 1
 

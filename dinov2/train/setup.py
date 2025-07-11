@@ -135,7 +135,7 @@ def setup_training_components(cfg, model, resume):
     )
 
     start_iter = (
-        checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get(
+        checkpointer.resume_or_load(cfg.MODEL.WEIGHTS).get(
             "iteration", -1
         )
         + 1
