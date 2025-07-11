@@ -37,7 +37,6 @@ train:
 evaluation:
   eval_period_iterations: 10000
 student:
-  arch: vit_large
   patch_size: 14
   embed_dim: 1024
   depth: 24
