@@ -27,7 +27,6 @@ def is_main_process():
 def all_reduce(tensor, **kwargs) -> None:
     if not is_enabled():
         return
-    dist.barrier()
     dist.all_reduce(tensor, **kwargs)
 
 
