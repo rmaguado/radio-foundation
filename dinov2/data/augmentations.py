@@ -42,8 +42,9 @@ class DataAugmentationDINO(object):
                 self.dataset_config.pixel_range.lower,
                 self.dataset_config.pixel_range.upper,
             )
-            transforms_list = self.transform_groups_config[transform_key].copy()
-            for tc in transforms_list:
+            transforms_config = self.transform_groups_config[transform_key].copy()
+            # also has transforms_config.num_crops
+            for tc in transforms_config.transforms:
                 name = tc.pop("name")
                 transforms_obj.add_transform(name, tc)
 
