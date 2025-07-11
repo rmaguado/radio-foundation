@@ -15,6 +15,15 @@ class RandomApply:
         if random.random() < self.p:
             return self.transform_function(img, **self.kwargs)
         return img
+    
+
+class Apply:
+    def __init__(self, transform_function: Callable, kwargs: dict) -> None:
+        self.transform_function = transform_function
+        self.kwargs = kwargs
+
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        return self.transform_function(img, **self.kwargs)
 
 
 class ImageTransforms:
@@ -84,7 +93,9 @@ class ImageTransforms:
         p = kwargs.pop("p", 1.0)
         transform_function = self._transforms[transform_name]
 
-        return RandomApply(transform_function, p, kwargs)
+        if p < 1.0:
+            return RandomApply(transform_function, p, kwargs)
+        return Apply(transform_function, kwargs)
 
     
     def _crop(self, img: torch.Tensor, croptype: str, size: int, scale: Tuple = (0.08, 1.0)) -> torch.Tensor:
