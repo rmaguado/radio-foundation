@@ -6,7 +6,7 @@ import copy
 
 
 class RandomApply:
-    def __init__(self, transform_function: Callable, p: float, kwargs: dict):
+    def __init__(self, transform_function: Callable, p: float, kwargs: dict) -> None:
         self.transform_function = transform_function
         self.p = p
         self.kwargs = kwargs
@@ -59,13 +59,7 @@ class ImageTransforms:
 
         return img
 
-    def keys(self):
-        """
-        Returns the keys of the transformations dictionary.
-        """
-        return self._transforms.keys()
-
-    def add_transform(self, transform_name: str, kwargs):
+    def add_transform(self, transform_name: str, kwargs) -> None:
         """
         Adds a transformation to the transform list.
 
@@ -75,7 +69,7 @@ class ImageTransforms:
         """
         self.transform_list.append(self._get_random_transform(transform_name, kwargs))
 
-    def add_normalize(self, mean: float, std: float):
+    def add_normalize(self, mean: float, std: float) -> None:
         """
         Adds a normalization transformation to the transform list.
 
