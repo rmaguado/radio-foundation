@@ -30,10 +30,6 @@ train:
   OFFICIAL_EPOCH_LENGTH: 1000
   cache_dataset: true
   centering: "centering" # or "sinkhorn_knopp"
-  full_image:
-    epochs: 10
-    batch_size_per_gpu: 16
-    grad_accum_steps: 4
 evaluation:
   eval_period_iterations: 10000
 student:

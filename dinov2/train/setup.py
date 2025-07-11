@@ -61,11 +61,9 @@ def build_schedulers(cfg):
     }
 
 
-def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
+def setup_dataloader(cfg, inputs_dtype):
 
-    image_size = (
-        cfg.student.full_image_size if use_full_image else cfg.crops.global_crops_size
-    )
+    image_size = cfg.crops.global_crops_size
 
     patch_size = cfg.student.patch_size
     n_tokens = (image_size // patch_size) ** 2
@@ -83,20 +81,16 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         dtype=inputs_dtype,
     )
 
-    dataset, weights = make_train_dataset(cfg, use_full_image)
+    dataset, weights = make_train_dataset(cfg)
 
-    batch_size = (
-        cfg.train.full_image.batch_size_per_gpu
-        if use_full_image
-        else cfg.train.batch_size_per_gpu
-    )
+    batch_size_per_gpu = cfg.train.batch_size_per_gpu
     if weights is not None:
         sampler_type = SamplerType.WEIGHTED_SHARDED_INFINITE
     else:
         sampler_type = SamplerType.SHARDED_INFINITE
     data_loader = make_data_loader(
         dataset=dataset,
-        batch_size=batch_size,
+        batch_size=batch_size_per_gpu,
         num_workers=cfg.train.num_workers,
         seed=cfg.train.seed,
         weights=weights,
@@ -108,21 +102,13 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
     return data_loader
 
 
-def get_full_size_iter(cfg):
-    full_img_epochs = cfg.train.full_image.epochs
+def get_max_iter(cfg):
+    num_epochs = cfg.optim.epochs
     epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
-    return full_img_epochs * epoch_len
+    return num_epochs * epoch_len
 
 
-def get_cropped_iter(cfg):
-    total_epochs = cfg.optim.epochs
-    full_img_epochs = cfg.train.full_image.epochs
-    cropped_epochs = total_epochs - full_img_epochs
-    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
-    return cropped_epochs * epoch_len
-
-
-def setup_training_components(cfg, model, resume):
+def setup_training_components(cfg, model):
     logger = logging.getLogger("dinov2")
 
     optimizer = build_optimizer(cfg, model.get_params_groups())
@@ -135,10 +121,7 @@ def setup_training_components(cfg, model, resume):
     )
 
     start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS)
-
-    full_size_iter = get_full_size_iter(cfg)
-    cropped_iter = get_cropped_iter(cfg)
-    max_iter = cropped_iter + full_size_iter
+    max_iter = get_max_iter(cfg)
 
     checkpointer = DDPPeriodicCheckpointer(
         checkpointer,
@@ -153,5 +136,4 @@ def setup_training_components(cfg, model, resume):
         checkpointer,
         start_iter,
         max_iter,
-        full_size_iter,
     )

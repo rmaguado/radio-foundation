@@ -68,7 +68,7 @@ def train(
     if img_mode == "crop":
         accum_steps = cfg.train.grad_accum_steps
     elif img_mode == "full":
-        accum_steps = cfg.train.full_image.grad_accum_steps
+        accum_steps = cfg.train.grad_accum_steps
     else:
         raise ValueError
 
@@ -124,7 +124,7 @@ def train(
     return iteration
 
 
-def do_train(cfg, model, resume=False):
+def do_train(cfg, model):
     model.train()
     inputs_dtype = get_dtype(cfg.compute_precision)
 
@@ -134,8 +134,7 @@ def do_train(cfg, model, resume=False):
         checkpointer,
         start_iter,
         max_iter,
-        full_size_iter,
-    ) = setup_training_components(cfg, model, resume)
+    ) = setup_training_components(cfg, model)
 
     iteration = start_iter
 
@@ -146,30 +145,20 @@ def do_train(cfg, model, resume=False):
 
     train_components = [cfg, metric_logger, model, optimizer, schedulers, checkpointer]
 
-    if iteration < max_iter - full_size_iter:
-        data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=False)
+    if iteration < max_iter:
+        data_loader = setup_dataloader(cfg, inputs_dtype)
         metric_logger.set_dataloader(data_loader)
 
         iteration = train(
             *train_components,
             img_mode="crop",
             start_iter=start_iter,
-            max_iter=max_iter - full_size_iter,
+            max_iter=max_iter,
         )
 
         logger.info("Finished training on resize-crop images.")
-    logger.info(f"Resuming with full-size images for {max_iter - iteration} steps")
 
-    data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=True)
-    metric_logger.set_dataloader(data_loader)
-    train(
-        *train_components,
-        img_mode="full",
-        start_iter=iteration,
-        max_iter=max_iter,
-    )
     do_test(cfg, model, f"training_{iteration}")
-    logger.info("Finished training on full-size images")
 
 
 def main():
