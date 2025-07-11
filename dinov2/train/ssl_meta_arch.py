@@ -154,6 +154,10 @@ class SSLMetaArch(nn.Module):
         upperbound = images["upperbound"]
         masks_weight = images["masks_weight"].cuda(non_blocking=True)
 
+        logger.info(global_crops.shape)
+        logger.info(local_crops.shape)
+        logger.info(masks.shape)
+
         n_local_crops_loss_terms = max(n_local_crops * n_global_crops, 1)
         n_global_crops_loss_terms = (n_global_crops - 1) * n_global_crops
 
