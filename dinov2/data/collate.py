@@ -38,15 +38,15 @@ def collate_data_and_cast(
             - upperbound (int): The upperbound.
             - n_masked_patches (torch.Tensor): The number of masked patches.
     """
-    n_global_crops = len(samples_list[0][0]["global_crops"])
-    n_local_crops = len(samples_list[0][0]["local_crops"])
+    n_global_crops = len(samples_list[0]["global_crops"])
+    n_local_crops = len(samples_list[0]["local_crops"])
 
     collated_global_crops = torch.stack(
-        [s[0]["global_crops"][i] for i in range(n_global_crops) for s in samples_list]
+        [s["global_crops"][i] for i in range(n_global_crops) for s in samples_list]
     )
 
     collated_local_crops = torch.stack(
-        [s[0]["local_crops"][i] for i in range(n_local_crops) for s in samples_list]
+        [s["local_crops"][i] for i in range(n_local_crops) for s in samples_list]
     )
 
     B = len(collated_global_crops)
