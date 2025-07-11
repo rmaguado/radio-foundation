@@ -107,7 +107,7 @@ class VolumeDataset:
         else:
             new_spacing = (min(original_spacing),) * 3
 
-        image = self.resample_to_isotropic(image, new_spacing)
+        #image = self.resample_to_isotropic(image, new_spacing)
 
         volume = sitk.GetArrayFromImage(image)  # (slices, height, width)
         volume_tensor = torch.tensor(volume, dtype=torch.float32)
