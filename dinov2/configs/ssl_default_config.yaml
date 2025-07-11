@@ -1,6 +1,6 @@
 MODEL:
   WEIGHTS: ''
-compute_precision: fp16
+compute_precision: bf16
 dino:
   loss_weight: 1.0
   head_n_prototypes: 65536
