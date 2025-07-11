@@ -428,77 +428,36 @@ def init_weights_vit_timm(module: nn.Module, name: str = ""):
             nn.init.zeros_(module.bias)
 
 
-def vit_small(patch_size=16, num_register_tokens=0, **kwargs):
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=384,
-        depth=12,
-        num_heads=6,
-        mlp_ratio=4,
+def build_model(args, only_teacher, img_size):
+    vit_kwargs = dict(
+        img_size=img_size,
+        patch_size=args.patch_size,
+        embed_dim=args.embed_dim,
+        depth=args.depth,
+        num_heads=args.num_heads,
+        mlp_ratio=args.mlp_ratio,
+        in_chans=args.channels,
+        init_values=args.layerscale,
+        ffn_layer=args.ffn_layer,
+        block_chunks=args.block_chunks,
+        qkv_bias=args.qkv_bias,
+        proj_bias=args.proj_bias,
+        ffn_bias=args.ffn_bias,
+        embed_layer=args.embed_layer,
+        conv_channels=args.conv_channels,
+        num_register_tokens=args.num_register_tokens,
+        interpolate_offset=args.interpolate_offset,
+        interpolate_antialias=args.interpolate_antialias,
         block_fn=partial(Block, attn_class=MemEffAttention),
-        num_register_tokens=num_register_tokens,
-        **kwargs,
     )
-    return model
-
-
-def vit_base(patch_size=16, num_register_tokens=0, **kwargs):
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=768,
-        depth=12,
-        num_heads=12,
-        mlp_ratio=4,
-        block_fn=partial(Block, attn_class=MemEffAttention),
-        num_register_tokens=num_register_tokens,
-        **kwargs,
+    teacher = DinoVisionTransformer(**vit_kwargs)
+    if only_teacher:
+        return teacher, teacher.embed_dim
+    student = DinoVisionTransformer(
+        **vit_kwargs,
+        drop_path_rate=args.drop_path_rate,
+        drop_path_uniform=args.drop_path_uniform,
     )
-    return model
-
-
-def vit_large(patch_size=16, num_register_tokens=0, **kwargs):
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=1024,
-        depth=24,
-        num_heads=16,
-        mlp_ratio=4,
-        block_fn=partial(Block, attn_class=MemEffAttention),
-        num_register_tokens=num_register_tokens,
-        **kwargs,
-    )
-    return model
-
-
-def vit_giant2(patch_size=16, num_register_tokens=0, **kwargs):
-    """
-    Close to ViT-giant, with embed-dim 1536 and 24 heads => embed-dim per head 64
-    """
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=1536,
-        depth=40,
-        num_heads=24,
-        mlp_ratio=4,
-        block_fn=partial(Block, attn_class=MemEffAttention),
-        num_register_tokens=num_register_tokens,
-        **kwargs,
-    )
-    return model
-
-
-def vit_rate(patch_size=20, num_register_tokens=0, **kwargs):
-    """
-    Similar to CT-CLIP from https://arxiv.org/abs/2403.17834
-    """
-    model = DinoVisionTransformer(
-        patch_size=patch_size,
-        embed_dim=512,
-        depth=8,
-        num_heads=8,
-        mlp_ratio=4,
-        block_fn=partial(Block, attn_class=MemEffAttention),
-        num_register_tokens=num_register_tokens,
-        **kwargs,
-    )
-    return model
+    embed_dim = student.embed_dim
+    return student, teacher, embed_dim
+    

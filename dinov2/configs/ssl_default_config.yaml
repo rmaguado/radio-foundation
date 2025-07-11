@@ -39,6 +39,10 @@ evaluation:
 student:
   arch: vit_large
   patch_size: 14
+  embed_dim: 1024
+  depth: 24
+  num_heads: 16
+  mlp_ratio: 4.0
   full_image_size: 504
   channels: 1
   drop_path_rate: 0.4
