@@ -10,11 +10,15 @@ import torch
 from omegaconf import OmegaConf
 
 from dinov2.logging import MetricLogger, setup_logging
-from dinov2.configs import get_cfg_from_path, write_config #validate_config
+from dinov2.configs import get_cfg_from_path, write_config  # validate_config
 
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
-from dinov2.train.setup import setup_training_components, setup_dataloader, fix_random_seeds
+from dinov2.train.setup import (
+    setup_training_components,
+    setup_dataloader,
+    fix_random_seeds,
+)
 import dinov2.train.distributed as dist
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -34,6 +38,7 @@ def should_eval_model(cfg, iteration):
         cfg.evaluation.eval_period_iterations > 0
         and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0
     )
+
 
 def get_dtype(dtype_str):
     if dtype_str == "fp16":
@@ -77,11 +82,11 @@ def apply_gradient_operations(cfg, model, optimizer, accum_steps):
 
 
 def log_training_step(metric_logger, loss_dict, schedulers, iteration):
-    if dist.get_global_size() > 1:
+    if dist.get_world_size() > 1:
         for v in loss_dict.values():
             torch.distributed.all_reduce(v)
     loss_dict_reduced = {
-        k: v.item() / dist.get_global_size() for k, v in loss_dict.items()
+        k: v.item() / dist.get_world_size() for k, v in loss_dict.items()
     }
 
     if math.isnan(sum(loss_dict_reduced.values())):
@@ -173,13 +178,9 @@ def do_train(cfg, model):
     model.train()
     inputs_dtype = get_dtype(cfg.compute_precision)
 
-    (
-        optimizer,
-        schedulers,
-        checkpointer,
-        start_iter,
-        max_iter
-    ) = setup_training_components(cfg, model)
+    (optimizer, schedulers, checkpointer, start_iter, max_iter) = (
+        setup_training_components(cfg, model)
+    )
 
     iteration = start_iter
 
@@ -202,7 +203,7 @@ def do_train(cfg, model):
     )
 
     logger.info("Finished training.")
-    
+
     do_test(cfg, model, f"training_{iteration}")
 
 
@@ -230,7 +231,7 @@ def main():
     fix_random_seeds(seed + rank)
 
     write_config(cfg, args.output_path)
-    #validate_config(cfg)
+    # validate_config(cfg)
     logger.info(OmegaConf.to_yaml(cfg))
 
     assert (
