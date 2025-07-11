@@ -3,7 +3,7 @@ import math
 import torch
 import logging
 
-import dinov2.distributed as distributed
+import dinov2.distributed as dist
 
 
 logger = logging.getLogger("dinov2")
@@ -43,11 +43,11 @@ def apply_gradient_operations(cfg, model, optimizer, accum_steps):
 
 
 def log_training_step(metric_logger, loss_dict, schedulers, iteration):
-    if distributed.get_global_size() > 1:
+    if dist.get_world_size() > 1:
         for v in loss_dict.values():
-            torch.distributed.all_reduce(v)
+            dist.all_reduce(v)
     loss_dict_reduced = {
-        k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()
+        k: v.item() / dist.get_world_size() for k, v in loss_dict.items()
     }
 
     if math.isnan(sum(loss_dict_reduced.values())):
@@ -69,7 +69,7 @@ def do_test(cfg, model, iteration):
 
     new_state_dict = {k: v.cpu() for k, v in model.teacher.state_dict().items()}
 
-    if distributed.is_main_process():
+    if dist.is_main_process():
         iterstring = str(iteration)
         eval_dir = os.path.join(cfg.train.output_dir, "eval", iterstring)
         os.makedirs(eval_dir, exist_ok=True)
