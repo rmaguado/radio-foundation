@@ -11,7 +11,7 @@ import numpy as np
 import torch
 from torch.utils.data.sampler import Sampler
 
-import dinov2.distributed as distributed
+import dinov2.distributed as dist
 
 
 logger = logging.getLogger("dinov2")
@@ -106,13 +106,11 @@ class InfiniteSampler(Sampler):
         *,
         sample_count: int,
         seed: int = 0,
-        start: Optional[int] = None,
-        step: Optional[int] = None,
     ):
         self._sample_count = sample_count
         self._seed = seed
-        self._start = distributed.get_global_rank() if start is None else start
-        self._step = distributed.get_global_size() if step is None else step
+        self._start = dist.get_rank()
+        self._step = dist.get_world_size()
 
     def __iter__(self):
         iterator = self._iterator()
@@ -140,14 +138,12 @@ class WeightedInfiniteSampler(Sampler):
         sizes: List[int],
         weights: List[float],
         seed: int = 0,
-        start: Optional[int] = None,
-        step: Optional[int] = None,
     ):
         self._dataset_sizes = sizes
         self._weights = weights
         self._seed = seed
-        self._start = distributed.get_global_rank() if start is None else start
-        self._step = distributed.get_global_size() if step is None else step
+        self._start = dist.get_rank()
+        self._step = dist.get_world_size()
 
         check_weighted_sampler_params(dataset_names, sizes, weights)
 
@@ -172,13 +168,11 @@ class ShardedInfiniteSampler(Sampler):
         *,
         sample_count: int,
         seed: int = 0,
-        start: Optional[int] = None,
-        step: Optional[int] = None,
     ):
         self._sample_count = sample_count
         self._seed = seed
-        self._start = distributed.get_global_rank() if start is None else start
-        self._step = distributed.get_global_size() if step is None else step
+        self._start = dist.get_rank()
+        self._step = dist.get_world_size()
         self._iter_count = 0
         self._shuffle_tensor_slice_fn = _new_shuffle_tensor_slice
 
@@ -217,14 +211,12 @@ class WeightedShardedInfiniteSampler(Sampler):
         sizes: List[int],
         weights: List[float],
         seed: int = 0,
-        start: Optional[int] = None,
-        step: Optional[int] = None,
     ):
         self._dataset_sizes = sizes
         self._weights = weights
         self._seed = seed
-        self._start = distributed.get_global_rank() if start is None else start
-        self._step = distributed.get_global_size() if step is None else step
+        self._start = dist.get_rank()
+        self._step = dist.get_world_size()
         self._iter_count = 0
         self._shuffle_tensor_slice_fn = _new_shuffle_tensor_slice
 

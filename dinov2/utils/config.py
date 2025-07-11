@@ -8,7 +8,7 @@ import os
 
 from omegaconf import OmegaConf
 
-import dinov2.distributed as distributed
+import dinov2.distributed as dist
 from dinov2.logging import setup_logging
 from dinov2.utils import utils
 from dinov2.configs import dinov2_default_config
@@ -36,7 +36,7 @@ def get_cfg_from_args(args):
 
 def default_setup(args):
     seed = getattr(args, "seed", 0)
-    rank = distributed.get_global_rank()
+    rank = dist.get_rank()
 
     if getattr(args, "debug", False):
         logging_level = logging.DEBUG
