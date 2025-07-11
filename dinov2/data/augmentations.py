@@ -32,6 +32,11 @@ class DataAugmentationDINO(object):
         self.transforms = self._load_transforms_from_cfg()
 
     def _load_transforms_from_cfg(self) -> Dict[str, ImageTransforms]:
+        transform_configs = {}
+        for config in copy.deepcopy(self.transform_groups_config):
+            name = config.pop("name")
+            transform_configs[name] = config
+
         transform_groups = {}
 
         for transform_group, transform_key in self.transform_groups.items():
@@ -40,7 +45,7 @@ class DataAugmentationDINO(object):
                 self.dataset_config.pixel_range.lower,
                 self.dataset_config.pixel_range.upper,
             )
-            transforms_list = copy.deepcopy(self.transform_groups_config[transform_key])
+            transforms_list = transform_configs[transform_key]
             for tc in transforms_list:
                 name = tc.pop("name")
                 transforms_obj.add_transform(name, tc)
