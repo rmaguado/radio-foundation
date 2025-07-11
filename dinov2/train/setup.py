@@ -97,7 +97,7 @@ def build_schedulers(cfg):
 
 def setup_dataloader(cfg, inputs_dtype):
 
-    image_size = cfg.student.embed_layers[0].img_size
+    image_size = 224
     patch_size = cfg.student.patch_size
     n_tokens = (image_size // patch_size) ** 2
     mask_generator = MaskingGenerator(
