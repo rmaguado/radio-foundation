@@ -8,7 +8,6 @@ from torchvision import transforms
 from einops import rearrange
 
 from dinov2.models import build_model_from_cfg
-from dinov2.utils.utils import load_pretrained_weights
 
 
 class ImageTransform:
@@ -172,6 +171,13 @@ def get_autocast_dtype(cfg):
         return torch.bfloat16
     else:
         return torch.float
+
+
+def load_pretrained_weights(model, pretrained_weights, checkpoint_key):
+    
+    torch.load(
+        pretrained_weights, map_location="cpu", weights_only=False
+    )
 
 
 def load_model_eval(path_to_checkpoint, config, device, select_layers):

@@ -1,12 +1,49 @@
 import logging
 import torch
 from functools import partial
+import numpy as np
+import random
 
 from dinov2.train.checkpointer import DDPCheckpointer, DDPPeriodicCheckpointer
 
-from dinov2.utils.utils import CosineScheduler
 from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
+
+
+
+
+class CosineScheduler(object):
+    def __init__(
+        self,
+        base_value,
+        final_value,
+        total_iters,
+        warmup_iters=0,
+        start_warmup_value=0,
+        freeze_iters=0,
+    ):
+        super().__init__()
+        self.final_value = final_value
+        self.total_iters = total_iters
+
+        freeze_schedule = np.zeros((freeze_iters))
+
+        warmup_schedule = np.linspace(start_warmup_value, base_value, warmup_iters)
+
+        iters = np.arange(total_iters - warmup_iters - freeze_iters)
+        schedule = final_value + 0.5 * (base_value - final_value) * (
+            1 + np.cos(np.pi * iters / len(iters))
+        )
+        self.schedule = np.concatenate((freeze_schedule, warmup_schedule, schedule))
+
+        assert len(self.schedule) == self.total_iters
+
+    def __getitem__(self, it):
+        if it >= self.total_iters:
+            return self.final_value
+        else:
+            return self.schedule[it]
+
 
 
 def build_optimizer(cfg, params_groups):
@@ -61,12 +98,9 @@ def build_schedulers(cfg):
     }
 
 
-def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
+def setup_dataloader(cfg, inputs_dtype):
 
-    image_size = (
-        cfg.student.full_image_size if use_full_image else cfg.crops.global_crops_size
-    )
-
+    image_size = cfg.student.embed_layers[0].img_size
     patch_size = cfg.student.patch_size
     n_tokens = (image_size // patch_size) ** 2
     mask_generator = MaskingGenerator(
@@ -83,20 +117,16 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
         dtype=inputs_dtype,
     )
 
-    dataset, weights = make_train_dataset(cfg, use_full_image)
+    dataset, weights = make_train_dataset(cfg)
 
-    batch_size = (
-        cfg.train.full_image.batch_size_per_gpu
-        if use_full_image
-        else cfg.train.batch_size_per_gpu
-    )
+    batch_size_per_gpu = cfg.train.batch_size_per_gpu
     if weights is not None:
         sampler_type = SamplerType.WEIGHTED_SHARDED_INFINITE
     else:
         sampler_type = SamplerType.SHARDED_INFINITE
     data_loader = make_data_loader(
         dataset=dataset,
-        batch_size=batch_size,
+        batch_size=batch_size_per_gpu,
         num_workers=cfg.train.num_workers,
         seed=cfg.train.seed,
         weights=weights,
@@ -108,10 +138,10 @@ def setup_dataloader(cfg, inputs_dtype, use_full_image: bool):
     return data_loader
 
 
-def get_full_size_iter(cfg):
-    full_img_epochs = cfg.train.full_image.epochs
+def get_max_iter(cfg):
+    num_epochs = cfg.optim.epochs
     epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
-    return full_img_epochs * epoch_len
+    return num_epochs * epoch_len
 
 
 def get_cropped_iter(cfg):
@@ -122,7 +152,7 @@ def get_cropped_iter(cfg):
     return cropped_epochs * epoch_len
 
 
-def setup_training_components(cfg, model, resume):
+def setup_training_components(cfg, model):
     logger = logging.getLogger("dinov2")
 
     optimizer = build_optimizer(cfg, model.get_params_groups())
@@ -135,10 +165,7 @@ def setup_training_components(cfg, model, resume):
     )
 
     start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS)
-
-    full_size_iter = get_full_size_iter(cfg)
-    cropped_iter = get_cropped_iter(cfg)
-    max_iter = cropped_iter + full_size_iter
+    max_iter = get_max_iter(cfg)
 
     checkpointer = DDPPeriodicCheckpointer(
         checkpointer,
@@ -153,5 +180,13 @@ def setup_training_components(cfg, model, resume):
         checkpointer,
         start_iter,
         max_iter,
-        full_size_iter,
     )
+
+def fix_random_seeds(seed=31):
+    """
+    Fix random seeds.
+    """
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
