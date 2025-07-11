@@ -240,8 +240,8 @@ def main():
         == cfg.train.batch_size_total
     ), "batch_size_per_gpu x grad_accum_steps x world_size must be equal to batch_size_total"
 
-    model = SSLMetaArch(cfg, rank).to(rank)
-    model.prepare_for_distributed_training()
+    model = SSLMetaArch(cfg).to(torch.device("cuda"))
+    model.prepare_for_distributed_training(rank)
 
     try:
         do_train(cfg, model)
