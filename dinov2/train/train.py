@@ -7,6 +7,8 @@ import logging
 import os
 import torch
 
+from torch.profiler import profile, ProfilerActivity, record_function
+
 from dinov2.logging import MetricLogger
 from dinov2.utils.config import setup
 
@@ -77,35 +79,47 @@ def train(
         start_iter,
         accum_steps,
     ):
-        if iteration > max_iter:
-            return
+        with profile(
+            activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True
+        ) as prof:
+            if iteration > max_iter:
+                return
 
-        if should_reset_grad(cfg, grad_accum_counter, accum_steps):
-            mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
-            optimizer.zero_grad(set_to_none=True)
+            if should_reset_grad(cfg, grad_accum_counter, accum_steps):
+                mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
+                optimizer.zero_grad(set_to_none=True)
 
-        with torch.autocast(device_type="cuda", enabled=True, dtype=dtype):
-            loss_dict, loss_accumulator = model.forward(data, teacher_temp=teacher_temp)
+            with torch.autocast(device_type="cuda", enabled=True, dtype=dtype):
+                with record_function("mode-forward"):
+                    loss_dict, loss_accumulator = model.forward(
+                        data, teacher_temp=teacher_temp
+                    )
 
-        loss_accumulator.backward()
+            with record_function("model-backward"):
+                loss_accumulator.backward()
 
-        torch.cuda.synchronize()
-
-        if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
-            apply_gradient_operations(cfg, model, optimizer, accum_steps)
-            model.update_teacher(mom)
-
-            log_training_step(metric_logger, loss_dict, schedulers, iteration)
-
-            checkpointer.step(iteration)
-
-            iteration += 1
-
-            if should_eval_model(cfg, iteration):
-                do_test(cfg, model, f"training_{iteration}")
                 torch.cuda.synchronize()
 
-        grad_accum_counter += 1
+            if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
+                with record_function("grad-operations"):
+                    apply_gradient_operations(cfg, model, optimizer, accum_steps)
+                model.update_teacher(mom)
+
+                with record_function("logging"):
+                    log_training_step(metric_logger, loss_dict, schedulers, iteration)
+
+                    checkpointer.step(iteration)
+
+                iteration += 1
+
+                if should_eval_model(cfg, iteration):
+                    do_test(cfg, model, f"training_{iteration}")
+                    torch.cuda.synchronize()
+
+            grad_accum_counter += 1
+
+        if dist.is_main_process():
+            prof.export_chrome_trace(f"runs/_traces/trace_{iteration:05}.json")
 
     return iteration
 
