@@ -31,10 +31,10 @@ def _get_decay_rate(
         "register_tokens",
     ]:
         layer_id = 0
-    elif name.startswith("embed_layers"):
+    elif "embed_layers" in name:
         layer_id = 0
-    elif name.startswith("blocks"):
-        layer_id = int(name.split(".")[1]) + 1
+    elif "blocks" in name:
+        layer_id = int(name.split("blocks.")[1].split(".")[0]) + 1
     else:
         layer_id = num_layers + 1
 
@@ -65,10 +65,10 @@ def get_params_groups_with_decay(
         if "last_layer" in name:
             d.update({"is_last_layer": True})
 
-        if name.endswith(".bias") or "norm" in name or "gamma" in name:
+        if ".bias" in name or "norm" in name or "gamma" in name:
             d.update({"wd_multiplier": 0.0})
 
-        if name.startswith("embed_layers"):
+        if "embed_layers" in name:
             d.update({"lr_multiplier": d["lr_multiplier"] * patch_embed_lr_mult})
 
         all_param_groups.append(d)
