@@ -140,6 +140,7 @@ def train(
 
             with record_function("model-backward"):
                 loss_accumulator.backward()
+                torch.cuda.synchronize()
 
             if should_apply_training_step(grad_accum_counter, accum_steps):
                 with record_function("apply-grad-operations"):
@@ -207,7 +208,6 @@ def do_train(cfg, model):
 
 
 def do_test(cfg, model, iteration):
-    dist.barrier()
 
     new_state_dict = {k: v.cpu() for k, v in model.teacher.state_dict().items()}
 
@@ -221,7 +221,7 @@ def do_test(cfg, model, iteration):
         teacher_ckp_path = os.path.join(eval_dir, "teacher_checkpoint.pth")
         torch.save({"teacher": new_state_dict}, teacher_ckp_path)
 
-    dist.barrier()
+    torch.cuda.synchronize()
 
 
 def main():
