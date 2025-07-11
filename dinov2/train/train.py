@@ -39,6 +39,7 @@ def should_eval_model(cfg, iteration):
         and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0
     )
 
+
 def get_dtype(dtype_str):
     if dtype_str == "fp16":
         return torch.half
@@ -83,11 +84,7 @@ def train(
             mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
             optimizer.zero_grad(set_to_none=True)
 
-        with torch.autocast(
-            device_type="cuda",
-            enabled=cfg.train.autocast,
-            dtype=dtype,
-        ):
+        with torch.autocast(device_type="cuda", enabled=True, dtype=dtype):
             loss_dict, loss_accumulator = model.forward(data, teacher_temp=teacher_temp)
 
         loss_accumulator.backward()
@@ -116,7 +113,6 @@ def train(
 def do_train(cfg, model, resume=False):
     model.train()
     inputs_dtype = get_dtype(cfg.compute_precision)
-    
 
     (
         optimizer,
