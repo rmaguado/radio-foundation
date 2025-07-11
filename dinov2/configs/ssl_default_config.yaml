@@ -20,8 +20,9 @@ ibot:
   head_nlayers: 3
   head_hidden_dim: 2048
 train:
-  grad_accum_steps: 1
-  batch_size_per_gpu: 64
+  grad_accum_steps: 16
+  batch_size_per_gpu: 16
+  batch_size_total: 2048
   output_dir: .
   saveckp_iterations: 5000
   print_freq: 100
