@@ -144,14 +144,6 @@ def get_max_iter(cfg):
     return num_epochs * epoch_len
 
 
-def get_cropped_iter(cfg):
-    total_epochs = cfg.optim.epochs
-    full_img_epochs = cfg.train.full_image.epochs
-    cropped_epochs = total_epochs - full_img_epochs
-    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
-    return cropped_epochs * epoch_len
-
-
 def setup_training_components(cfg, model):
     logger = logging.getLogger("dinov2")
 
