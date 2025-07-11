@@ -22,7 +22,7 @@ class DataAugmentationDINO(object):
         self.transform_groups = config.augmentations[self.augmentations_group].copy()
 
         assert all(
-            key in self.transform_groups.keys() for key in ["local_2d", "global_2d", "local_3d", "global_3d"]
+            key in ["local_2d", "global_2d", "local_3d", "global_3d"] for key in self.transform_groups.keys()
         ), f"Unrecognized augmentation group: {self.transform_groups.keys()}"
 
         self.dataset_config = dataset_config.copy()
