@@ -67,10 +67,11 @@ def update_schedules(optimizer, schedulers, iteration) -> Tuple[float, float]:
 
 
 def apply_gradient_operations(cfg, model, optimizer, accum_steps):
-    for group in optimizer.param_groups:
-        for param in group["params"]:
-            if param.grad is not None:
-                param.grad.data.div_(accum_steps)
+    if accum_steps > 1:
+        for group in optimizer.param_groups:
+            for param in group["params"]:
+                if param.grad is not None:
+                    param.grad.data.div_(accum_steps)
 
     if cfg.optim.clip_grad:
         torch.nn.utils.clip_grad_norm_(model.student.parameters(), cfg.optim.clip_grad)
