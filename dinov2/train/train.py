@@ -15,7 +15,7 @@ from dinov2.configs import get_cfg_from_path, write_config #validate_config
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
 from dinov2.train.setup import setup_training_components, setup_dataloader, fix_random_seeds
-import dinov2.distributed as dist
+import dinov2.train.distributed as dist
 
 torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")

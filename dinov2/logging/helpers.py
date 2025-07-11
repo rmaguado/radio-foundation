@@ -6,7 +6,7 @@ import time
 
 import torch
 
-import dinov2.distributed as dist
+import dinov2.train.distributed as dist
 
 logger = logging.getLogger("dinov2")
 
