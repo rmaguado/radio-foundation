@@ -3,20 +3,24 @@
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
 
-import pathlib
+import os
 
-from omegaconf import OmegaConf
-
-
-def load_config(config_name: str):
-    config_filename = config_name + ".yaml"
-    return OmegaConf.load(pathlib.Path(__file__).parent.resolve() / config_filename)
+from omegaconf import OmegaConf, DictConfig
+#from dinov2.configs.validation import validate_config
 
 
-dinov2_default_config = load_config("ssl_default_config")
+dinov2_default_config = OmegaConf.load("dinov2/configs/ssl_default_config.yaml")
 
 
-def load_and_merge_config(config_name: str):
-    default_config = OmegaConf.create(dinov2_default_config)
-    loaded_config = load_config(config_name)
-    return OmegaConf.merge(default_config, loaded_config)
+def write_config(cfg, output_dir: str, name: str = "config.yaml") -> None:
+    saved_cfg_path = os.path.join(output_dir, name)
+    with open(saved_cfg_path, "w") as f:
+        OmegaConf.save(config=cfg, f=f)
+
+
+def get_cfg_from_path(config_file: str) -> DictConfig:
+    default_cfg = OmegaConf.create(dinov2_default_config)
+    cfg = OmegaConf.load(config_file)
+    cfg = OmegaConf.merge(default_cfg, cfg)
+    assert isinstance(cfg, DictConfig), "cfg must be a DictConfig"
+    return cfg
