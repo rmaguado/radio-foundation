@@ -165,12 +165,13 @@ def do_train(cfg, model, resume=False):
 def main():
 
     dist.setup_distributed_slurm()
+    rank = dist.get_rank()
 
     args = get_args_parser(add_help=True).parse_args()
     cfg = setup(args)
 
     model = SSLMetaArch(cfg).to(torch.device("cuda"))
-    model.prepare_for_distributed_training()
+    model.prepare_for_distributed_training(rank)
 
     try:
         do_train(cfg, model, resume=not args.no_resume)

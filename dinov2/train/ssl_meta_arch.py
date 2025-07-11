@@ -452,12 +452,12 @@ class SSLMetaArch(nn.Module):
             )
         return all_params_groups
 
-    def prepare_for_distributed_training(self):
+    def prepare_for_distributed_training(self, rank):
 
         for k, v in self.student.items():
             self.teacher[k].load_state_dict(self.student[k].state_dict())
 
             self.student[k] = DDP(
                 module=self.student[k],
-                device_ids=[self.device],
+                device_ids=[rank],
             )
