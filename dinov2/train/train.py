@@ -6,9 +6,6 @@
 import logging
 import os
 import torch
-import warnings
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
 
 from dinov2.logging import MetricLogger
 from dinov2.utils.config import setup
@@ -22,7 +19,7 @@ from dinov2.train.utils import (
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
 from dinov2.train.setup import setup_training_components, setup_dataloader
-from dinov2.configs.validation import validate_config
+import dinov2.distributed as dist
 
 torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")
@@ -54,7 +51,6 @@ def train(
     start_iter: int,
     max_iter: int,
 ):
-    fp16_scaler = model.fp16_scaler
     grad_accum_counter = 0
     iteration = start_iter
 
@@ -79,10 +75,14 @@ def train(
             mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
             optimizer.zero_grad(set_to_none=True)
 
-        loss_dict = model.forward_backward(data, teacher_temp=teacher_temp)
+        loss_dict, loss_accumulator = model.forward(data, teacher_temp=teacher_temp)
+
+        loss_accumulator.backward()
+
+        torch.cuda.synchronize()
 
         if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
-            apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps)
+            apply_gradient_operations(cfg, model, optimizer, accum_steps)
             model.update_teacher(mom)
 
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
@@ -133,7 +133,7 @@ def do_train(cfg, model, resume=False):
             max_iter=max_iter - full_size_iter,
         )
 
-        logger.info(f"Finished training on resize-crop images.")
+        logger.info("Finished training on resize-crop images.")
     logger.info(f"Resuming with full-size images for {max_iter - iteration} steps")
 
     data_loader = setup_dataloader(cfg, inputs_dtype, use_full_image=True)
@@ -148,27 +148,24 @@ def do_train(cfg, model, resume=False):
     logger.info("Finished training on full-size images")
 
 
-def main(args):
+def main():
+
+    dist.setup_distributed_slurm()
+
+    args = get_args_parser(add_help=True).parse_args()
     cfg = setup(args)
-    is_validated = validate_config(cfg) if not args.skip_validation else True
-    if not is_validated:
-        logger.error("Config validation failed. Exiting.")
-        return
 
     model = SSLMetaArch(cfg).to(torch.device("cuda"))
     model.prepare_for_distributed_training()
 
-    logger.debug("Model:\n{}".format(model))
-
-    do_train(cfg, model, resume=not args.no_resume)
+    try:
+        do_train(cfg, model, resume=not args.no_resume)
+    finally:
+        dist.cleanup_distributed()
 
 
 if __name__ == "__main__":
     if os.environ.get("PYTHONPATH") is not None and not os.path.exists("dinov2"):
         os.chdir(os.environ["PYTHONPATH"])
 
-    args = get_args_parser(add_help=True).parse_args()
-    try:
-        main(args)
-    finally:
-        torch.distributed.destroy_process_group()
+    main()

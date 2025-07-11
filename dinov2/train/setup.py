@@ -2,11 +2,8 @@ import logging
 import torch
 from functools import partial
 
-from dinov2.fsdp import (
-    FSDPCheckpointer,
-    FlexibleFSDPCheckpointer,
-    FlexiblePeriodicCheckpointer,
-)
+from dinov2.train.checkpointer import DDPCheckpointer, DDPPeriodicCheckpointer
+
 from dinov2.utils.utils import CosineScheduler
 from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
@@ -133,16 +130,7 @@ def setup_training_components(cfg, model, resume):
     schedulers = build_schedulers(cfg)
     logger.info("Schedulers ready.")
 
-    sharding_strategy = cfg.compute_precision.teacher.backbone.sharding_strategy
-    if sharding_strategy in [
-        "NO_SHARD",
-        "SHARD_GRAD_OP",
-    ]:
-        checkpointer_wrapper = FlexibleFSDPCheckpointer
-    else:
-        checkpointer_wrapper = FSDPCheckpointer
-
-    checkpointer = checkpointer_wrapper(
+    checkpointer = DDPCheckpointer(
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
@@ -157,7 +145,7 @@ def setup_training_components(cfg, model, resume):
     cropped_iter = get_cropped_iter(cfg)
     max_iter = cropped_iter + full_size_iter
 
-    checkpointer = FlexiblePeriodicCheckpointer(
+    checkpointer = DDPPeriodicCheckpointer(
         checkpointer,
         period=cfg.train.saveckp_iterations,
         max_iter=max_iter,

@@ -8,20 +8,12 @@ import logging
 
 import torch
 from torch import nn
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
 from dinov2.models import build_model_from_cfg
 from dinov2.layers import DINOHead
-from dinov2.utils.utils import has_batchnorms
-from dinov2.utils.param_groups import get_params_groups_with_decay, fuse_params_groups
-from dinov2.fsdp import (
-    get_fsdp_wrapper,
-    ShardedGradScaler,
-    get_fsdp_modules,
-    reshard_fsdp_model,
-)
-
-from dinov2.models.vision_transformer import BlockChunk
+from dinov2.utils.param_groups import get_params_groups_with_decay
 
 
 try:
@@ -37,9 +29,6 @@ class SSLMetaArch(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.fp16_scaler = (
-            ShardedGradScaler() if cfg.compute_precision.grad_scaler else None
-        )
 
         student_model_dict = dict()
         teacher_model_dict = dict()
@@ -143,8 +132,6 @@ class SSLMetaArch(nn.Module):
             else:
                 logger.debug("OPTIONS -- IBOT -- head shared with DINO")
 
-        self.need_to_synchronize_fsdp_streams = True
-
         self.student = nn.ModuleDict(student_model_dict)
         self.teacher = nn.ModuleDict(teacher_model_dict)
 
@@ -155,18 +142,7 @@ class SSLMetaArch(nn.Module):
             f"Student and Teacher are built: they are both {cfg.student.arch} network."
         )
 
-    def forward(self, inputs):
-        raise NotImplementedError(
-            "forward method is not implemented in SSLMetaArch. Use forward_backward instead."
-        )
-
-    def backprop_loss(self, loss):
-        if self.fp16_scaler is not None:
-            self.fp16_scaler.scale(loss).backward()
-        else:
-            loss.backward()
-
-    def forward_backward(self, images, teacher_temp):
+    def forward(self, images, teacher_temp):
         n_global_crops = 2
         assert n_global_crops == 2
         n_local_crops = self.cfg.crops.local_crops_number
@@ -310,7 +286,6 @@ class SSLMetaArch(nn.Module):
         teacher_dino_softmaxed_centered_list, masked_teacher_ibot_softmaxed_centered = (
             get_teacher_output()
         )
-        reshard_fsdp_model(self.teacher)
 
         loss_dict = {}
 
@@ -442,38 +417,23 @@ class SSLMetaArch(nn.Module):
             # accumulate loss
             loss_accumulator += self.ibot_loss_weight * ibot_patch_loss
 
-        self.backprop_loss(loss_accumulator)
-
-        self.fsdp_synchronize_streams()
-
-        return loss_dict
-
-    def fsdp_synchronize_streams(self):
-        if self.need_to_synchronize_fsdp_streams:
-            torch.cuda.synchronize()
-            for attr in {
-                "_unshard_stream",
-                "_post_backward_stream",
-                "_pre_unshard_stream",
-                "_all_reduce_stream",
-                "_default_stream",
-            }:
-                stream = getattr(self.teacher.backbone, attr)
-                setattr(self.student.dino_head, attr, stream)
-                setattr(self.teacher.dino_head, attr, stream)
-                setattr(self.student.backbone, attr, stream)
-            self.need_to_synchronize_fsdp_streams = False
+        return loss_dict, loss_accumulator
 
     def update_teacher(self, m):
         student_param_list = []
         teacher_param_list = []
         with torch.no_grad():
             for k in self.student.keys():
-                for ms, mt in zip(
-                    get_fsdp_modules(self.student[k]), get_fsdp_modules(self.teacher[k])
-                ):
-                    student_param_list += ms.params
-                    teacher_param_list += mt.params
+                student_module = (
+                    self.student[k].module
+                    if hasattr(self.student[k], "module")
+                    else self.student[k]
+                )
+                teacher_module = self.teacher[k]
+
+                for ms, mt in zip(student_module.modules(), teacher_module.modules()):
+                    student_param_list += list(ms.parameters())
+                    teacher_param_list += list(mt.parameters())
             torch._foreach_mul_(teacher_param_list, m)
             torch._foreach_add_(teacher_param_list, student_param_list, alpha=1 - m)
 
@@ -481,39 +441,23 @@ class SSLMetaArch(nn.Module):
         super().train()
         self.teacher.eval()
 
-    def get_maybe_fused_params_for_submodel(self, m):
-        params_groups = get_params_groups_with_decay(
-            model=m,
-            lr_decay_rate=self.cfg.optim.layerwise_decay,
-            patch_embed_lr_mult=self.cfg.optim.patch_embed_lr_mult,
-        )
-        fused_params_groups = fuse_params_groups(params_groups)
-        logger.info("fusing param groups")
-
-        for g in fused_params_groups:
-            g["foreach"] = True
-        return fused_params_groups
-
     def get_params_groups(self):
         all_params_groups = []
         for m in self.student.values():
-            all_params_groups += self.get_maybe_fused_params_for_submodel(m)
+            all_params_groups += get_params_groups_with_decay(
+                m,
+                lr_decay_rate=self.cfg.optim.layerwise_decay,
+                patch_embed_lr_mult=self.cfg.optim.patch_embed_lr_mult,
+                num_layers=self.cfg.student.depth,
+            )
         return all_params_groups
 
     def prepare_for_distributed_training(self):
-        logger.info("DISTRIBUTED FSDP -- preparing model for distributed training")
-        if has_batchnorms(self.student):
-            raise NotImplementedError(
-                "FSDP does not support batchnorms. Please use SyncBN instead."
-            )
-        # below will synchronize all student subnetworks across gpus:
+
         for k, v in self.student.items():
             self.teacher[k].load_state_dict(self.student[k].state_dict())
-            student_model_cfg = self.cfg.compute_precision.student[k]
-            self.student[k] = get_fsdp_wrapper(
-                student_model_cfg, modules_to_wrap={BlockChunk}
-            )(self.student[k])
-            teacher_model_cfg = self.cfg.compute_precision.teacher[k]
-            self.teacher[k] = get_fsdp_wrapper(
-                teacher_model_cfg, modules_to_wrap={BlockChunk}
-            )(self.teacher[k])
+
+            self.student[k] = DDP(
+                module=self.student[k],
+                device_ids=[self.device],
+            )

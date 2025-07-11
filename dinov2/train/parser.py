@@ -30,11 +30,6 @@ For python-based LazyConfig, use "path.key=value".
         help="Output directory to save logs and checkpoints",
     )
     parser.add_argument(
-        "--skip-validation",
-        action="store_true",
-        help="Skip config validation",
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Set logging level to DEBUG.",

@@ -29,10 +29,7 @@ def update_schedules(optimizer, schedulers, iteration):
     return momentum, teacher_temp
 
 
-def apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps):
-    if fp16_scaler is not None:
-        fp16_scaler.unscale_(optimizer)
-
+def apply_gradient_operations(cfg, model, optimizer, accum_steps):
     for group in optimizer.param_groups:
         for param in group["params"]:
             if param.grad is not None:
@@ -42,11 +39,7 @@ def apply_gradient_operations(cfg, model, optimizer, fp16_scaler, accum_steps):
         for v in model.student.values():
             v.clip_grad_norm_(cfg.optim.clip_grad)
 
-    if fp16_scaler is not None:
-        fp16_scaler.step(optimizer)
-        fp16_scaler.update()
-    else:
-        optimizer.step()
+    optimizer.step()
 
 
 def log_training_step(metric_logger, loss_dict, schedulers, iteration):
