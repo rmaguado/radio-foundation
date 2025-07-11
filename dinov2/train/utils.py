@@ -43,11 +43,11 @@ def apply_gradient_operations(cfg, model, optimizer, accum_steps):
 
 
 def log_training_step(metric_logger, loss_dict, schedulers, iteration):
-    if distributed.get_global_size() > 1:
+    if distributed.get_world_size() > 1:
         for v in loss_dict.values():
             torch.distributed.all_reduce(v)
     loss_dict_reduced = {
-        k: v.item() / distributed.get_global_size() for k, v in loss_dict.items()
+        k: v.item() / distributed.get_world_size() for k, v in loss_dict.items()
     }
 
     if math.isnan(sum(loss_dict_reduced.values())):
