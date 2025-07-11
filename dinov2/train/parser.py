@@ -3,26 +3,12 @@ import argparse
 
 def get_args_parser(add_help: bool = True):
     parser = argparse.ArgumentParser("DINOv2 training", add_help=add_help)
+    parser.add_argument("--config_path", default="", help="path to config file")
     parser.add_argument(
-        "--config-file", default="", metavar="FILE", help="path to config file"
-    )
-    parser.add_argument("--eval", type=str, default="", help="Eval type to perform")
-    parser.add_argument(
-        "opts",
-        help="""
-Modify config options at the end of the command. For Yacs configs, use
-space-separated "PATH.KEY VALUE" pairs.
-For python-based LazyConfig, use "path.key=value".
-        """.strip(),
-        default=None,
-        nargs=argparse.REMAINDER,
-    )
-    parser.add_argument(
-        "--output-dir",
-        "--output_dir",
+        "--output_path",
         default="",
         type=str,
-        help="Output directory to save logs and checkpoints",
+        help="Path to output directory to save logs and checkpoints",
     )
     parser.add_argument(
         "--debug",
