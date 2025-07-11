@@ -173,7 +173,7 @@ def main():
     model.prepare_for_distributed_training(rank)
 
     try:
-        do_train(cfg, model, resume=not args.no_resume)
+        do_train(cfg, model)
     finally:
         dist.cleanup_distributed()
 

@@ -6,11 +6,6 @@ def get_args_parser(add_help: bool = True):
     parser.add_argument(
         "--config-file", default="", metavar="FILE", help="path to config file"
     )
-    parser.add_argument(
-        "--no-resume",
-        action="store_true",
-        help="Whether to not attempt to resume from the checkpoint directory. ",
-    )
     parser.add_argument("--eval", type=str, default="", help="Eval type to perform")
     parser.add_argument(
         "opts",
