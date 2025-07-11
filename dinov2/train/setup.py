@@ -10,8 +10,6 @@ from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
 
 
-
-
 class CosineScheduler(object):
     def __init__(
         self,
@@ -43,7 +41,6 @@ class CosineScheduler(object):
             return self.final_value
         else:
             return self.schedule[it]
-
 
 
 def build_optimizer(cfg, params_groups):
@@ -121,9 +118,9 @@ def setup_dataloader(cfg, inputs_dtype):
 
     batch_size_per_gpu = cfg.train.batch_size_per_gpu
     if weights is not None:
-        sampler_type = SamplerType.WEIGHTED_SHARDED_INFINITE
+        sampler_type = SamplerType.WEIGHTED_INFINITE
     else:
-        sampler_type = SamplerType.SHARDED_INFINITE
+        sampler_type = SamplerType.INFINITE
     data_loader = make_data_loader(
         dataset=dataset,
         batch_size=batch_size_per_gpu,
@@ -173,6 +170,7 @@ def setup_training_components(cfg, model):
         start_iter,
         max_iter,
     )
+
 
 def fix_random_seeds(seed=31):
     """
