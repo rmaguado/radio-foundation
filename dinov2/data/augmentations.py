@@ -8,7 +8,6 @@ import logging
 import torch
 from omegaconf import DictConfig
 from typing import Dict, List
-import copy
 
 from .transforms import ImageTransforms
 
@@ -20,23 +19,21 @@ class DataAugmentationDINO(object):
     def __init__(self, config: DictConfig, dataset_config: DictConfig) -> None:
         self.augmentations_group = dataset_config.augmentations
         self.transform_groups = config.augmentations[self.augmentations_group].copy()
+        self.dataset_config = dataset_config.copy()
+        self.embed_config = config.student.embed_layers.copy()
 
         assert all(
             key in ["local_2d", "global_2d", "local_3d", "global_3d"] for key in self.transform_groups.keys()
         ), f"Unrecognized augmentation group: {self.transform_groups.keys()}"
 
-        self.dataset_config = dataset_config.copy()
-        self.transform_groups_config = config.transform_groups.copy()
-        self.embed_config = config.student.embed_layers.copy()
+        self.transform_groups_config = {}
+        for transform_group_config in config.transform_groups.copy():
+            name = transform_group_config.pop("name")
+            self.transform_groups_config[name] = transform_group_config
 
         self.transforms = self._load_transforms_from_cfg()
 
     def _load_transforms_from_cfg(self) -> Dict[str, ImageTransforms]:
-        transform_configs = {}
-        for config in copy.deepcopy(self.transform_groups_config):
-            name = config.pop("name")
-            transform_configs[name] = config
-
         transform_groups = {}
 
         for transform_group, transform_key in self.transform_groups.items():
@@ -45,7 +42,7 @@ class DataAugmentationDINO(object):
                 self.dataset_config.pixel_range.lower,
                 self.dataset_config.pixel_range.upper,
             )
-            transforms_list = transform_configs[transform_key]
+            transforms_list = self.transform_groups_config[transform_key].copy()
             for tc in transforms_list:
                 name = tc.pop("name")
                 transforms_obj.add_transform(name, tc)
