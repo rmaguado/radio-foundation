@@ -50,7 +50,7 @@ class DataAugmentationDINO(object):
         image_transforms = ImageTransforms(
             self.dataset_config.pixel_range.lower,
             self.dataset_config.pixel_range.upper,
-            self.dataset_config.channels,
+            10,
         )
         augmentations_list = copy.deepcopy(self.augmentations_config[transform_key])
         for tc in augmentations_list:
