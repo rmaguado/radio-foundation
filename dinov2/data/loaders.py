@@ -5,20 +5,15 @@
 
 import logging
 from enum import Enum
-from typing import Any, Callable, Tuple, List, Optional, TypeVar
+from typing import Any, Callable, List, Optional, TypeVar
 from omegaconf import DictConfig
 from tabulate import tabulate
 
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import MultiDataset, DicomCtDataset, NiftiCtDataset, MedicalImageDataset
-from .samplers import (
-    InfiniteSampler,
-    WeightedInfiniteSampler,
-    ShardedInfiniteSampler,
-    WeightedShardedInfiniteSampler,
-)
+from .datasets import MultiDataset, DicomVolumeDataset, NiftiVolumeDataset
+from .samplers import InfiniteSampler, WeightedInfiniteSampler
 from .augmentations import DataAugmentationDINO
 
 
@@ -27,22 +22,10 @@ logger = logging.getLogger("dinov2")
 
 class SamplerType(Enum):
     INFINITE = 0
-    SHARDED_INFINITE = 1
-    WEIGHTED_INFINITE = 2
-    WEIGHTED_SHARDED_INFINITE = 3
+    WEIGHTED_INFINITE = 1
 
 
-def make_train_dataset(config: DictConfig) -> Tuple[MedicalImageDataset, Optional[List[float]]]:
-    """
-    Parse the dataset from the given OmegaConf configuration.
-
-    Args:
-        config (DictConfig): The OmegaConf dictionary configuration for the dataset.
-
-    Returns:
-        MedicalImageDataset: The corresponding dataset object(s).
-    """
-
+def make_train_dataset(config: DictConfig):
     dataset_objects = []
     weights = []
 
@@ -59,39 +42,28 @@ def make_train_dataset(config: DictConfig) -> Tuple[MedicalImageDataset, Optiona
     return dataset_objects[0], [1.0]
 
 
-def build_dataset_from_cfg(
-    config, dataset_config
-) -> Tuple[MedicalImageDataset, Optional[float]]:
-
-    def get_ct_kwargs(dataset_config):
-        return {
-            "channels": dataset_config.channels,
-            "lower_window": dataset_config.pixel_range.lower,
-            "upper_window": dataset_config.pixel_range.upper,
-        }
-
-    dataset_type = dataset_config.type
+def build_dataset_from_cfg(config, dataset_config):
+    dataset_name = dataset_config.name
+    dataset_type = dataset_config.type  # ct or mri
     dataset_storage = dataset_config.storage
     transform = DataAugmentationDINO(config, dataset_config)
 
     weight = dataset_config.weight if hasattr(dataset_config, "weight") else None
 
     dataset_kwargs = {
-        "dataset_name": dataset_config.name,
-        "root_path": dataset_config.root_path,
+        "dataset_name": dataset_name,
+        "index_path": dataset_config.index_path,
+        "modality": dataset_type,
         "transform": transform,
     }
 
-    if dataset_type == "ct":
-        dataset_kwargs.update(get_ct_kwargs(dataset_config))
-        if dataset_storage == "dicom":
-            dataset_object = DicomCtDataset(**dataset_kwargs)
-        elif dataset_storage == "nifti":
-            dataset_object = NiftiCtDataset(**dataset_kwargs)
-        else:
-            raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
+    if dataset_storage == "dicom":
+        dataset_object = DicomVolumeDataset(**dataset_kwargs)
+    elif dataset_storage == "nifti":
+        dataset_object = NiftiVolumeDataset(**dataset_kwargs)
     else:
-        raise ValueError(f"Unsupported dataset type: {dataset_type}")
+        raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
+
     return dataset_object, weight
 
 
@@ -106,7 +78,7 @@ def _make_sampler(
     Creates a sampler with the specified parameters.
     A sampler is a strategy for sampling data from a dataset.
     Supported sampler types includes:
-        - INFINITE, SHARDED_INFINITE, WEIGHTED_INFINITE, WEIGHTED_SHARDED_INFINITE.
+        - INFINITE or WEIGHTED_INFINITE.
 
     Args:
         dataset: The dataset to create the sampler for.
@@ -125,10 +97,7 @@ def _make_sampler(
         dataset_names = [dataset.dataset_name]
     sample_count = len(dataset)
 
-    if sampler_type in [
-        SamplerType.WEIGHTED_INFINITE,
-        SamplerType.WEIGHTED_SHARDED_INFINITE,
-    ]:
+    if sampler_type == SamplerType.WEIGHTED_INFINITE:
         assert weights is not None, "Weights must be provided for weighted sampling"
 
     if weights is not None:
@@ -159,17 +128,10 @@ def _make_sampler(
     if sampler_type == SamplerType.INFINITE:
         logger.info("sampler: infinite")
         return InfiniteSampler(sample_count=sample_count, seed=seed)
-    elif sampler_type == SamplerType.SHARDED_INFINITE:
-        logger.info("sampler: sharded infinite")
-        return ShardedInfiniteSampler(sample_count=sample_count, seed=seed)
     elif sampler_type == SamplerType.WEIGHTED_INFINITE:
         logger.info("sampler: weighted infinite")
+        assert weights is not None, "Weights must be provided for weighted sampling"
         return WeightedInfiniteSampler(
-            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
-        )
-    elif sampler_type == SamplerType.WEIGHTED_SHARDED_INFINITE:
-        logger.info("sampler: weighted sharded infinite")
-        return WeightedShardedInfiniteSampler(
             dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
         )
 
@@ -189,7 +151,7 @@ def make_data_loader(
     weights: Optional[List[float]] = None,
     sampler_type: Optional[SamplerType] = SamplerType.INFINITE,
     drop_last: bool = True,
-    persistent_workers: bool = False,
+    persistent_workers: bool = True,
     collate_fn: Optional[Callable[[List[T]], Any]] = None,
 ):
     """
@@ -201,7 +163,7 @@ def make_data_loader(
         num_workers: The number of workers to use.
         seed: The random seed to use.
         weights: The weights for each dataset if using multiple groups of data.
-        sampler_type: Which sampler to use: EPOCH, INFINITE, SHARDED_INFINITE, DISTRIBUTED or None.
+        sampler_type: Which sampler to use: INFINITE or WEIGHTED_INFINITE.
         sampler_size: The number of images per epoch (when applicable) or -1 for the entire dataset.
         drop_last: Whether the last non-full batch of data should be dropped.
         persistent_workers: maintain the workers Dataset instances alive after a dataset has been consumed once.
@@ -225,10 +187,7 @@ def make_data_loader(
         drop_last=drop_last,
         persistent_workers=persistent_workers,
         collate_fn=collate_fn,
+        prefetch_factor=3,
     )
 
-    try:
-        logger.info(f"# of batches: {len(data_loader):,d}")
-    except TypeError:
-        logger.info("infinite data loader")
     return data_loader
