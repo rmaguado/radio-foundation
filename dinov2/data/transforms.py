@@ -87,16 +87,16 @@ class ImageTransforms:
         return RandomApply(transform_function, p, kwargs)
 
     
-    def _crop(self, img: torch.Tensor, croptype: str, crop_size: int, scale: Tuple = (0.08, 1.0)) -> torch.Tensor:
+    def _crop(self, img: torch.Tensor, croptype: str, size: int, scale: Tuple = (0.08, 1.0)) -> torch.Tensor:
         if croptype == "3d":
-            return self._resized_crop_3d(img, crop_size, scale)
+            return self._resized_crop_3d(img, size, scale)
         else:
-            return self._resized_crop_2d(img, crop_size, scale)
+            return self._resized_crop_2d(img, size, scale)
 
     def _resized_crop_3d(
-        self, img: torch.Tensor, crop_size: int, scale: Tuple
+        self, img: torch.Tensor, size: int, scale: Tuple
     ) -> torch.Tensor:
-        crop_shape = (crop_size, crop_size, crop_size)
+        crop_shape = (size, ) * 3
 
         d, h, w = img.shape  # Expecting [D, H, W]
 
@@ -128,9 +128,9 @@ class ImageTransforms:
         return resized
 
     def _resized_crop_2d(
-        self, img: torch.Tensor, crop_size: int, scale: Tuple
+        self, img: torch.Tensor, size: int, scale: Tuple
     ) -> torch.Tensor:
-        crop_shape = (crop_size, crop_size)
+        crop_shape = (size, ) * 2
 
         _, h, w = img.shape  # [C, H, W]
 
