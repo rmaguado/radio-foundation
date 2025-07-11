@@ -85,20 +85,6 @@ crops:
   - 0.32
   global_crops_size: 224
   local_crops_size: 98
-datasets:
-  - name: radiomics_datasets
-    weight: 1.0
-    root_path: .
-    type: ct
-    storage: dicom
-    augmentation: default_ct
-    channels: 10
-    pixel_range:
-      lower: -1000.0
-      upper: 1900.0
-    norm:
-      mean: -573.8
-      std: 461.3
 augmentations:
   default_ct:
     global_1:
@@ -125,3 +111,16 @@ augmentations:
       p: 0.5
     - name: gaussian_blur
       p: 0.5
+datasets:
+  - name: default_dataset
+    weight: 1.0
+    index_path: .
+    type: ct
+    storage: dicom
+    augmentation: default_ct
+    pixel_range:
+      lower: -1000.0
+      upper: 1900.0
+    norm:
+      mean: -573.8
+      std: 461.3

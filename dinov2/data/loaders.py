@@ -12,7 +12,7 @@ from tabulate import tabulate
 import torch
 from torch.utils.data import Sampler, DataLoader
 
-from .datasets import MultiDataset, DicomCtDataset, NiftiCtDataset, MedicalImageDataset
+from .datasets import MultiDataset, DicomVolumeDataset, NiftiVolumeDataset
 from .samplers import (
     InfiniteSampler,
     WeightedInfiniteSampler,
@@ -34,7 +34,7 @@ class SamplerType(Enum):
 
 def make_train_dataset(
     config: DictConfig,
-) -> Tuple[MedicalImageDataset, Optional[List[float]]]:
+):
     """
     Parse the dataset from the given OmegaConf configuration.
 
@@ -61,15 +61,8 @@ def make_train_dataset(
     return dataset_objects[0], [1.0]
 
 
-def build_dataset_from_cfg(config, dataset_config) -> Tuple[MedicalImageDataset, Optional[float]]:
-
-    def get_ct_kwargs(dataset_config):
-        return {
-            "channels": dataset_config.channels,
-            "lower_window": dataset_config.pixel_range.lower,
-            "upper_window": dataset_config.pixel_range.upper,
-        }
-
+def build_dataset_from_cfg(config, dataset_config):
+    dataset_name = dataset_config.name
     dataset_type = dataset_config.type
     dataset_storage = dataset_config.storage
     transform = DataAugmentationDINO(config, dataset_config)
@@ -77,21 +70,19 @@ def build_dataset_from_cfg(config, dataset_config) -> Tuple[MedicalImageDataset,
     weight = dataset_config.weight if hasattr(dataset_config, "weight") else None
 
     dataset_kwargs = {
-        "dataset_name": dataset_config.name,
-        "root_path": dataset_config.root_path,
+        "dataset_name": dataset_name,
+        "index_path": dataset_config.index_path,
+        "modality": dataset_type,
         "transform": transform,
     }
 
-    if dataset_type == "ct":
-        dataset_kwargs.update(get_ct_kwargs(dataset_config))
-        if dataset_storage == "dicom":
-            dataset_object = DicomCtDataset(**dataset_kwargs)
-        elif dataset_storage == "nifti":
-            dataset_object = NiftiCtDataset(**dataset_kwargs)
-        else:
-            raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
+    if dataset_storage == "dicom":
+        dataset_object = DicomVolumeDataset(**dataset_kwargs)
+    elif dataset_storage == "nifti":
+        dataset_object = NiftiVolumeDataset(**dataset_kwargs)
     else:
-        raise ValueError(f"Unsupported dataset type: {dataset_type}")
+        raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
+    
     return dataset_object, weight
 
 
