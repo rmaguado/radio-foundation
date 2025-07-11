@@ -39,6 +39,13 @@ def should_eval_model(cfg, iteration):
         and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0
     )
 
+def get_dtype(dtype_str):
+    if dtype_str == "fp16":
+        return torch.half
+    elif dtype_str == "bf16":
+        return torch.bfloat16
+    return torch.float
+
 
 def train(
     cfg,
@@ -51,6 +58,7 @@ def train(
     start_iter: int,
     max_iter: int,
 ):
+    dtype = get_dtype(cfg.compute_precision)
     grad_accum_counter = 0
     iteration = start_iter
 
@@ -78,7 +86,7 @@ def train(
         with torch.autocast(
             device_type="cuda",
             enabled=cfg.train.autocast,
-            dtype=torch.half,
+            dtype=dtype,
         ):
             loss_dict, loss_accumulator = model.forward(data, teacher_temp=teacher_temp)
 
@@ -107,7 +115,8 @@ def train(
 
 def do_train(cfg, model, resume=False):
     model.train()
-    inputs_dtype = torch.half
+    inputs_dtype = get_dtype(cfg.compute_precision)
+    
 
     (
         optimizer,
