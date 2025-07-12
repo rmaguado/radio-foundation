@@ -9,7 +9,7 @@ class Crop:
         scale: Tuple[float, float],
         size: Tuple[int, int, int],
     ) -> None:
-        self.crop_size = size
+        self.crop_size = torch.tensor(size, dtype=torch.float32)
         self.crop_scale = scale
 
     def get_scale(self) -> float:
@@ -25,7 +25,7 @@ class Crop:
         spacing = torch.tensor(spacing, dtype=torch.float32)
         min_spacing = spacing.min()
 
-        crop_physical_shape = torch.tensor(self.crop_size, dtype=torch.float32) * spacing / min_spacing
+        crop_physical_shape = self.crop_size * spacing / min_spacing
 
         scale = self.get_scale()
         scaled_physical_crop = crop_physical_shape * scale
@@ -47,7 +47,7 @@ class Crop:
 
         resampled = torch.nn.functional.interpolate(
             cropped,
-            size=self.crop_size,
+            size=tuple(self.crop_size.to(torch.int32).tolist()),
             mode="trilinear",
             align_corners=False,
         )
@@ -72,7 +72,7 @@ class Crop:
 
         resampled = torch.nn.functional.interpolate(
             img_crop,
-            size=self.crop_size,
+            size=tuple(self.crop_size.to(torch.int32).tolist()),
             mode="bilinear",
             align_corners=False,
         )
@@ -96,7 +96,7 @@ class Crop:
 
         resampled = torch.nn.functional.interpolate(
             img_crop,
-            size=self.crop_size,
+            size=tuple(self.crop_size.to(torch.int32).tolist()),
             mode="trilinear",
             align_corners=False,
         )
