@@ -47,7 +47,10 @@ class Crop:
         end = [start[i] + crop_dims_voxels[i] for i in range(3)]
 
         cropped = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
-        cropped_tensor = torch.tensor(cropped, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+        if isinstance(cropped, torch.Tensor):
+            cropped_tensor = cropped.unsqueeze(0).unsqueeze(0)
+        else:
+            cropped_tensor = torch.tensor(cropped, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
 
         resampled = torch.nn.functional.interpolate(
             cropped_tensor,
@@ -73,7 +76,10 @@ class Crop:
         end = [start[i] + crop_shape[i] for i in range(2)]
 
         cropped = img[:, start[0] : end[0], start[1] : end[1]]
-        cropped_tensor = torch.tensor(cropped, dtype=torch.float32).unsqueeze(0)
+        if isinstance(cropped, torch.Tensor):
+            cropped_tensor = cropped.unsqueeze(0)
+        else:
+            cropped_tensor = torch.tensor(cropped, dtype=torch.float32).unsqueeze(0)
 
         resampled = torch.nn.functional.interpolate(
             cropped_tensor,
@@ -98,7 +104,10 @@ class Crop:
         end = [start[i] + crop_shape[i] for i in range(3)]
 
         cropped = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
-        cropped_tensor = torch.tensor(cropped, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+        if isinstance(cropped, torch.Tensor):
+            cropped_tensor = cropped.unsqueeze(0).unsqueeze(0)
+        else:
+            cropped_tensor = torch.tensor(cropped, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
 
         resampled = torch.nn.functional.interpolate(
             cropped_tensor,
