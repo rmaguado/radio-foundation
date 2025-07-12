@@ -3,6 +3,7 @@ import torch
 from typing import Tuple, Callable
 from torchvision.transforms.functional import gaussian_blur
 
+
 class Crop:
     def __init__(
         self,
@@ -32,7 +33,9 @@ class Crop:
 
         crop_dims_voxels = torch.floor(scaled_physical_crop / spacing).to(torch.int32)
 
-        crop_dims_voxels = torch.minimum(crop_dims_voxels, original_shape.to(torch.int32))
+        crop_dims_voxels = torch.minimum(
+            crop_dims_voxels, original_shape.to(torch.int32)
+        )
         crop_dims_voxels = torch.maximum(
             crop_dims_voxels, torch.tensor([1, 1, 1], dtype=torch.int32)
         )
@@ -53,12 +56,11 @@ class Crop:
         )
 
         return resampled.squeeze(0).squeeze(0)
-    
+
     def crop2d(
         self,
         img: torch.Tensor,
     ) -> torch.Tensor:
-        
         xy_shape = torch.tensor(img.shape[1:], dtype=torch.float32)
         scale = self.get_scale()
 
@@ -69,16 +71,15 @@ class Crop:
         start = [random.randint(0, int(max_start[i])) for i in range(2)]
         end = [start[i] + crop_shape[i] for i in range(2)]
 
-        img_crop = img[:,start[0]:end[0],start[1]:end[1]].unsqueeze(0)
+        img_crop = img[:, start[0] : end[0], start[1] : end[1]].unsqueeze(0)
 
         resampled = torch.nn.functional.interpolate(
             img_crop,
-            size=tuple(self.crop_size.to(torch.int32).tolist()),
+            size=tuple(self.crop_size.to(torch.int32).tolist()[1:]),
             mode="bilinear",
             align_corners=False,
         )
         return resampled.squeeze(0)
-    
 
     def crop3d(
         self,
@@ -94,7 +95,11 @@ class Crop:
         start = [random.randint(0, int(max_start[i])) for i in range(3)]
         end = [start[i] + crop_shape[i] for i in range(3)]
 
-        img_crop = img[start[0]:end[0],start[1]:end[1],start[2]:end[2]].unsqueeze(0).unsqueeze(0)
+        img_crop = (
+            img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
+            .unsqueeze(0)
+            .unsqueeze(0)
+        )
 
         resampled = torch.nn.functional.interpolate(
             img_crop,
@@ -103,8 +108,8 @@ class Crop:
             align_corners=False,
         )
         return resampled.squeeze(0).squeeze(0)
-    
-    def __call__(self, img, spacing=None) -> torch.Tensor:        
+
+    def __call__(self, img, spacing=None) -> torch.Tensor:
         if spacing is not None:
             return self.crop_anisotropic(img, spacing)
         if img.shape[0] == self.crop_size[0]:
@@ -114,7 +119,7 @@ class Crop:
 
 class Flip:
     def __init__(self, skip_first=True) -> None:
-        self.flip_dims = [1,2] if skip_first else [0,1,2]
+        self.flip_dims = [1, 2] if skip_first else [0, 1, 2]
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         flip_dims = [dim for dim in self.flip_dims if random.random() < 0.5]
@@ -122,7 +127,9 @@ class Flip:
 
 
 class GaussianBlur:
-    def __init__(self, p: float = 1.0, sigma: Tuple[float, float] | float = (0.1, 0.5)) -> None:
+    def __init__(
+        self, p: float = 1.0, sigma: Tuple[float, float] | float = (0.1, 0.5)
+    ) -> None:
         self.p = p
         self.sigma = sigma
 
@@ -131,36 +138,42 @@ class GaussianBlur:
             return gaussian_blur(img, kernel_size=3, sigma=self.sigma)
         return img
 
+
 class Norm:
     def __init__(self, mean: float, std: float) -> None:
         self.mean = mean
         self.std = std
+
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         return (img - self.mean) / self.std
-    
+
 
 class ImageTransforms:
     def __init__(self) -> None:
         self.transforms = []
+
     def __iadd__(self, new_transform: Callable) -> None:
         self.transforms.append(new_transform)
         return self
-    def __call__(self, img: torch.Tensor, spacing: Tuple[float, ...] = None) -> torch.Tensor:
+
+    def __call__(
+        self, img: torch.Tensor, spacing: Tuple[float, ...] = None
+    ) -> torch.Tensor:
         for i, transform in enumerate(self.transforms):
             if i == 0:
                 img = transform(img, spacing)
             else:
                 img = transform(img)
         return img
-    
+
+
 def get_transform(name, kwargs) -> Callable:
     transform_keys = {
         "crop": Crop,
         "flip": Flip,
         "gaussian_blur": GaussianBlur,
-        "norm": Norm
+        "norm": Norm,
     }
     if name not in transform_keys:
         raise ValueError(f"Transform name '{name}' not recognized.")
     return transform_keys[name](**kwargs)
-    
