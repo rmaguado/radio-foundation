@@ -35,34 +35,6 @@ class VolumeDataset:
         self.modality = modality
         self.transform = transform
 
-    def resample_to_isotropic(self, image, new_spacing):
-        """
-        Resample a SimpleITK image to isotropic voxel spacing.
-
-        Args:
-            image (sitk.Image): The input image to resample.
-            new_spacing (tuple): The desired isotropic spacing (x, y, z).
-
-        Returns:
-            sitk.Image: The resampled image.
-        """
-        original_spacing = image.GetSpacing()
-        original_size = image.GetSize()
-
-        new_size = [
-            int(round(osz * ospc / nspc))
-            for osz, ospc, nspc in zip(original_size, original_spacing, new_spacing)
-        ]
-
-        resampler = sitk.ResampleImageFilter()
-        resampler.SetOutputSpacing(new_spacing)
-        resampler.SetSize(new_size)
-        resampler.SetOutputDirection(image.GetDirection())
-        resampler.SetOutputOrigin(image.GetOrigin())
-        resampler.SetInterpolator(sitk.sitkLinear)
-
-        return resampler.Execute(image)
-
     def __len__(self) -> int:
         """
         Returns the number of samples in the dataset.
@@ -99,22 +71,12 @@ class VolumeDataset:
 
         image = self.get_image_data(idx)
 
-        original_spacing = image.GetSpacing()
-        ratio = max(original_spacing) / min(original_spacing)
-
-        if ratio > 3.0:
-            new_spacing = (max(original_spacing) / 2,) * 3
-        else:
-            new_spacing = (min(original_spacing),) * 3
-
-        #image = self.resample_to_isotropic(image, new_spacing)
+        spacing = image.GetSpacing()
 
         volume = sitk.GetArrayFromImage(image)  # (slices, height, width)
         volume_tensor = torch.tensor(volume, dtype=torch.float32)
 
-        sliced_volume = volume_tensor[:10,:,:] # TEMPORARY
-
-        return self.transform(sliced_volume)
+        return self.transform(volume_tensor, spacing)
 
 
 class DicomVolumeDataset(VolumeDataset):

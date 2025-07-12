@@ -1,235 +1,160 @@
 import random
 import torch
-from torchvision import transforms
-from typing import Union, Tuple, Callable
-import copy
+from typing import Tuple, Callable
+from torchvision.transforms.functional import gaussian_blur
 
-Param = Union[str, float]
+class Crop:
+    def __init__(
+        self,
+        scale: Tuple[float, float],
+        size: Tuple[int, int, int],
+    ) -> None:
+        self.crop_size = torch.tensor(size, dtype=torch.float32)
+        self.crop_scale = scale
+
+    def get_scale(self) -> float:
+        return random.uniform(self.crop_scale[0], self.crop_scale[1])
+
+    def crop_anisotropic(
+        self,
+        img: torch.Tensor,
+        spacing: Tuple[float, float, float],
+    ) -> torch.Tensor:
+
+        original_shape = torch.tensor(img.shape, dtype=torch.float32)
+        spacing = torch.tensor(spacing, dtype=torch.float32)
+        min_spacing = spacing.min()
+
+        crop_physical_shape = self.crop_size * spacing / min_spacing
+
+        scale = self.get_scale()
+        scaled_physical_crop = crop_physical_shape * scale
+
+        crop_dims_voxels = torch.floor(scaled_physical_crop / spacing).to(torch.int32)
+
+        crop_dims_voxels = torch.minimum(crop_dims_voxels, original_shape.to(torch.int32))
+        crop_dims_voxels = torch.maximum(
+            crop_dims_voxels, torch.tensor([1, 1, 1], dtype=torch.int32)
+        )
+
+        max_start = (original_shape.to(torch.int32) - crop_dims_voxels).clamp(min=0)
+
+        start = [random.randint(0, int(max_start[i])) for i in range(3)]
+        end = [start[i] + crop_dims_voxels[i] for i in range(3)]
+
+        cropped = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
+        cropped = cropped.unsqueeze(0).unsqueeze(0)
+
+        resampled = torch.nn.functional.interpolate(
+            cropped,
+            size=self.crop_size,
+            mode="trilinear",
+            align_corners=False,
+        )
+
+        return resampled.squeeze(0).squeeze(0)
+    
+    def crop2d(
+        self,
+        img: torch.Tensor,
+    ) -> torch.Tensor:
+        
+        xy_shape = torch.tensor(img.shape[1:], dtype=torch.float32)
+        scale = self.get_scale()
+
+        crop_shape = torch.floor(xy_shape * scale)
+        max_start = xy_shape - crop_shape
+
+        start = [random.randint(0, int(max_start[i])) for i in range(2)]
+        end = [start[i] + crop_shape[i] for i in range(2)]
+
+        img_crop = img[:,start[0]:end[0],start[1]:end[1]].unsqueeze(0)
+
+        resampled = torch.nn.functional.interpolate(
+            img_crop,
+            size=self.crop_size,
+            mode="bilinear",
+            align_corners=False,
+        )
+        return resampled.squeeze(0)
+    
+
+    def crop3d(
+        self,
+        img: torch.Tensor,
+    ) -> torch.Tensor:
+        img_shape = torch.tensor(img.shape, dtype=torch.float32)
+        scale = self.get_scale()
+
+        crop_shape = torch.floor(img_shape * scale)
+        max_start = img_shape - crop_shape
+
+        start = [random.randint(0, int(max_start[i])) for i in range(3)]
+        end = [start[i] + crop_shape[i] for i in range(3)]
+
+        img_crop = img[start[0]:end[0],start[1]:end[1],start[2]:end[2]].unsqueeze(0).unsqueeze(0)
+
+        resampled = torch.nn.functional.interpolate(
+            img_crop,
+            size=self.crop_size,
+            mode="trilinear",
+            align_corners=False,
+        )
+        return resampled.squeeze(0).squeeze(0)
+    
+    def __call__(self, img, spacing=None) -> torch.Tensor:        
+        if spacing is not None:
+            return self.crop_anisotropic(img, spacing)
+        if img.shape[0] == self.crop_size[0]:
+            return self.crop2d(img)
+        return self.crop3d(img)
 
 
-class ImageTransforms:
-
-    def __init__(self, lower_bound: float, upper_bound: float, channels: int) -> None:
-        """
-        Initializes a Transform object.
-        Contains a list of transformations to be applied to an image.
-
-        Args:
-            lower_bound (float): The minimum value of the image pixel.
-            upper_bound (float): The maximum value of the image pixel.
-            channels (int): The number of channels in the image.
-        """
-        self.lower_bound = lower_bound
-        self.upper_bound = upper_bound
-        self.channels = channels
-
-        self.transform_list = []
-
-        self._transforms = {
-            "brightness": self._brightness,
-            "contrast": self._contrast,
-            "saturation": self._saturation,
-            "hue": self._hue,
-            "sharpness": self._sharpness,
-            "rotate": self._rotate,
-            "flip": self._flip,
-            "color_jitter": self._color_jitter,
-            "gaussian_blur": self._gaussian_blur,
-            "solarize": self._solarize,
-            "gray_scale": self._gray_scale,
-            "noise": self._noise,
-            "gamma_correction": self._gamma_correction,
-            "window": self._window,
-            "zresample_artefacts": self._zresample_artefacts,
-        }
+class Flip:
+    def __init__(self, skip_first=True) -> None:
+        self.flip_dims = [1,2] if skip_first else [0,1,2]
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        """
-        Applies the transformations to the image.
+        flip_dims = [dim for dim in self.flip_dims if random.random() < 0.5]
+        return img.flip(dims=flip_dims)
 
-        Args:
-            img (torch.Tensor): The image to be transformed.
 
-        Returns:
-            torch.Tensor: The transformed image.
-        """
-        for transform in self.transform_list:
-            img = transform(img)
+class GaussianBlur:
+    def __init__(self, p: float = 1.0, sigma: Tuple[float, float] | float = (0.1, 0.5)) -> None:
+        self.p = p
+        self.sigma = sigma
 
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        if random.random() < self.p:
+            return gaussian_blur(img, kernel_size=3, sigma=self.sigma)
         return img
 
-    def keys(self):
-        """
-        Returns the keys of the transformations dictionary.
-        """
-        return self._transforms.keys()
+class Norm:
+    def __init__(self, mean: float, std: float) -> None:
+        self.mean = mean
+        self.std = std
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        return (img - self.mean) / self.std
+    
 
-    def add_transform(self, transform_name: str, kwargs):
-        """
-        Adds a transformation to the transform list.
-
-        Args:
-            transform_name (str): The name of the transformation to be added.
-            **kwargs: The parameters of the transformation.
-        """
-        self.transform_list.append(self._get_random_transform(transform_name, kwargs))
-
-    def add_crop(self, crop_size: int, crop_scale: Tuple):
-        """
-        Adds a random resized crop transformation to the transform list.
-
-        Args:
-            crop_size (int): The size of the crop.
-            crop_scale (Tuple): The range of scale of the crop.
-        """
-        self.transform_list.append(
-            transforms.RandomResizedCrop(
-                crop_size,
-                scale=crop_scale,
-                interpolation=transforms.InterpolationMode.BICUBIC,
-                antialias=True,
-            )
-        )
-
-    def add_normalize(self, mean: float, std: float):
-        """
-        Adds a normalization transformation to the transform list.
-
-        Args:
-            mean (float): The mean value of the image pixel.
-            std (float): The standard deviation of the image pixel.
-        """
-        self.transform_list.append(transforms.Normalize(mean=mean, std=std))
-
-    def _get_random_transform(self, transform_name: str, kwargs: dict) -> Callable:
-        kwargs = copy.deepcopy(kwargs)
-        p = kwargs.pop("p")
-        transform_function = self._transforms[transform_name]
-
-        def random_apply(img):
-            if random.random() < p:
-                return transform_function(img, **kwargs)
-            return img
-
-        return random_apply
-
-    def _brightness(
-        self, img: torch.Tensor, bounds: Tuple = (0.1, 0.4)
-    ) -> torch.Tensor:
-        factor = random.uniform(bounds[0], bounds[1])
-        img = img + factor
-        return torch.clip(img, self.lower_bound, self.upper_bound)
-
-    def _contrast(self, img: torch.Tensor, bounds: Tuple = (0.1, 0.4)) -> torch.Tensor:
-        mean = torch.mean(img)
-        factor = 1.0 + random.uniform(bounds[0], bounds[1])
-        img = (img - mean) * factor + mean
-        return torch.clip(img, self.lower_bound, self.upper_bound)
-
-    def _saturation(
-        self, img: torch.Tensor, bounds: Tuple = (0.1, 0.4)
-    ) -> torch.Tensor:
-        factor = random.uniform(bounds[0], bounds[1])
-        return transforms.functional.adjust_saturation(img, factor)
-
-    def _hue(self, img: torch.Tensor) -> torch.Tensor:
-        factor = random.uniform(-0.5, 0.5)
-        return transforms.functional.adjust_hue(img, factor)
-
-    def _sharpness(self, img: torch.Tensor, bounds: Tuple = (0.9, 1.5)) -> torch.Tensor:
-        img = img.unsqueeze(0)
-
-        factor = random.uniform(bounds[0], bounds[1])
-        kernel = (
-            (
-                torch.tensor(
-                    [[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]], dtype=torch.float32
-                )
-                * factor
-            )
-            .unsqueeze(0)
-            .unsqueeze(0)
-        )
-
-        img = torch.nn.functional.conv2d(img, kernel, padding=1)
-
-        return img.squeeze(0)
-
-    def _rotate(
-        self,
-        img: torch.Tensor,
-    ) -> torch.Tensor:
-        angle = 180.0 * random.uniform(-1, 1)
-        return transforms.functional.rotate(img, angle, fill=self.lower_bound)
-
-    def _flip(self, img: torch.Tensor) -> torch.Tensor:
-        return transforms.functional.hflip(img)
-
-    def _color_jitter(
-        self,
-        img: torch.Tensor,
-        brightness_bounds: Tuple = (0.1, 0.4),
-        contrast_bounds: Tuple = (0.1, 0.4),
-        saturation_bounds: Tuple = (0.1, 0.4),
-    ) -> torch.Tensor:
-
-        img = self._brightness(img, brightness_bounds)
-        img = self._contrast(img, contrast_bounds)
-        img = self._saturation(img, saturation_bounds)
-        return self._hue(img)
-
-    def _gaussian_blur(
-        self, img: torch.Tensor, bounds: Tuple = (0.1, 2.0)
-    ) -> torch.Tensor:
-        sigma = random.uniform(bounds[0], bounds[1])
-        return transforms.functional.gaussian_blur(img, kernel_size=3, sigma=sigma)
-
-    def _solarize(self, img: torch.Tensor, bounds: Tuple) -> torch.Tensor:
-        threshold = random.uniform(bounds[0], bounds[1])
-        mask = img > threshold
-        img[mask] = self.upper_bound - img[mask]
-
+class ImageTransform:
+    def __init__(self) -> None:
+        self.transforms = []
+    def __add__(self, new_transform: Callable) -> None:
+        self.transforms.append(new_transform)
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        for t in self.transforms:
+            img = t(img)
         return img
-
-    def _gray_scale(self, img: torch.Tensor) -> torch.Tensor:
-        return transforms.functional.rgb_to_grayscale(img)
-
-    def _noise(
-        self, img: torch.Tensor, mean: float = 0.0, std: float = 1.0
-    ) -> torch.Tensor:
-        noise = torch.normal(mean, std, size=img.size())
-        return img + noise
-
-    def _gamma_correction(
-        self, img: torch.Tensor, bounds: Tuple = (0.1, 2.0)
-    ) -> torch.Tensor:
-        gamma = random.uniform(bounds[0], bounds[1])
-        return img**gamma
-
-    def _window(
-        self, img: torch.Tensor, width_bounds: Tuple, height_bounds: Tuple
-    ) -> torch.Tensor:
-
-        width = int(random.uniform(width_bounds[0], width_bounds[1]))
-        height = int(random.uniform(height_bounds[0], height_bounds[1]))
-
-        img = torch.clip(img, height, height + width)
-
-        img = (img - height) / width * (
-            self.upper_bound - self.lower_bound
-        ) + self.lower_bound
-
-        return img
-
-    def _zresample_artefacts(self, img: torch.Tensor) -> torch.Tensor:
-        original_shape = img.shape
-        factor = random.uniform(1, 3)
-        img = torch.nn.functional.interpolate(
-            img.unsqueeze(0), scale_factor=(1, 1, factor), mode="trilinear"
-        ).squeeze(0)
-
-        img = torch.nn.functional.interpolate(
-            img.unsqueeze(0), size=original_shape[1:], mode="trilinear"
-        ).squeeze(0)
-
-        return img
+    
+def get_transform(name, kwargs) -> Callable:
+    transform_keys = {
+        "crop": Crop,
+        "flip": Flip,
+        "gaussian_blur": GaussianBlur,
+        "norm": Norm
+    }
+    if name not in transform_keys:
+        raise ValueError(f"Transform name '{name}' not recognized.")
+    return transform_keys[name](**kwargs)
+    

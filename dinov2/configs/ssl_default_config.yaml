@@ -76,39 +76,23 @@ optim:
   adamw_beta1: 0.9
   adamw_beta2: 0.999
 crops:
-  global_crops_scale:
-  - 0.32
-  - 1.0
   local_crops_number: 8
-  local_crops_scale:
-  - 0.05
-  - 0.32
   global_crops_size: 224
   local_crops_size: 98
 augmentations:
   default_ct:
-    global_1:
-    - name: rotate
-      p: 0.8
-    - name: globalcrop
+    global:
+    - name: crop
+      scale: [0.32, 1.0]
+      size: [10, 224, 224]
     - name: flip
       p: 0.5
     - name: gaussian_blur
-      p: 1.0
-    global_2:
-    - name: globalcrop
-    - name: flip
-      p: 0.5
-    - name: noise
-      p: 0.5
-      mean: 0.0
-      std: 0.1
-    - name: gaussian_blur
-      p: 0.1
     local:
-    - name: localcrop
+    - name: crop
+      scale: [0.05, 0.32]
+      size: [10, 98, 98]
     - name: flip
-      p: 0.5
     - name: gaussian_blur
       p: 0.5
 datasets:
