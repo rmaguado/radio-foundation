@@ -82,7 +82,7 @@ def build_dataset_from_cfg(config, dataset_config):
         dataset_object = NiftiVolumeDataset(**dataset_kwargs)
     else:
         raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
-    
+
     return dataset_object, weight
 
 
