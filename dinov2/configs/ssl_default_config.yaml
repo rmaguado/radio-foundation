@@ -86,7 +86,6 @@ augmentations:
       scale: [0.32, 1.0]
       size: [10, 224, 224]
     - name: flip
-      p: 0.5
     - name: gaussian_blur
     local:
     - name: crop
