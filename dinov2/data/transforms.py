@@ -143,9 +143,12 @@ class ImageTransforms:
     def __iadd__(self, new_transform: Callable) -> None:
         self.transforms.append(new_transform)
         return self
-    def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        for t in self.transforms:
-            img = t(img)
+    def __call__(self, img: torch.Tensor, spacing: Tuple[float, ...] = None) -> torch.Tensor:
+        for i, transform in enumerate(self.transforms):
+            if i == 0:
+                img = transform(img, spacing)
+            else:
+                img = transform(img)
         return img
     
 def get_transform(name, kwargs) -> Callable:
