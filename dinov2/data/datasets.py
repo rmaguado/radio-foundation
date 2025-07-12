@@ -2,7 +2,9 @@ import torch
 from typing import List, Dict, Tuple, Any, Callable
 import polars as pl
 import numpy as np
-import SimpleITK as sitk
+
+# import SimpleITK as sitk
+import nibabel as nib
 import logging
 
 
@@ -44,7 +46,7 @@ class VolumeDataset:
         """
         return len(self.df)
 
-    def get_image_data(self, idx: int) -> sitk.Image:
+    def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
         """
         Abstract method to retrieve the image data for a given index.
         Should be implemented by subclasses.
@@ -69,14 +71,9 @@ class VolumeDataset:
             Dict[str, torch.Tensor]: Dictionary of transformed image views.
         """
 
-        image = self.get_image_data(idx)
+        image, spacing = self.get_image_data(idx)
 
-        spacing = image.GetSpacing()
-
-        volume = sitk.GetArrayFromImage(image)  # (slices, height, width)
-        volume_tensor = torch.tensor(volume, dtype=torch.float32)
-
-        return self.transform(volume_tensor, spacing)
+        return self.transform(image, spacing)
 
 
 class DicomVolumeDataset(VolumeDataset):
@@ -86,27 +83,8 @@ class DicomVolumeDataset(VolumeDataset):
     Inherits from VolumeDataset and implements get_image_data for DICOM folders.
     """
 
-    def get_image_data(self, idx: int) -> sitk.Image:
-        """
-        Loads a DICOM image series as a SimpleITK image.
-
-        Args:
-            idx (int): Index of the sample.
-
-        Returns:
-            sitk.Image: The loaded DICOM image volume.
-        """
-        meta = self.df.row(idx)
-        dicom_folder = meta[0]
-
-        reader = sitk.ImageSeriesReader()
-        series_IDs = reader.GetGDCMSeriesIDs(dicom_folder)
-        assert series_IDs, f"No DICOM series found in: {dicom_folder}"
-        series_file_names = reader.GetGDCMSeriesFileNames(dicom_folder, series_IDs[0])
-        reader.SetFileNames(series_file_names)
-        image = reader.Execute()
-
-        return image
+    def get_image_data(self, idx: int):
+        raise NotImplementedError
 
 
 class NiftiVolumeDataset(VolumeDataset):
@@ -116,22 +94,19 @@ class NiftiVolumeDataset(VolumeDataset):
     Inherits from VolumeDataset and implements get_image_data for NIfTI files.
     """
 
-    def get_image_data(self, idx: int) -> sitk.Image:
-        """
-        Loads a NIfTI image file as a SimpleITK image.
-
-        Args:
-            idx (int): Index of the sample.
-
-        Returns:
-            sitk.Image: The loaded NIfTI image volume.
-        """
+    def get_image_data(self, idx: int):
         meta = self.df.row(idx)
         nifti_file_path = meta[0]
 
-        image = sitk.ReadImage(nifti_file_path)
+        image = nib.load(nifti_file_path)
 
-        return image
+        affine = image.affine
+
+        spacing = np.sqrt(np.sum(affine[:3, :3] ** 2, axis=0))
+
+        image_tensor = torch.tensor(image.get_fdata(), dtype=torch.float32)
+
+        return image_tensor, spacing
 
 
 class MultiDataset:
