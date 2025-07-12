@@ -140,7 +140,7 @@ class Norm:
 class ImageTransforms:
     def __init__(self) -> None:
         self.transforms = []
-    def __add__(self, new_transform: Callable) -> None:
+    def __iadd__(self, new_transform: Callable) -> None:
         self.transforms.append(new_transform)
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         for t in self.transforms:
