@@ -142,6 +142,7 @@ class ImageTransforms:
         self.transforms = []
     def __iadd__(self, new_transform: Callable) -> None:
         self.transforms.append(new_transform)
+        return self
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         for t in self.transforms:
             img = t(img)
