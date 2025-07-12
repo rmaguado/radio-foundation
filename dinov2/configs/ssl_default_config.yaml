@@ -83,13 +83,13 @@ augmentations:
   default_ct:
     global:
     - name: crop
-      scale: [0.32, 1.0]
+      scale: [0.5, 1.0]
       size: [10, 224, 224]
     - name: flip
     - name: gaussian_blur
     local:
     - name: crop
-      scale: [0.05, 0.32]
+      scale: [0.2, 0.5]
       size: [10, 98, 98]
     - name: flip
     - name: gaussian_blur
