@@ -15,7 +15,11 @@ from dinov2.logging import MetricLogger, setup_logging
 from dinov2.configs import get_cfg_from_path, write_config
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
-from dinov2.train.setup import setup_training_components, setup_dataloader, fix_random_seeds
+from dinov2.train.setup import (
+    setup_training_components,
+    setup_dataloader,
+    fix_random_seeds,
+)
 
 import dinov2.distributed as dist
 
@@ -45,6 +49,7 @@ def get_dtype(dtype_str):
     elif dtype_str == "bf16":
         return torch.bfloat16
     return torch.float
+
 
 def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
     for param_group in optimizer.param_groups:
@@ -80,7 +85,7 @@ def apply_gradient_operations(cfg, model, optimizer, accum_steps):
 
 
 def log_training_step(metric_logger, loss_dict, schedulers, iteration):
-    
+
     if dist.get_world_size() > 1:
         for k, v in loss_dict.items():
             loss_dict[k] = v.detach()
@@ -187,8 +192,10 @@ def train(
 
             grad_accum_counter += 1
 
-        if dist.is_main_process():
-            prof.export_chrome_trace(f"runs/_traces/trace_{iteration:05}.json")
+        if iteration > 10 and iteration % 4 == 0:
+            prof.export_chrome_trace(
+                f"runs/_traces/trace_{iteration:05}_{dist.get_rank()}.json"
+            )
 
     return iteration
 
@@ -254,7 +261,7 @@ def main():
     fix_random_seeds(seed + rank)
 
     write_config(cfg, args.output_path)
-    #validate_config(cfg)
+    # validate_config(cfg)
     logger.info(OmegaConf.to_yaml(cfg))
 
     assert (
