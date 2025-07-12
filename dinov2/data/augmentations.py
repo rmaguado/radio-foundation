@@ -94,7 +94,7 @@ class DataAugmentationDINO(object):
         output["global_crops"] = [global_crop_1, global_crop_2]
         output["global_crops_teacher"] = [global_crop_1, global_crop_2]
 
-        local_crops = [self.transforms["local"](image) for _ in range(self.local_crops_number)]
+        local_crops = [self.transforms["local"](image) for _ in range(8)]
 
         output["local_crops"] = local_crops
         output["offsets"] = ()
