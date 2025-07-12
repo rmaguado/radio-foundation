@@ -65,6 +65,7 @@ class Crop:
         crop_shape = torch.floor(xy_shape * scale)
         max_start = xy_shape - crop_shape
 
+        crop_shape = crop_shape.to(torch.int32).tolist()
         start = [random.randint(0, int(max_start[i])) for i in range(2)]
         end = [start[i] + crop_shape[i] for i in range(2)]
 
