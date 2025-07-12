@@ -10,7 +10,7 @@ from omegaconf import DictConfig
 import copy
 from typing import Tuple, Dict, List, Callable
 
-from dinov2.data.transforms import ImageTransform, get_transform
+from dinov2.data.transforms import ImageTransforms, get_transform
 
 
 logger = logging.getLogger("dinov2")
@@ -48,7 +48,7 @@ class DataAugmentationDINO(object):
         }
 
         transforms_cfg = copy.deepcopy(self.augmentations_config[transform_key])
-        image_transforms = ImageTransform()
+        image_transforms = ImageTransforms()
         
         for tc in transforms_cfg:
             name = tc.pop("name")

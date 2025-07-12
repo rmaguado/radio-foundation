@@ -137,7 +137,7 @@ class Norm:
         return (img - self.mean) / self.std
     
 
-class ImageTransform:
+class ImageTransforms:
     def __init__(self) -> None:
         self.transforms = []
     def __add__(self, new_transform: Callable) -> None:
