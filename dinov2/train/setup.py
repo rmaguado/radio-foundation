@@ -10,7 +10,6 @@ from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
 
 
-
 class CosineScheduler(object):
     def __init__(
         self,
@@ -42,7 +41,7 @@ class CosineScheduler(object):
             return self.final_value
         else:
             return self.schedule[it]
-        
+
 
 def fix_random_seeds(seed=31):
     """
@@ -141,6 +140,7 @@ def setup_dataloader(cfg, inputs_dtype):
         weights=weights,
         sampler_type=sampler_type,
         drop_last=True,
+        persistent_workers=True,
         collate_fn=collate_fn,
     )
 
