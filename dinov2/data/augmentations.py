@@ -17,9 +17,7 @@ logger = logging.getLogger("dinov2")
 
 
 class DataAugmentationDINO(object):
-    def __init__(
-        self, config: DictConfig, dataset_config: DictConfig
-    ) -> None:
+    def __init__(self, config: DictConfig, dataset_config: DictConfig) -> None:
         """
         Initializes an instance of the Augmentations class.
 
@@ -44,12 +42,12 @@ class DataAugmentationDINO(object):
         """
         norm_cfg = {
             "mean": self.dataset_config.norm.mean,
-            "std": self.dataset_config.norm.std
+            "std": self.dataset_config.norm.std,
         }
 
         transforms_cfg = copy.deepcopy(self.augmentations_config[transform_key])
         image_transforms = ImageTransforms()
-        
+
         for tc in transforms_cfg:
             name = tc.pop("name")
             if name == "norm":
@@ -65,13 +63,14 @@ class DataAugmentationDINO(object):
         Returns:
             Dict[str, Callable]: A dict of transform groups.
         """
-        
+
         return {
-            group: self.build_transform_group(group)
-            for group in ["global", "local"]
+            group: self.build_transform_group(group) for group in ["global", "local"]
         }
 
-    def __call__(self, image: torch.Tensor, spacing: Tuple[float,float,float]) -> Dict[str, List[torch.Tensor]]:
+    def __call__(
+        self, image: torch.Tensor, spacing: Tuple[float, float, float]
+    ) -> Dict[str, List[torch.Tensor]]:
         """
         Apply augmentations to the input image.
 
