@@ -69,7 +69,7 @@ class DataAugmentationDINO(object):
         }
 
     def __call__(
-        self, image: torch.Tensor, spacing: Tuple[float, float, float]
+        self, image_memmap, spacing: Tuple[float, float, float]
     ) -> Dict[str, List[torch.Tensor]]:
         """
         Apply augmentations to the input image.
@@ -87,8 +87,8 @@ class DataAugmentationDINO(object):
         """
         output = {}
 
-        global_crop_1 = self.transforms["global"](image, spacing)
-        global_crop_2 = self.transforms["global"](image, spacing)
+        global_crop_1 = self.transforms["global"](image_memmap, spacing)
+        global_crop_2 = self.transforms["global"](image_memmap, spacing)
 
         output["global_crops"] = [global_crop_1, global_crop_2]
         output["global_crops_teacher"] = [global_crop_1, global_crop_2]

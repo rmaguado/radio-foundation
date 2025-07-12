@@ -46,17 +46,7 @@ class VolumeDataset:
         """
         return len(self.df)
 
-    def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
-        """
-        Abstract method to retrieve the image data for a given index.
-        Should be implemented by subclasses.
-
-        Args:
-            idx (int): Index of the sample.
-
-        Returns:
-            sitk.Image: The loaded image.
-        """
+    def get_image_data(self, idx: int) -> Tuple[torch.Tensor | np.ndarray, Tuple[float, ...]]:
         raise NotImplementedError
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
@@ -71,9 +61,9 @@ class VolumeDataset:
             Dict[str, torch.Tensor]: Dictionary of transformed image views.
         """
 
-        image, spacing = self.get_image_data(idx)
+        image_memmap, spacing = self.get_image_data(idx)
 
-        return self.transform(image, spacing)
+        return self.transform(image_memmap, spacing)
 
 
 class DicomVolumeDataset(VolumeDataset):
@@ -94,7 +84,7 @@ class NiftiVolumeDataset(VolumeDataset):
     Inherits from VolumeDataset and implements get_image_data for NIfTI files.
     """
 
-    def get_image_data(self, idx: int):
+    def get_image_data(self, idx: int) -> Tuple[np.ndarray, Tuple[float, ...]]:
         meta = self.df.row(idx)
         nifti_file_path = meta[0]
 
@@ -104,9 +94,9 @@ class NiftiVolumeDataset(VolumeDataset):
 
         spacing = np.sqrt(np.sum(affine[:3, :3] ** 2, axis=0))
 
-        image_tensor = torch.tensor(image.get_fdata(), dtype=torch.float32)
+        image_memmap = image.dataobj
 
-        return image_tensor, spacing
+        return image_memmap, spacing
 
 
 class MultiDataset:

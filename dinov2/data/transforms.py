@@ -1,5 +1,6 @@
 import random
 import torch
+import numpy as np
 from typing import Tuple, Callable
 from torchvision.transforms.functional import gaussian_blur
 
@@ -18,7 +19,7 @@ class Crop:
 
     def crop_anisotropic(
         self,
-        img: torch.Tensor,
+        img: torch.Tensor | np.ndarray,
         spacing: Tuple[float, float, float],
     ) -> torch.Tensor:
 
@@ -46,10 +47,10 @@ class Crop:
         end = [start[i] + crop_dims_voxels[i] for i in range(3)]
 
         cropped = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
-        cropped = cropped.unsqueeze(0).unsqueeze(0)
+        cropped_tensor = torch.tensor(cropped, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
 
         resampled = torch.nn.functional.interpolate(
-            cropped,
+            cropped_tensor,
             size=tuple(self.crop_size.to(torch.int32).tolist()),
             mode="trilinear",
             align_corners=False,
@@ -59,7 +60,7 @@ class Crop:
 
     def crop2d(
         self,
-        img: torch.Tensor,
+        img: torch.Tensor | np.ndarray,
     ) -> torch.Tensor:
         xy_shape = torch.tensor(img.shape[1:], dtype=torch.float32)
         scale = self.get_scale()
@@ -71,10 +72,11 @@ class Crop:
         start = [random.randint(0, int(max_start[i])) for i in range(2)]
         end = [start[i] + crop_shape[i] for i in range(2)]
 
-        img_crop = img[:, start[0] : end[0], start[1] : end[1]].unsqueeze(0)
+        cropped = img[:, start[0] : end[0], start[1] : end[1]]
+        cropped_tensor = torch.tensor(cropped, dtype=torch.float32).unsqueeze(0)
 
         resampled = torch.nn.functional.interpolate(
-            img_crop,
+            cropped_tensor,
             size=tuple(self.crop_size.to(torch.int32).tolist()[1:]),
             mode="bilinear",
             align_corners=False,
@@ -83,7 +85,7 @@ class Crop:
 
     def crop3d(
         self,
-        img: torch.Tensor,
+        img: torch.Tensor | np.ndarray,
     ) -> torch.Tensor:
         img_shape = torch.tensor(img.shape, dtype=torch.float32)
         scale = self.get_scale()
@@ -95,21 +97,18 @@ class Crop:
         start = [random.randint(0, int(max_start[i])) for i in range(3)]
         end = [start[i] + crop_shape[i] for i in range(3)]
 
-        img_crop = (
-            img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
-            .unsqueeze(0)
-            .unsqueeze(0)
-        )
+        cropped = img[start[0] : end[0], start[1] : end[1], start[2] : end[2]]
+        cropped_tensor = torch.tensor(cropped, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
 
         resampled = torch.nn.functional.interpolate(
-            img_crop,
+            cropped_tensor,
             size=tuple(self.crop_size.to(torch.int32).tolist()),
             mode="trilinear",
             align_corners=False,
         )
         return resampled.squeeze(0).squeeze(0)
 
-    def __call__(self, img, spacing=None) -> torch.Tensor:
+    def __call__(self, img: torch.Tensor | np.ndarray, spacing=None) -> torch.Tensor:
         if spacing is not None:
             return self.crop_anisotropic(img, spacing)
         if img.shape[0] == self.crop_size[0]:
