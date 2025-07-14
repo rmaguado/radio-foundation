@@ -27,11 +27,11 @@ class DataAugmentationDINO:
         self.dataset_config = dataset_config
 
         crops_cfg = config.crops
-        self.enable_3d_crops = crops_cfg.views.enable_3d_crops
-        self.enable_2d_crops = crops_cfg.views.enable_2d_crops
-        self.num_global2d = crops_cfg.crops_number.global2d
-        self.num_local3d = crops_cfg.crops_number.local3d
-        self.num_local2d = crops_cfg.crops_number.local2d
+        self.enable_3d = crops_cfg.views.enable_3d
+        self.enable_2d = crops_cfg.views.enable_2d
+        self.num_global_2d = crops_cfg.crops_number.global_2d
+        self.num_local_3d = crops_cfg.crops_number.local_3d
+        self.num_local_2d = crops_cfg.crops_number.local_2d
         self.global_view_multiple = crops_cfg.crops_number.global_view_multiple
 
         self.transforms = self._create_transforms()
@@ -49,7 +49,7 @@ class DataAugmentationDINO:
         norm_cfg = self.dataset_config.norm
         crop_sizes = self.config.crops.crop_sizes
         
-        if self.enable_3d_crops:
+        if self.enable_3d:
             g_3d_size = (crop_sizes.global_3d,) * 3
             l_3d_size = (crop_sizes.local_3d,) * 3
 
@@ -65,11 +65,11 @@ class DataAugmentationDINO:
             local_3d_augment += self._create_base_augmentations(skip_first=False)
             transforms["local_3d"] = local_3d_augment
 
-        if self.enable_2d_crops:
+        if self.enable_2d:
             g_2d_size = (crop_sizes.channels, crop_sizes.global_2d, crop_sizes.global_2d)
             l_2d_size = (crop_sizes.channels, crop_sizes.local_2d, crop_sizes.local_2d)
 
-            if self.enable_3d_crops:
+            if self.enable_3d:
                 transforms["global_3d_resize"] = Resize(output_size=(crop_sizes.global_3d,) * 3)
                 transforms["slice_to_2d"] = Slice(channels=crop_sizes.channels)
             else:
@@ -91,25 +91,25 @@ class DataAugmentationDINO:
         output_crops: Dict[str, List[torch.Tensor]] = {}
         general_crop_3d: Optional[torch.Tensor] = None
 
-        if self.enable_3d_crops:
+        if self.enable_3d:
             general_crop_3d = self.transforms["general_crop_3d"](image_memmap, spacing)
             
             global_3d_input = (
                 self.transforms["global_3d_resize"](general_crop_3d)
-                if self.enable_2d_crops
+                if self.enable_2d
                 else general_crop_3d
             )
 
-            output_crops["global3d"] = [
+            output_crops["global_3d"] = [
                 self.transforms["global_3d"](global_3d_input)
                 for _ in range(self.global_view_multiple)
             ]
-            output_crops["local3d"] = [
+            output_crops["local_3d"] = [
                 self.transforms["local_3d"](global_3d_input)
                 for _ in range(self.num_local3d)
             ]
 
-        if self.enable_2d_crops:
+        if self.enable_2d:
             if general_crop_3d is not None:
                 global_2d_source_crops = [
                     self.transforms["slice_to_2d"](general_crop_3d)
@@ -121,10 +121,10 @@ class DataAugmentationDINO:
                     for _ in range(self.num_global2d)
                 ]
 
-            output_crops["local2d"] = [
+            output_crops["local_2d"] = [
                 self.transforms["local_2d"](view) for view in global_2d_source_crops
             ]
-            output_crops["global2d"] = [
+            output_crops["global_2d"] = [
                 self.transforms["global_2d_augment"](view)
                 for view in global_2d_source_crops
                 for _ in range(self.global_view_multiple)

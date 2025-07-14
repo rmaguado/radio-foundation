@@ -81,15 +81,15 @@ crops:
     enable_3d_crops: true
     enable_2d_crops: true
   crops_number:
-    global2d: 3
-    local3d: 4
-    local2d: 4
+    global_2d: 3
+    local_3d: 4
+    local_2d: 4
     global_view_multiple: 2
   crop_sizes:
-    global3d: 112
-    global2d: 224
-    local3d: 56
-    local2d: 112
+    global_3d: 112
+    global_2d: 224
+    local_3d: 56
+    local_2d: 112
     channels: 10
 datasets:
   - name: default_dataset
