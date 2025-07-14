@@ -5,8 +5,13 @@
 
 import torch
 import random
+import logging
+import numpy as np
+from einops import rearrange
 
 from typing import List, Tuple, Dict, Callable, Any
+
+logger = logging.getLogger("dinov2")
 
 
 def collate_data_and_cast(
@@ -14,78 +19,56 @@ def collate_data_and_cast(
     mask_ratio_tuple: Tuple[float, float],
     mask_probability: float,
     dtype: torch.dtype,
-    n_tokens: int,
-    mask_generator: Callable[[int], Any],
+    mask_generator: Callable,
 ) -> Dict[str, Any]:
-    """
-    Collates data and casts it to the specified data type.
+    view_groups = samples_list[0].keys()
+    collated_views = {}
 
-    Args:
-        samples_list (list): A list of samples.
-        mask_ratio_tuple (tuple): A tuple containing the minimum and maximum mask ratios.
-        mask_probability (float): The probability of masking.
-        dtype (torch.dtype): The data type to cast the collated crops to.
-        n_tokens (int): The number of tokens.
-        mask_generator (function): A function that generates masks.
+    for group_name in view_groups:
+        is_target = samples_list[0][group_name]["is_target"]
 
-    Returns:
-        dict: A dictionary containing the collated data.
-            - collated_global_crops (torch.Tensor): The collated global crops.
-            - collated_local_crops (torch.Tensor): The collated local crops.
-            - collated_masks (torch.Tensor): The collated masks.
-            - mask_indices_list (torch.Tensor): The mask indices list.
-            - masks_weight (torch.Tensor): The masks weight.
-            - upperbound (int): The upperbound.
-            - n_masked_patches (torch.Tensor): The number of masked patches.
-    """
-    n_global_crops = len(samples_list[0]["global_crops"])
-    n_local_crops = len(samples_list[0]["local_crops"])
+        group_uncollated_images = [
+            samples_list[i][group_name]["images"] for i in range(len(samples_list))
+        ]
 
-    collated_global_crops = torch.stack(
-        [s["global_crops"][i] for i in range(n_global_crops) for s in samples_list]
+        collated_views[group_name] = {
+            "images": torch.stack(group_uncollated_images).to(dtype),
+            "is_target": is_target,
+            "targets": samples_list[0][group_name]["targets"],
+            "embed_layer": samples_list[0][group_name]["embed_layer"],
+            "mask_shape": samples_list[0][group_name]["mask_shape"],
+            "view_shape": samples_list[0][group_name]["view_shape"],
+        }
+
+    target_group_names = [k for k, v in collated_views.items() if v["is_target"]]
+    batch_size = collated_views[target_group_names[0]]["images"].shape[0]
+    total_views = (
+        sum(np.prod(collated_views[k]["view_shape"]) for k in target_group_names)
+        * batch_size
     )
+    n_samples_masked = int(total_views * mask_probability)
 
-    collated_local_crops = torch.stack(
-        [s["local_crops"][i] for i in range(n_local_crops) for s in samples_list]
-    )
+    probs = torch.linspace(*mask_ratio_tuple, n_samples_masked).tolist()
+    probs += [0] * (total_views - n_samples_masked)
+    random.shuffle(probs)
 
-    B = len(collated_global_crops)
-    N = n_tokens
-    n_samples_masked = int(B * mask_probability)
-    probs = torch.linspace(*mask_ratio_tuple, n_samples_masked + 1)
-    upperbound = 0
-    masks_list = []
-    for i in range(0, n_samples_masked):
-        prob_min = probs[i]
-        prob_max = probs[i + 1]
-        masks_list.append(
-            torch.BoolTensor(
-                mask_generator(int(N * random.uniform(prob_min, prob_max)))
-            )
-        )
-        upperbound += int(N * prob_max)
-    for i in range(n_samples_masked, B):
-        masks_list.append(torch.BoolTensor(mask_generator(0)))
+    for group_name in target_group_names:
 
-    random.shuffle(masks_list)
+        batch_size = collated_views[group_name]["images"].shape[0]
+        mask_shape = collated_views[group_name]["mask_shape"]
+        view_shape = collated_views[group_name]["view_shape"]
+        num_views = batch_size * np.prod(view_shape)
 
-    collated_masks = torch.stack(masks_list).flatten(1)
-    mask_indices_list = collated_masks.flatten().nonzero().flatten()
+        masks = []
 
-    masks_weight = (
-        (1 / collated_masks.sum(-1).clamp(min=1.0))
-        .unsqueeze(-1)
-        .expand_as(collated_masks)[collated_masks]
-    )
+        for i in range(num_views):
 
-    return {
-        "collated_global_crops": collated_global_crops.to(dtype),
-        "collated_local_crops": collated_local_crops.to(dtype),
-        "collated_masks": collated_masks,
-        "mask_indices_list": mask_indices_list,
-        "masks_weight": masks_weight,
-        "upperbound": upperbound,
-        "n_masked_patches": torch.full(
-            (1,), fill_value=mask_indices_list.shape[0], dtype=torch.long
-        ),
-    }
+            mask_ratio = probs.pop(0)
+            masks.append(torch.from_numpy(mask_generator(mask_shape, mask_ratio)))
+
+        stacked_masks = torch.stack(masks)
+        target_mask_shape = (batch_size, *view_shape, np.prod(mask_shape))
+
+        collated_views[group_name]["masks"] = stacked_masks.view(*target_mask_shape)
+
+    return collated_views
