@@ -173,18 +173,29 @@ class Crop:
 class Resize:
     def __init__(self, output_size: Tuple[int, int, int]) -> None:
         self.output_size = output_size
-    def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        if img.shape[0] == self.output_size[0]:
-            mode = "bilinear"
-        else:
-            mode = "trilinear"
+    def _resize_2d(self, img: torch.Tensor) -> torch.Tensor:
+        mode = "bilinear"
+        img = img.unsqueeze(0)
         return torch.nn.functional.interpolate(
             img,
             size=self.output_size,
             mode=mode,
             align_corners=False,
-        )
-    
+        ).squeeze(0)
+    def _resize_3d(self, img: torch.Tensor) -> torch.Tensor:
+        mode = "trilinear"
+        img = img.unsqueeze(0).unsqueeze(0)
+        return torch.nn.functional.interpolate(
+            img,
+            size=self.output_size,
+            mode=mode,
+            align_corners=False,
+        ).squeeze(0).squeeze(0)
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        if img.shape[0] == self.output_size[0]:
+            return self._resize_2d(img)
+        return self._resize_3d(img)
+        
 
 class Slice:
     def __init__(self, channels: int = 1) -> None:
