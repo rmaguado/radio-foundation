@@ -4,98 +4,130 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import logging
+from typing import Callable, Dict, List, Optional, Tuple
 
 import torch
 from omegaconf import DictConfig
-import copy
-from typing import Tuple, Dict, List, Callable
 
-from dinov2.data.transforms import ImageTransforms, get_transform
-
+from dinov2.data.transforms import *
 
 logger = logging.getLogger("dinov2")
 
 
-class DataAugmentationDINO(object):
+class DataAugmentationDINO:
+    """
+    Data augmentation class for DINO, supporting 2D and 3D crops.
+
+    This class sets up and applies a series of transformations to generate
+    global and local views from an input image, which can be either 2D or 3D.
+    """
+
     def __init__(self, config: DictConfig, dataset_config: DictConfig) -> None:
-        """
-        Initializes an instance of the Augmentations class.
-
-        Args:
-            config (DictConfig): The primary configuration object.
-            dataset_config (DictConfig): The dataset configuration object.
-        """
+        self.config = config
         self.dataset_config = dataset_config
-        self.augmentations_config = config.augmentations[dataset_config.augmentation]
 
-        self.transforms = self.load_transforms_from_cfg()
+        crops_cfg = config.crops
+        self.enable_3d_crops = crops_cfg.views.enable_3d_crops
+        self.enable_2d_crops = crops_cfg.views.enable_2d_crops
+        self.num_global2d = crops_cfg.crops_number.global2d
+        self.num_local3d = crops_cfg.crops_number.local3d
+        self.num_local2d = crops_cfg.crops_number.local2d
+        self.global_view_multiple = crops_cfg.crops_number.global_view_multiple
 
-    def build_transform_group(self, transform_key) -> List[Callable]:
-        """
-        Builds a transformation group based on the given transform key.
+        self.transforms = self._create_transforms()
 
-        Parameters:
-            transform_key (str): The key to identify the desired transformation group.
+    def _create_base_augmentations(self, skip_first: bool) -> ImageTransforms:
+        """Creates a base augmentation pipeline with Flip and Permute."""
+        augment = ImageTransforms()
+        augment += Flip(skip_first=skip_first)
+        augment += Permute(skip_first=skip_first)
+        return augment
 
-        Returns:
-            transforms.Compose: The composed transformation group.
-        """
-        norm_cfg = {
-            "mean": self.dataset_config.norm.mean,
-            "std": self.dataset_config.norm.std,
-        }
+    def _create_transforms(self) -> Dict[str, Callable]:
+        """Builds the dictionary of transformation functions based on config."""
+        transforms: Dict[str, Callable] = {}
+        norm_cfg = self.dataset_config.norm
+        crop_sizes = self.config.crops.crop_sizes
+        
+        if self.enable_3d_crops:
+            g_3d_size = (crop_sizes.global_3d,) * 3
+            l_3d_size = (crop_sizes.local_3d,) * 3
 
-        transforms_cfg = copy.deepcopy(self.augmentations_config[transform_key])
-        image_transforms = ImageTransforms()
+            general_crop_3d = ImageTransforms()
+            general_crop_3d += Crop(scale=(0.3, 1.0), size=g_3d_size)
+            general_crop_3d += Norm(**norm_cfg)
+            transforms["general_crop_3d"] = general_crop_3d
 
-        for tc in transforms_cfg:
-            name = tc.pop("name")
-            if name == "norm":
-                tc = norm_cfg
-            image_transforms += get_transform(name, tc)
+            transforms["global_3d"] = self._create_base_augmentations(skip_first=False)
+            
+            local_3d_augment = ImageTransforms()
+            local_3d_augment += Crop(scale=(0.1, 0.5), size=l_3d_size)
+            local_3d_augment += self._create_base_augmentations(skip_first=False)
+            transforms["local_3d"] = local_3d_augment
 
-        return image_transforms
+        if self.enable_2d_crops:
+            g_2d_size = (crop_sizes.channels, crop_sizes.global_2d, crop_sizes.global_2d)
+            l_2d_size = (crop_sizes.channels, crop_sizes.local_2d, crop_sizes.local_2d)
 
-    def load_transforms_from_cfg(self) -> Dict[str, Callable]:
-        """
-        Load transforms from configuration file for each group (global1, global2, local).
+            if self.enable_3d_crops:
+                transforms["global_3d_resize"] = Resize(output_size=(crop_sizes.global_3d,) * 3)
+                transforms["slice_to_2d"] = Slice(channels=crop_sizes.channels)
+            else:
+                transforms["global_crop_2d"] = Crop(scale=(0.3, 1.0), size=g_2d_size)
 
-        Returns:
-            Dict[str, Callable]: A dict of transform groups.
-        """
-
-        return {
-            group: self.build_transform_group(group) for group in ["global", "local"]
-        }
+            transforms["global_2d_augment"] = self._create_base_augmentations(skip_first=True)
+            
+            local_2d_augment = ImageTransforms()
+            local_2d_augment += Crop(scale=(0.1, 0.5), size=l_2d_size)
+            local_2d_augment += self._create_base_augmentations(skip_first=True)
+            transforms["local_2d"] = local_2d_augment
+            
+        return transforms
 
     def __call__(
-        self, image_memmap, spacing: Tuple[float, float, float]
+        self, image_memmap: torch.Tensor, spacing: Tuple[float, float, float]
     ) -> Dict[str, List[torch.Tensor]]:
-        """
-        Apply augmentations to the input image.
+        """Applies the configured augmentations to an image."""
+        output_crops: Dict[str, List[torch.Tensor]] = {}
+        general_crop_3d: Optional[torch.Tensor] = None
 
-        Args:
-            image: The input image to apply augmentations to.
+        if self.enable_3d_crops:
+            general_crop_3d = self.transforms["general_crop_3d"](image_memmap, spacing)
+            
+            global_3d_input = (
+                self.transforms["global_3d_resize"](general_crop_3d)
+                if self.enable_2d_crops
+                else general_crop_3d
+            )
 
-        Returns:
-            output: A dictionary containing the augmented image crops and offsets.
-                - "global_crops": A list of global crops of the image.
-                - "global_crops_teacher": A list of global crops of the image.
-                - "local_crops": A list of local crops of the image.
-                - "offsets": An empty tuple.
+            output_crops["global3d"] = [
+                self.transforms["global_3d"](global_3d_input)
+                for _ in range(self.global_view_multiple)
+            ]
+            output_crops["local3d"] = [
+                self.transforms["local_3d"](global_3d_input)
+                for _ in range(self.num_local3d)
+            ]
 
-        """
-        output = {}
+        if self.enable_2d_crops:
+            if general_crop_3d is not None:
+                global_2d_source_crops = [
+                    self.transforms["slice_to_2d"](general_crop_3d)
+                    for _ in range(self.num_global2d)
+                ]
+            else:
+                global_2d_source_crops = [
+                    self.transforms["global_crop_2d"](image_memmap, spacing)
+                    for _ in range(self.num_global2d)
+                ]
 
-        global_crop_1 = self.transforms["global"](image_memmap, spacing)
-        global_crop_2 = self.transforms["global"](image_memmap, spacing)
-
-        output["global_crops"] = [global_crop_1, global_crop_2]
-        output["global_crops_teacher"] = [global_crop_1, global_crop_2]
-
-        local_crops = [self.transforms["local"](global_crop_1) for _ in range(8)]
-
-        output["local_crops"] = local_crops
-        output["offsets"] = ()
-
-        return output
+            output_crops["local2d"] = [
+                self.transforms["local_2d"](view) for view in global_2d_source_crops
+            ]
+            output_crops["global2d"] = [
+                self.transforms["global_2d_augment"](view)
+                for view in global_2d_source_crops
+                for _ in range(self.global_view_multiple)
+            ]
+            
+        return output_crops

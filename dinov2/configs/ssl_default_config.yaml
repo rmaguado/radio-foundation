@@ -34,27 +34,28 @@ train:
 evaluation:
   eval_period_iterations: 10000
 student:
-  patch_size: 14
+  model_name: vitl14_2d3d
   embed_dim: 1024
   depth: 24
   num_heads: 16
-  mlp_ratio: 4.0
-  full_image_size: 448
-  channels: 10
+  mlp_ratio: 4
+  embed_layers:
+  - type: patch2d
+    patch_size: 14
+    img_size: 448
+    in_channels: 10
+  - type: patch3d
+    patch_size: 14
+    img_size: 224
   drop_path_rate: 0.4
   layerscale: 1.0e-05
   drop_path_uniform: true
   pretrained_weights: ''
   ffn_layer: "swiglu"
-  block_chunks: 0
   qkv_bias: true
   proj_bias: true
   ffn_bias: true
-  embed_layer: "patch"
-  conv_channels: 0
   num_register_tokens: 4
-  interpolate_antialias: true
-  interpolate_offset: 0.0
 teacher:
   momentum_teacher: 0.994
   final_momentum_teacher: 1.0
@@ -76,31 +77,26 @@ optim:
   adamw_beta1: 0.9
   adamw_beta2: 0.999
 crops:
-  local_crops_number: 8
-  global_crops_size: 224
-  local_crops_size: 98
-augmentations:
-  default_ct:
-    global:
-    - name: crop
-      scale: [0.5, 1.0]
-      size: [10, 224, 224]
-    - name: flip
-    - name: gaussian_blur
-    local:
-    - name: crop
-      scale: [0.2, 0.5]
-      size: [10, 98, 98]
-    - name: flip
-    - name: gaussian_blur
-      p: 0.5
+  views:
+    enable_3d_crops: true
+    enable_2d_crops: true
+  crops_number:
+    global2d: 3
+    local3d: 4
+    local2d: 4
+    global_view_multiple: 2
+  crop_sizes:
+    global3d: 112
+    global2d: 224
+    local3d: 56
+    local2d: 112
+    channels: 10
 datasets:
   - name: default_dataset
     weight: 1.0
     index_path: .
     type: ct
     storage: dicom
-    augmentation: default_ct
     pixel_range:
       lower: -1000.0
       upper: 1900.0
