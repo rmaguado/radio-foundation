@@ -1,100 +1,139 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-#
-# This source code is licensed under the Apache License, Version 2.0
-# found in the LICENSE file in the root directory of this source tree.
+from typing import Callable, Optional
 
-# References:
-#   https://github.com/facebookresearch/dino/blob/master/vision_transformer.py
-#   https://github.com/rwightman/pytorch-image-models/tree/master/timm/layers/patch_embed.py
-
-from typing import Callable, Optional, Tuple, Union
-
-from torch import Tensor
+import torch
 import torch.nn as nn
-
-
-def make_2tuple(x):
-    if isinstance(x, tuple):
-        assert len(x) == 2
-        return x
-
-    assert isinstance(x, int)
-    return (x, x)
+import torch.nn.functional as F
+from einops import rearrange, repeat
 
 
 class PatchEmbed(nn.Module):
-    """
-    2D image to patch embedding: (B,C,H,W) -> (B,N,D)
-
-    Args:
-        img_size: Image size.
-        patch_size: Patch token size.
-        in_chans: Number of input image channels.
-        embed_dim: Number of linear projection output channels.
-        norm_layer: Normalization layer.
-    """
-
     def __init__(
         self,
-        img_size: Union[int, Tuple[int, int]] = 224,
-        patch_size: Union[int, Tuple[int, int]] = 16,
-        in_chans: int = 3,
+        img_size: int = 224,
+        patch_size: int = 16,
         embed_dim: int = 768,
+        in_channels: int = 1,
         norm_layer: Optional[Callable] = None,
-        flatten_embedding: bool = True,
     ) -> None:
         super().__init__()
-
-        image_HW = make_2tuple(img_size)
-        patch_HW = make_2tuple(patch_size)
-        patch_grid_size = (
-            image_HW[0] // patch_HW[0],
-            image_HW[1] // patch_HW[1],
-        )
-
-        self.img_size = image_HW
-        self.patch_size = patch_HW
-        self.patches_resolution = patch_grid_size
-        self.num_patches = patch_grid_size[0] * patch_grid_size[1]
-
-        self.in_chans = in_chans
+        self.img_size = img_size
+        self.patch_size = patch_size
         self.embed_dim = embed_dim
+        self.in_channels = in_channels
 
-        self.flatten_embedding = flatten_embedding
+        self.patches_resolution = img_size // patch_size
 
-        self.proj = nn.Conv2d(
-            in_chans, embed_dim, kernel_size=patch_HW, stride=patch_HW
-        )
-        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
+        self.proj = self._get_projection_layer()
+        self.num_patches = self._calculate_num_patches()
+        self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim))
+        self.norm = norm_layer(embed_dim) if norm_layer is not None else nn.Identity()
 
-    def forward(self, x: Tensor) -> Tensor:
-        _, _, H, W = x.shape
-        patch_H, patch_W = self.patch_size
+    def _get_projection_layer(self) -> nn.Module:
+        """Return the appropriate projection layer (e.g., nn.Conv2d, nn.Conv3d)."""
+        raise NotImplementedError
 
-        assert (
-            H % patch_H == 0
-        ), f"Input image height {H} is not a multiple of patch height {patch_H}"
-        assert (
-            W % patch_W == 0
-        ), f"Input image width {W} is not a multiple of patch width: {patch_W}"
+    def _calculate_num_patches(self) -> int:
+        """Calculate the total number of patches based on dimensions."""
+        raise NotImplementedError
 
-        x = self.proj(x)  # B C H W
-        H, W = x.size(2), x.size(3)
-        x = x.flatten(2).transpose(1, 2)  # B HW C
+    def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
+        """Rearrange the projected tensor from (B, E, Dims...) to (B, N, E)."""
+        raise NotImplementedError
+
+    def get_pos_embed(self, *patch_dims: int) -> torch.Tensor:
+        """
+        Interpolate positional embeddings to match the input's patch dimensions.
+        `patch_dims` should be (H, W) for 2D and (D, H, W) for 3D.
+        """
+        raise NotImplementedError
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.proj(x)
+        B, E, *patch_dims = x.shape
+        x = self._rearrange_projection(x)
         x = self.norm(x)
-        if not self.flatten_embedding:
-            x = x.reshape(-1, H, W, self.embed_dim)  # B H W C
+
+        pos_embed = self.get_pos_embed(*patch_dims)
+
+        x = x + repeat(pos_embed, "1 n d -> b n d", b=B)
+
         return x
 
-    def flops(self) -> float:
-        Ho, Wo = self.patches_resolution
-        flops = (
-            Ho
-            * Wo
-            * self.embed_dim
-            * self.in_chans
-            * (self.patch_size[0] * self.patch_size[1])
+
+class PatchEmbed2D(PatchEmbed):
+    def _get_projection_layer(self) -> nn.Module:
+        return nn.Conv2d(
+            self.in_channels,
+            self.embed_dim,
+            kernel_size=self.patch_size,
+            stride=self.patch_size,
         )
-        if self.norm is not None:
-            flops += Ho * Wo * self.embed_dim
-        return flops
+
+    def _calculate_num_patches(self) -> int:
+        return self.patches_resolution * self.patches_resolution
+
+    def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
+        return rearrange(x, "b e h w -> b (h w) e")
+
+    def get_pos_embed(self, *patch_dims: int) -> torch.Tensor:
+        H, W = patch_dims
+        num_patches = H * W
+        if num_patches == self.num_patches:
+            return self.pos_embed
+        
+        pos_embed = self.pos_embed[0]
+        orig_size = int(self.num_patches**0.5)
+        pos_embed_2d = rearrange(
+            pos_embed, "(h w) d -> 1 d h w", h=orig_size, w=orig_size
+        )
+        pos_embed_2d = F.interpolate(
+            pos_embed_2d, size=(H, W), mode="bicubic", align_corners=False
+        )
+        pos_embed_2d = rearrange(pos_embed_2d, "1 d h w -> 1 (h w) d")
+        return pos_embed_2d
+
+
+class PatchEmbed3D(PatchEmbed):
+    def _get_projection_layer(self) -> nn.Module:
+        return nn.Conv3d(
+            self.in_channels,
+            self.embed_dim,
+            kernel_size=self.patch_size,
+            stride=self.patch_size,
+        )
+
+    def _calculate_num_patches(self) -> int:
+        return (
+            self.patches_resolution * self.patches_resolution * self.patches_resolution
+        )
+
+    def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
+        return rearrange(x, "b e d h w -> b (d h w) e")
+
+    def get_pos_embed(self, *patch_dims: int) -> torch.Tensor:
+        D, H, W = patch_dims
+        num_patches = D * H * W
+        if num_patches == self.num_patches:
+            return self.pos_embed
+        pos_embed = self.pos_embed[0]
+        orig_size = int(round(self.num_patches ** (1 / 3)))
+        pos_embed_3d = rearrange(
+            pos_embed, "(d h w) c -> 1 c d h w", d=orig_size, h=orig_size, w=orig_size
+        )
+        pos_embed_3d = F.interpolate(
+            pos_embed_3d, size=(D, H, W), mode="trilinear", align_corners=False
+        )
+        pos_embed_3d = rearrange(pos_embed_3d, "1 c d h w -> 1 (d h w) c")
+        return pos_embed_3d
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.proj(x.unsqueeze(1))
+        B, E, *patch_dims = x.shape
+        x = self._rearrange_projection(x)
+        x = self.norm(x)
+
+        pos_embed = self.get_pos_embed(*patch_dims)
+
+        x = x + repeat(pos_embed, "1 n d -> b n d", b=B)
+
+        return x
