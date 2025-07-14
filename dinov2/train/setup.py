@@ -107,20 +107,12 @@ def build_schedulers(cfg):
 
 def setup_dataloader(cfg, inputs_dtype):
 
-    image_size = cfg.crops.global_crops_size
-
-    patch_size = cfg.student.patch_size
-    n_tokens = (image_size // patch_size) ** 2
-    mask_generator = MaskingGenerator(
-        input_size=(image_size // patch_size, image_size // patch_size),
-        max_num_patches=0.5 * image_size // patch_size * image_size // patch_size,
-    )
+    mask_generator = MaskingGenerator()
 
     collate_fn = partial(
         collate_data_and_cast,
         mask_ratio_tuple=cfg.ibot.mask_ratio_min_max,
         mask_probability=cfg.ibot.mask_sample_probability,
-        n_tokens=n_tokens,
         mask_generator=mask_generator,
         dtype=inputs_dtype,
     )
