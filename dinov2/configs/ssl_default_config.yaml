@@ -78,8 +78,8 @@ optim:
   adamw_beta2: 0.999
 crops:
   views:
-    enable_3d_crops: true
-    enable_2d_crops: true
+    enable_3d: true
+    enable_2d: true
   crops_number:
     global_2d: 3
     local_3d: 4
