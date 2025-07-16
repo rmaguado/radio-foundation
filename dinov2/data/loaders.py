@@ -62,17 +62,16 @@ def make_train_dataset(
 
 
 def build_dataset_from_cfg(config, dataset_config):
-    dataset_name = dataset_config.name
-    dataset_type = dataset_config.type
     dataset_storage = dataset_config.storage
     transform = DataAugmentationDINO(config, dataset_config)
 
     weight = dataset_config.weight if hasattr(dataset_config, "weight") else None
 
     dataset_kwargs = {
-        "dataset_name": dataset_name,
+        "dataset_name": dataset_config.name,
         "index_path": dataset_config.index_path,
-        "modality": dataset_type,
+        "modality": dataset_config.type,
+        "bounds": dataset_config.bounds,
         "transform": transform,
     }
 

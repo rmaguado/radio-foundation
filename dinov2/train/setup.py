@@ -107,12 +107,26 @@ def build_schedulers(cfg):
 
 def setup_dataloader(cfg, inputs_dtype):
 
+    mask_shapes = {
+        "global_2d": (
+            cfg.crops.crop_sizes.global_2d
+            // cfg.student.embed_layers.patch2d.patch_size,
+        )
+        * 2,
+        "global_3d": (
+            cfg.crops.crop_sizes.global_3d
+            // cfg.student.embed_layers.patch3d.patch_size,
+        )
+        * 3,
+    }
+
     mask_generator = MaskingGenerator()
 
     collate_fn = partial(
         collate_data_and_cast,
-        mask_ratio_tuple=cfg.ibot.mask_ratio_min_max,
+        mask_ratio_range=cfg.ibot.mask_ratio_min_max,
         mask_probability=cfg.ibot.mask_sample_probability,
+        mask_shapes=mask_shapes,
         mask_generator=mask_generator,
         dtype=inputs_dtype,
     )

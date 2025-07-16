@@ -31,6 +31,7 @@ class VolumeDataset:
         index_path: str,
         modality: str,
         transform: Callable = lambda x: x,
+        bounds: Tuple[float, float] = (-1000, 1900),
     ) -> None:
         self.dataset_name = dataset_name
         self.df = pl.read_csv(index_path)
@@ -46,7 +47,9 @@ class VolumeDataset:
         """
         return len(self.df)
 
-    def get_image_data(self, idx: int) -> Tuple[torch.Tensor | np.ndarray, Tuple[float, ...]]:
+    def get_image_data(
+        self, idx: int
+    ) -> Tuple[torch.Tensor | np.ndarray, Tuple[float, ...]]:
         raise NotImplementedError
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
@@ -89,14 +92,25 @@ class NiftiVolumeDataset(VolumeDataset):
         nifti_file_path = meta[0]
 
         image = nib.load(nifti_file_path)
-
         affine = image.affine
-
         spacing = np.sqrt(np.sum(affine[:3, :3] ** 2, axis=0))
 
         image_memmap = image.dataobj
 
-        return image_memmap, spacing
+        if self.modality.lower() == "ct":
+            slope = image.header.get_slope_inter()[0]
+            intercept = image.header.get_slope_inter()[1]
+
+            slope = 1.0 if slope is None else slope
+            intercept = 0.0 if intercept is None else intercept
+
+            image_array = np.asarray(image_memmap, dtype=np.float32)
+            image_array = slope * image_array + intercept
+            return image_array, spacing
+
+        else:
+            image_array = np.asarray(image_memmap, dtype=np.float32)
+            return image_array, spacing
 
 
 class MultiDataset:

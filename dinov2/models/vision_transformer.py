@@ -57,8 +57,7 @@ def get_embedding_layers(
         nn.ModuleDict: Dictionary of embedding layers keyed by type.
     """
     embed_layers = nn.ModuleDict()
-    for config in embed_configs:
-        layer_type = config["type"]
+    for layer_type, config in embed_configs.items():
         if layer_type not in EMBED_LAYER_REGISTRY:
             raise NotImplementedError(
                 f"Embedding layer type '{layer_type}' is not implemented. Available: {list(EMBED_LAYER_REGISTRY.keys())}"
@@ -336,4 +335,3 @@ def build_model(args, only_teacher: bool) -> Tuple[nn.Module | None, nn.Module]:
         drop_path_uniform=args.drop_path_uniform,
     )
     return student, teacher
-    

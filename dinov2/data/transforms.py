@@ -4,12 +4,13 @@ import numpy as np
 from typing import Tuple, Callable
 from torchvision.transforms.functional import gaussian_blur
 
+
 class Crop:
     def __init__(
         self,
         scale: Tuple[float, float],
         size: Tuple[int, int, int],
-        preserve_axis_order: bool = False
+        preserve_axis_order: bool = False,
     ) -> None:
         self.crop_size = torch.tensor(size, dtype=torch.float32)
         self.crop_scale = scale
@@ -20,9 +21,7 @@ class Crop:
         return random.uniform(self.crop_scale[0], self.crop_scale[1])
 
     def _get_crop_indices(
-        self,
-        original_shape: torch.Tensor,
-        crop_dims_voxels: torch.Tensor
+        self, original_shape: torch.Tensor, crop_dims_voxels: torch.Tensor
     ) -> Tuple[list, list, list]:
         permutation = list(range(len(original_shape)))
         if self.preserve_axis_order:
@@ -31,16 +30,24 @@ class Crop:
         perm_crop_dims_voxels = crop_dims_voxels[permutation]
         perm_original_shape = original_shape[permutation]
 
-        max_start = (perm_original_shape.to(torch.int32) - perm_crop_dims_voxels).clamp(min=0)
-        start = [random.randint(0, int(max_start[i])) for i in range(len(original_shape))]
+        max_start = (perm_original_shape.to(torch.int32) - perm_crop_dims_voxels).clamp(
+            min=0
+        )
+        start = [
+            random.randint(0, int(max_start[i])) for i in range(len(original_shape))
+        ]
         end = [start[i] + perm_crop_dims_voxels[i] for i in range(len(original_shape))]
 
         inverse_permutation = [0] * len(original_shape)
         for i, p in enumerate(permutation):
             inverse_permutation[p] = i
 
-        start_orig_order = [start[inverse_permutation[i]] for i in range(len(original_shape))]
-        end_orig_order = [end[inverse_permutation[i]] for i in range(len(original_shape))]
+        start_orig_order = [
+            start[inverse_permutation[i]] for i in range(len(original_shape))
+        ]
+        end_orig_order = [
+            end[inverse_permutation[i]] for i in range(len(original_shape))
+        ]
 
         return start_orig_order, end_orig_order, inverse_permutation
 
@@ -49,16 +56,19 @@ class Crop:
         img: torch.Tensor | np.ndarray,
         start_indices: list,
         end_indices: list,
-        inverse_permutation: list = None
+        inverse_permutation: list = None,
     ) -> torch.Tensor:
         """Crops, potentially permutes, and converts the image to a tensor for interpolation."""
-        if len(start_indices) == 3: # 3D cropping
-            cropped = img[start_indices[0] : end_indices[0],
-                          start_indices[1] : end_indices[1],
-                          start_indices[2] : end_indices[2]]
-        elif len(start_indices) == 2: # 2D cropping (assuming channel-first for 2D)
-            cropped = img[:, start_indices[0] : end_indices[0],
-                          start_indices[1] : end_indices[1]]
+        if len(start_indices) == 3:  # 3D cropping
+            cropped = img[
+                start_indices[0] : end_indices[0],
+                start_indices[1] : end_indices[1],
+                start_indices[2] : end_indices[2],
+            ]
+        elif len(start_indices) == 2:  # 2D cropping (assuming channel-first for 2D)
+            cropped = img[
+                :, start_indices[0] : end_indices[0], start_indices[1] : end_indices[1]
+            ]
         else:
             raise ValueError("Unsupported number of dimensions for cropping.")
 
@@ -87,7 +97,9 @@ class Crop:
         crop_physical_shape = self.crop_size * spacing_tensor / min_spacing
         scale = self._get_scale()
         scaled_physical_crop = crop_physical_shape * scale
-        crop_dims_voxels = torch.floor(scaled_physical_crop / spacing_tensor).to(torch.int32)
+        crop_dims_voxels = torch.floor(scaled_physical_crop / spacing_tensor).to(
+            torch.int32
+        )
 
         crop_dims_voxels = torch.minimum(
             crop_dims_voxels, original_shape.to(torch.int32)
@@ -96,7 +108,9 @@ class Crop:
             crop_dims_voxels, torch.tensor([1, 1, 1], dtype=torch.int32)
         )
 
-        start, end, inverse_permutation = self._get_crop_indices(original_shape, crop_dims_voxels)
+        start, end, inverse_permutation = self._get_crop_indices(
+            original_shape, crop_dims_voxels
+        )
         cropped_tensor = self._process_image(img, start, end, inverse_permutation)
 
         resampled = torch.nn.functional.interpolate(
@@ -122,27 +136,35 @@ class Crop:
 
         if is_3d:
             crop_shape = torch.floor(img_shape * scale)
-        else: # For 2D, assuming channel-first, so shape refers to spatial dims
+        else:  # For 2D, assuming channel-first, so shape refers to spatial dims
             crop_shape = torch.floor(img_shape[1:] * scale)
 
-
         crop_dims_voxels = crop_shape.to(torch.int32)
-        
+
         # Ensure crop dimensions are at least 1
-        crop_dims_voxels = torch.maximum(crop_dims_voxels, torch.tensor([1] * len(crop_dims_voxels), dtype=torch.int32))
+        crop_dims_voxels = torch.maximum(
+            crop_dims_voxels,
+            torch.tensor([1] * len(crop_dims_voxels), dtype=torch.int32),
+        )
 
         # Adjust original_shape for _get_crop_indices depending on 2D or 3D
         effective_original_shape = img_shape if is_3d else img_shape[1:]
 
-        start, end, inverse_permutation = self._get_crop_indices(effective_original_shape, crop_dims_voxels)
-        
-        cropped_tensor = self._process_image(img, start, end, inverse_permutation if is_3d else None)
+        start, end, inverse_permutation = self._get_crop_indices(
+            effective_original_shape, crop_dims_voxels
+        )
+
+        cropped_tensor = self._process_image(
+            img, start, end, inverse_permutation if is_3d else None
+        )
 
         # Unsqueeze for batch and channel dimensions for interpolate
         if is_3d:
             cropped_tensor = cropped_tensor.unsqueeze(0).unsqueeze(0)
         else:
-            cropped_tensor = cropped_tensor.unsqueeze(0) # For 2D, only batch dim needed
+            cropped_tensor = cropped_tensor.unsqueeze(
+                0
+            )  # For 2D, only batch dim needed
 
         resampled = torch.nn.functional.interpolate(
             cropped_tensor,
@@ -153,13 +175,15 @@ class Crop:
 
         return resampled.squeeze(0).squeeze(0) if is_3d else resampled.squeeze(0)
 
-    def __call__(self, img: torch.Tensor | np.ndarray, spacing: Tuple[float, float, float] = None) -> torch.Tensor:
+    def __call__(
+        self, img: torch.Tensor | np.ndarray, spacing: Tuple[float, float, float] = None
+    ) -> torch.Tensor:
         """
         Applies cropping based on input image dimensions and optional spacing.
         """
         if spacing is not None:
             return self.crop_anisotropic(img, spacing)
-        
+
         if len(img.shape) == 3 and img.shape[0] == self.crop_size[0]:
             target_size = tuple(self.crop_size.to(torch.int32).tolist()[1:])
             return self._crop_and_resample(img, target_size, "bilinear", is_3d=False)
@@ -167,12 +191,15 @@ class Crop:
             target_size = tuple(self.crop_size.to(torch.int32).tolist())
             return self._crop_and_resample(img, target_size, "trilinear", is_3d=True)
         else:
-            raise ValueError(f"Unsupported image dimensions: {img.shape}. Expected 3D (D,H,W) or 2D (C,H,W where C matches crop_size[0]).")
+            raise ValueError(
+                f"Unsupported image dimensions: {img.shape}. Expected 3D (D,H,W) or 2D (C,H,W where C matches crop_size[0])."
+            )
 
 
 class Resize:
     def __init__(self, output_size: Tuple[int, int, int]) -> None:
         self.output_size = output_size
+
     def _resize_2d(self, img: torch.Tensor) -> torch.Tensor:
         mode = "bilinear"
         img = img.unsqueeze(0)
@@ -182,34 +209,42 @@ class Resize:
             mode=mode,
             align_corners=False,
         ).squeeze(0)
+
     def _resize_3d(self, img: torch.Tensor) -> torch.Tensor:
         mode = "trilinear"
         img = img.unsqueeze(0).unsqueeze(0)
-        return torch.nn.functional.interpolate(
-            img,
-            size=self.output_size,
-            mode=mode,
-            align_corners=False,
-        ).squeeze(0).squeeze(0)
+        return (
+            torch.nn.functional.interpolate(
+                img,
+                size=self.output_size,
+                mode=mode,
+                align_corners=False,
+            )
+            .squeeze(0)
+            .squeeze(0)
+        )
+
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         if img.shape[0] == self.output_size[0]:
             return self._resize_2d(img)
         return self._resize_3d(img)
-        
+
 
 class Slice:
     def __init__(self, channels: int = 1) -> None:
         self.c = channels
+
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         axis = random.randint(0, 2)
         idx = random.randint(0, img.shape[axis] - 1 - self.c)
+
         if axis == 0:
-            return img[idx:idx+self.c, :, :]
+            return img[idx : idx + self.c, :, :]
         elif axis == 1:
-            return img[:, idx:idx+self.c, :]
+            return img[:, idx : idx + self.c, :].permute(1, 2, 0)
         else:
-            return img[:, :, idx:idx+self.c]
-        
+            return img[:, :, idx : idx + self.c].permute(2, 0, 1)
+
 
 class Permute:
     def __init__(self, skip_first: bool = True) -> None:
@@ -218,11 +253,11 @@ class Permute:
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         if self.skip_first:
             dims_order = [1, 2]
-            dims_order = random.shuffle(dims_order)
+            random.shuffle(dims_order)
             dims_order = [0] + dims_order
         else:
             dims_order = [0, 1, 2]
-            dims_order = random.shuffle(dims_order)
+            random.shuffle(dims_order)
 
         return img.permute(dims_order)
 
@@ -270,7 +305,7 @@ class ImageTransforms:
         self, img: torch.Tensor, spacing: Tuple[float, ...] = None
     ) -> torch.Tensor:
         for i, transform in enumerate(self.transforms):
-            if i == 0:
+            if i == 0 and spacing is not None:
                 img = transform(img, spacing)
             else:
                 img = transform(img)

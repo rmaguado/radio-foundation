@@ -40,13 +40,13 @@ student:
   num_heads: 16
   mlp_ratio: 4
   embed_layers:
-  - type: patch2d
-    patch_size: 14
-    img_size: 448
-    in_channels: 10
-  - type: patch3d
-    patch_size: 14
-    img_size: 224
+    patch2d:
+      patch_size: 14
+      img_size: 448
+      in_channels: 10
+    patch3d:
+      patch_size: 14
+      img_size: 224
   drop_path_rate: 0.4
   layerscale: 1.0e-05
   drop_path_uniform: true
@@ -97,9 +97,7 @@ datasets:
     index_path: .
     type: ct
     storage: dicom
-    pixel_range:
-      lower: -1000.0
-      upper: 1900.0
+    bounds: [-1000.0, 1900.0] 
     norm:
       mean: -573.8
       std: 461.3
