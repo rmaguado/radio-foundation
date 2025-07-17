@@ -12,7 +12,7 @@ from omegaconf import OmegaConf
 from torch.profiler import profile, ProfilerActivity, record_function
 
 from dinov2.logging import MetricLogger, setup_logging
-from dinov2.configs import get_cfg_from_path, write_config
+from dinov2.configs import get_cfg_from_path, write_config, validate_config
 from dinov2.train.ssl_meta_arch import SSLMetaArch
 from dinov2.train.parser import get_args_parser
 from dinov2.train.setup import (
@@ -261,7 +261,7 @@ def main():
     fix_random_seeds(seed + rank)
 
     write_config(cfg, args.output_path)
-    # validate_config(cfg)
+    validate_config(cfg)
     logger.info(OmegaConf.to_yaml(cfg))
 
     assert (

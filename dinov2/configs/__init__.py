@@ -6,7 +6,7 @@
 import os
 
 from omegaconf import OmegaConf, DictConfig
-#from dinov2.configs.validation import validate_config
+from dinov2.configs.validation import validate_config
 
 
 dinov2_default_config = OmegaConf.load("dinov2/configs/ssl_default_config.yaml")
