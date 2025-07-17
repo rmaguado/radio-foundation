@@ -15,6 +15,12 @@ logger = logging.getLogger("dinov2")
 
 
 MASKABLE_VIEW_NAMES = {"global_2d", "global_3d"}
+VIEW_INFO = {
+    "global_3d": {"is_target": True, "embed_layer": "patch_3d"},
+    "local_3d": {"is_target": False, "embed_layer": "patch_3d"},
+    "global_2d": {"is_target": True, "embed_layer": "patch_2d"},
+    "local_2d": {"is_target": False, "embed_layer": "patch_2d"},
+}
 
 
 def collate_data_and_cast(
@@ -56,7 +62,7 @@ def collate_data_and_cast(
     total_maskable_views = 0
     for name in view_names:
         images = torch.stack([torch.stack(s[name]) for s in samples]).to(dtype)
-        collated_data[name] = {"images": images}
+        collated_data[name] = {"images": images, **VIEW_INFO[name]}
         if name in MASKABLE_VIEW_NAMES:
             total_maskable_views += np.prod(images.shape[:2])
 
