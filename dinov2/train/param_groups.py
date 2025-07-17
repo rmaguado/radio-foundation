@@ -4,6 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import logging
+from typing import List, Dict, Any
 
 
 logger = logging.getLogger("dinov2")
@@ -46,7 +47,7 @@ def get_params_groups_with_decay(
     lr_decay_rate,
     patch_embed_lr_mult,
     num_layers,
-):
+) -> List[Dict[str, Any]]:
 
     all_param_groups = []
 
