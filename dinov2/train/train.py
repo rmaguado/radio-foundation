@@ -38,8 +38,8 @@ def should_apply_training_step(cfg, grad_accum_counter, accum_steps):
 
 def should_eval_model(cfg, iteration):
     return (
-        cfg.evaluation.eval_period_iterations > 0
-        and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0
+        cfg.checkpoints.save_teacher_iterations > 0
+        and (iteration + 1) % cfg.checkpoints.save_teacher_iterations == 0
     )
 
 
@@ -148,7 +148,7 @@ def train(
         raise ValueError
 
     for data in metric_logger.log_every(
-        cfg.train.print_freq,
+        cfg.checkpoints.print_iterations,
         "Training",
         max_iter,
         start_iter,

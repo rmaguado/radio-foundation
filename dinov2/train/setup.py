@@ -60,7 +60,7 @@ def build_optimizer(cfg, params_groups):
 
 
 def build_schedulers(cfg):
-    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
+    epoch_len = cfg.train.iterations_per_epoch
     lr = dict(
         base_value=cfg.optim["lr"],
         final_value=cfg.optim["min_lr"],
@@ -155,7 +155,7 @@ def setup_dataloader(cfg, inputs_dtype):
 
 def get_max_iter(cfg):
     num_epochs = cfg.optim.epochs
-    epoch_len = cfg.train.OFFICIAL_EPOCH_LENGTH
+    epoch_len = cfg.train.iterations_per_epoch
     return num_epochs * epoch_len
 
 
@@ -171,12 +171,12 @@ def setup_training_components(cfg, model):
         model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True
     )
 
-    start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS)
+    start_iter = checkpointer.resume_or_load()
     max_iter = get_max_iter(cfg)
 
     checkpointer = DDPPeriodicCheckpointer(
         checkpointer,
-        period=cfg.train.saveckp_iterations,
+        period=cfg.checkpoints.save_checkpoint_iterations,
         max_iter=max_iter,
         max_to_keep=3,
     )
