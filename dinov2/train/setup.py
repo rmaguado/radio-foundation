@@ -111,12 +111,12 @@ def setup_dataloader(cfg, inputs_dtype):
     if cfg.crops.views.enable_2d:
         mask_shapes["global_2d"] = (
             cfg.crops.crop_sizes.global_2d
-            // cfg.student.embed_layers.patch_2d.patch_size,
+            // next(x for x in cfg.student.embed_layers if x["name"] == "patch_2d").patch_size,
         ) * 2
     if cfg.crops.views.enable_3d:
         mask_shapes["global_3d"] = (
             cfg.crops.crop_sizes.global_3d
-            // cfg.student.embed_layers.patch_3d.patch_size,
+            // next(x for x in cfg.student.embed_layers if x["name"] == "patch_3d").patch_size,
         ) * 3
 
     mask_generator = MaskingGenerator()
