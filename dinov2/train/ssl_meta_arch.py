@@ -325,14 +325,16 @@ class SSLMetaArch(nn.Module):
                         total_loss += loss
                         n_loss_terms += 1
 
-                s_tokens = group_student_tokens
-                t_tokens = teacher_dino_tokens["global_3d"]
+                if "global_3d" in teacher_dino_tokens.keys():
 
-                for v0 in range(self.global_view_multiple):
-                    t_tokens_i = t_tokens[:, v0, :]
-                    loss = self.dino_loss(s_tokens, t_tokens_i)
-                    total_loss += loss
-                    n_loss_terms += 1
+                    s_tokens = group_student_tokens
+                    t_tokens = teacher_dino_tokens["global_3d"]
+
+                    for v0 in range(self.global_view_multiple):
+                        t_tokens_i = t_tokens[:, v0, :]
+                        loss = self.dino_loss(s_tokens, t_tokens_i)
+                        total_loss += loss
+                        n_loss_terms += 1
 
             if group_name == "global_3d":
                 s_tokens = group_student_tokens
