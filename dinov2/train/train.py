@@ -9,7 +9,7 @@ import math
 import torch
 from omegaconf import OmegaConf
 
-from torch.profiler import profile, ProfilerActivity, record_function
+# from torch.profiler import profile, ProfilerActivity, record_function
 
 from dinov2.logging import MetricLogger, setup_logging
 from dinov2.configs import get_cfg_from_path, write_config, validate_config
@@ -154,48 +154,35 @@ def train(
         start_iter,
         accum_steps,
     ):
-        with profile(
-            activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True
-        ) as prof:
-            if iteration > max_iter:
-                return
 
-            if should_reset_grad(cfg, grad_accum_counter, accum_steps):
-                mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
-                optimizer.zero_grad(set_to_none=True)
+        if iteration > max_iter:
+            return
 
-            with torch.autocast(device_type="cuda", enabled=True, dtype=dtype):
-                with record_function("mode-forward"):
-                    loss_dict, loss_accumulator = model.forward(
-                        data, teacher_temp=teacher_temp
-                    )
+        if should_reset_grad(cfg, grad_accum_counter, accum_steps):
+            mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)
+            optimizer.zero_grad(set_to_none=True)
 
-            with record_function("model-backward"):
-                loss_accumulator.backward()
+        with torch.autocast(device_type="cuda", enabled=True, dtype=dtype):
+            loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)
 
-                torch.cuda.synchronize()
+        loss_accumulator.backward()
 
-            if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
-                with record_function("grad-operations"):
-                    apply_gradient_operations(cfg, model, optimizer, accum_steps)
-                model.update_teacher(mom)
+        torch.cuda.synchronize()
 
-                with record_function("logging"):
-                    log_training_step(metric_logger, loss_dict, schedulers, iteration)
+        if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
+            apply_gradient_operations(cfg, model, optimizer, accum_steps)
+            model.update_teacher(mom)
 
-                    checkpointer.step(iteration)
+            log_training_step(metric_logger, loss_dict, schedulers, iteration)
 
-                iteration += 1
+            checkpointer.step(iteration)
 
-                if should_eval_model(cfg, iteration):
-                    do_test(cfg, model, f"training_{iteration}")
+            iteration += 1
 
-            grad_accum_counter += 1
+            if should_eval_model(cfg, iteration):
+                do_test(cfg, model, f"training_{iteration}")
 
-        if iteration > 10 and iteration % 4 == 0:
-            prof.export_chrome_trace(
-                f"runs/_traces/trace_{iteration:05}_{dist.get_rank()}.json"
-            )
+        grad_accum_counter += 1
 
     return iteration
 
