@@ -107,18 +107,17 @@ def build_schedulers(cfg):
 
 def setup_dataloader(cfg, inputs_dtype):
 
-    mask_shapes = {
-        "global_2d": (
+    mask_shapes = {}
+    if cfg.crops.views.enable_2d:
+        mask_shapes["global_2d"] = (
             cfg.crops.crop_sizes.global_2d
             // cfg.student.embed_layers.patch_2d.patch_size,
-        )
-        * 2,
-        "global_3d": (
+        ) * 2
+    if cfg.crops.views.enable_3d:
+        mask_shapes["global_3d"] = (
             cfg.crops.crop_sizes.global_3d
             // cfg.student.embed_layers.patch_3d.patch_size,
-        )
-        * 3,
-    }
+        ) * 3
 
     mask_generator = MaskingGenerator()
 
