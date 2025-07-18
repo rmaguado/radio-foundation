@@ -62,7 +62,7 @@ def build_optimizer(cfg, params_groups):
 def build_schedulers(cfg):
     epoch_len = cfg.train.iterations_per_epoch
     lr = dict(
-        base_value=cfg.optim["lr"],
+        base_value=cfg.optim["base_lr"],
         final_value=cfg.optim["min_lr"],
         total_iters=cfg.optim["epochs"] * epoch_len,
         warmup_iters=cfg.optim["warmup_epochs"] * epoch_len,
