@@ -31,11 +31,11 @@ class SSLMetaArch(nn.Module):
         self.student = nn.ModuleDict()
         self.teacher = nn.ModuleDict()
 
-        student_backbone, teacher_backbone, embed_dim = build_model_from_cfg(cfg)
+        student_backbone, teacher_backbone = build_model_from_cfg(cfg)
         self.student["backbone"] = student_backbone
         self.teacher["backbone"] = teacher_backbone
 
-        self.embed_dim = embed_dim
+        self.embed_dim = cfg.student.embed_dim
         self.dino_out_dim = cfg.dino.head_n_prototypes
 
         self.do_koleo = cfg.dino.koleo_loss_weight > 0
@@ -45,7 +45,7 @@ class SSLMetaArch(nn.Module):
         self.dino_loss_weight = cfg.dino.loss_weight
         dino_head = partial(
             DINOHead,
-            in_dim=embed_dim,
+            in_dim=self.embed_dim,
             out_dim=cfg.dino.head_n_prototypes,
             hidden_dim=cfg.dino.head_hidden_dim,
             bottleneck_dim=cfg.dino.head_bottleneck_dim,
@@ -70,7 +70,7 @@ class SSLMetaArch(nn.Module):
             if self.ibot_separate_head:
                 ibot_head = partial(
                     DINOHead,
-                    in_dim=embed_dim,
+                    in_dim=self.embed_dim,
                     out_dim=cfg.ibot.head_n_prototypes,
                     hidden_dim=cfg.ibot.head_hidden_dim,
                     bottleneck_dim=cfg.ibot.head_bottleneck_dim,
@@ -99,11 +99,11 @@ class SSLMetaArch(nn.Module):
             images = view_info["images"]
             masks = view_info.get("masks", None)
 
-            images = images.to(self.device, non_blocking=True)
+            images = images.cuda(non_blocking=True)
             collated_views[group_name]["images"] = images
 
             if masks is not None:
-                masks = masks.to(self.device, non_blocking=True)
+                masks = masks.cuda(non_blocking=True)
                 collated_views[group_name]["masks"] = masks
 
     def _process_group(
@@ -159,7 +159,7 @@ class SSLMetaArch(nn.Module):
             output["mask_weights"] = mask_weights[masks.view(-1)]
 
         return output
-    
+
     def _update_teacher_centers(
         self, uncentered_views: Dict[str, Dict[str, torch.Tensor]]
     ) -> None:
@@ -239,7 +239,7 @@ class SSLMetaArch(nn.Module):
         """Runs the student model across all view groups."""
         student_outputs = {"dino": {}, "ibot": {}, "mask_weights": {}}
 
-        for group_name, view_info in collated_views.items():            
+        for group_name, view_info in collated_views.items():
             group_output = self._process_group(
                 model=self.student,
                 images=view_info["images"],
@@ -267,7 +267,7 @@ class SSLMetaArch(nn.Module):
         """
         Calculates the total DINO loss, handling both self-comparison and hierarchical comparison.
         """
-        total_loss = torch.tensor(0.0, device=self.device)
+        total_loss = torch.tensor(0.0).cuda()
         n_loss_terms = 0
 
         for group_name, group_student_tokens in student_dino_tokens.items():
@@ -277,7 +277,7 @@ class SSLMetaArch(nn.Module):
                     group_student_tokens,
                     "b (v0 v1) e -> b v0 v1 e",
                     v0=self.num_global_2d,
-                    v1=self.global_view_multiple
+                    v1=self.global_view_multiple,
                 )
                 t_tokens_grouped = rearrange(
                     teacher_dino_tokens["global_2d"],
@@ -287,12 +287,14 @@ class SSLMetaArch(nn.Module):
                 )
 
                 for v0 in range(self.num_global_2d):
-                    s_tokens = s_tokens_grouped[:,v0,:,:]
-                    t_tokens = t_tokens_grouped[:,v0,:,:]
+                    s_tokens = s_tokens_grouped[:, v0, :, :]
+                    t_tokens = t_tokens_grouped[:, v0, :, :]
 
                     for v1 in range(self.global_view_multiple):
-                        s_tokens_i = torch.cat(t_tokens[:,:v1,:], t_tokens[:,v1+1:,:])
-                        t_tokens_i = s_tokens[:,v1,:]
+                        s_tokens_i = torch.cat(
+                            [t_tokens[:, :v1, :], t_tokens[:, v1 + 1 :, :]], dim=1
+                        )
+                        t_tokens_i = s_tokens[:, v1, :]
 
                         loss = self.dino_loss(s_tokens_i, t_tokens_i)
                         total_loss += loss
@@ -309,15 +311,15 @@ class SSLMetaArch(nn.Module):
                     teacher_dino_tokens["global_2d"],
                     "b (v0 v1) e -> b v0 v1 e",
                     v0=self.num_global_2d,
-                    v1=self.global_view_multiple
+                    v1=self.global_view_multiple,
                 )
 
                 for v0 in range(self.num_global_2d):
-                    s_tokens = s_tokens_grouped[:,v0,:,:]
-                    t_tokens = t_tokens_grouped[:,v0,:,:]
+                    s_tokens = s_tokens_grouped[:, v0, :, :]
+                    t_tokens = t_tokens_grouped[:, v0, :, :]
 
                     for v1 in range(self.global_view_multiple):
-                        t_tokens_i = t_tokens[:,v1,:]
+                        t_tokens_i = t_tokens[:, v1, :]
 
                         loss = self.dino_loss(s_tokens, t_tokens_i)
                         total_loss += loss
@@ -327,7 +329,7 @@ class SSLMetaArch(nn.Module):
                 t_tokens = teacher_dino_tokens["global_3d"]
 
                 for v0 in range(self.global_view_multiple):
-                    t_tokens_i = t_tokens[:,v0,:]
+                    t_tokens_i = t_tokens[:, v0, :]
                     loss = self.dino_loss(s_tokens, t_tokens_i)
                     total_loss += loss
                     n_loss_terms += 1
@@ -337,26 +339,28 @@ class SSLMetaArch(nn.Module):
                 t_tokens = teacher_dino_tokens["global_3d"]
 
                 for v0 in range(self.global_view_multiple):
-                    s_tokens_i = torch.cat(s_tokens[:,:v0,:], s_tokens[:,v0+1:,:])
-                    t_tokens_i = t_tokens[:,v0,:]
-                    
+                    s_tokens_i = torch.cat(
+                        [s_tokens[:, :v0, :], s_tokens[:, v0 + 1 :, :]], dim=1
+                    )
+                    t_tokens_i = t_tokens[:, v0, :]
+
                     loss = self.dino_loss(s_tokens_i, t_tokens_i)
                     total_loss += loss
                     n_loss_terms += 1
-            
+
             if group_name == "local_3d":
                 s_tokens = group_student_tokens
                 t_tokens = teacher_dino_tokens["global_3d"]
 
                 for v0 in range(self.global_view_multiple):
-                    t_tokens_i = t_tokens[:,v0,:]
+                    t_tokens_i = t_tokens[:, v0, :]
 
-                    loss = self.dino_loss(s_tokens, t_tokens)
+                    loss = self.dino_loss(s_tokens, t_tokens_i)
                     total_loss += loss
                     n_loss_terms += 1
 
         if n_loss_terms == 0:
-            return torch.tensor(0.0, device=self.device)
+            return torch.tensor(0.0).cuda()
 
         return total_loss / n_loss_terms
 
@@ -366,9 +370,9 @@ class SSLMetaArch(nn.Module):
     ) -> torch.Tensor:
         """Calculates the total KoLeo loss among student target views within a batch."""
         if not self.do_koleo:
-            return torch.tensor(0.0, device=self.device)
+            return torch.tensor(0.0).cuda()
 
-        total_loss = torch.tensor(0.0, device=self.device)
+        total_loss = torch.tensor(0.0).cuda()
         total_terms = 0
 
         for group_name, s_tokens in student_global_dino_tokens.items():
@@ -380,7 +384,7 @@ class SSLMetaArch(nn.Module):
                 total_terms += 1
 
         if total_terms == 0:
-            return torch.tensor(0.0, device=self.device)
+            return torch.tensor(0.0).cuda()
 
         return total_loss / total_terms
 
@@ -392,9 +396,9 @@ class SSLMetaArch(nn.Module):
     ) -> torch.Tensor:
         """Calculates the total iBOT loss across all student-teacher view pairs."""
         if not self.do_ibot:
-            return torch.tensor(0.0, device=self.device)
+            return torch.tensor(0.0).cuda()
 
-        total_loss = torch.tensor(0.0, device=self.device)
+        total_loss = torch.tensor(0.0).cuda()
         total_terms = 0
 
         for group_name, s_tokens in student_ibot_tokens.items():
@@ -408,7 +412,7 @@ class SSLMetaArch(nn.Module):
             total_terms += 1
 
         if total_terms == 0:
-            return torch.tensor(0.0, device=self.device)
+            return torch.tensor(0.0).cuda()
 
         return total_loss / total_terms
 
@@ -420,12 +424,11 @@ class SSLMetaArch(nn.Module):
         """
         self._prepare_inputs(collated_views)
 
-        
         teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
         student_outputs = self._run_student_pass(collated_views)
 
         dino_loss = self._calculate_dino_loss(
-            student_outputs["dino"], teacher_outputs["dino"], collated_views
+            student_outputs["dino"], teacher_outputs["dino"]
         )
 
         ibot_loss = self._calculate_ibot_loss(
@@ -451,11 +454,10 @@ class SSLMetaArch(nn.Module):
             "dino_loss": dino_loss.detach(),
             "ibot_loss": ibot_loss.detach(),
             "koleo_loss": koleo_loss.detach(),
-            "total_loss": total_loss.detach(),
         }
 
         return total_loss, loss_dict
-    
+
     def update_teacher(self, m) -> None:
         student_param_list = []
         teacher_param_list = []
