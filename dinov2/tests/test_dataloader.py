@@ -32,20 +32,14 @@ def test_dataloader_speed(cfg, dataloader):
         tf = time.time() - t0
         logger.info(f"Batch {idx}: waited {tf:.06f} seconds.")
 
-    assert True
-
-def test_dataloader_output(cfg, dataloader):
-    dataloader_iter = iter(dataloader)
-    data = next(dataloader_iter)
-
     assert all(x in data.keys() for x in ["global_3d", "local_3d", "global_2d", "local_2d"])
 
-def test_dataloader_inspect(cfg, dataloader):
+def test_dataloader_output(dataloader):
     dataloader_iter = iter(dataloader)
     data = next(dataloader_iter)
     output_path = "dinov2/tests/out"
 
-    global_3d = data["global_3d"]
+    global_3d = data["global_3d"]["images"]
     _, V, D, W, H = global_3d.shape
 
     plt.figure()
