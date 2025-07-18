@@ -99,7 +99,6 @@ class TrainConfig(BaseModel):
 
     @field_validator(
         "iterations_per_epoch",
-        "epochs",
         "batch_size_total",
         "batch_size_per_gpu",
         "grad_accum_steps",
