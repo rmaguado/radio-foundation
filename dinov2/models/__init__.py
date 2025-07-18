@@ -7,6 +7,4 @@ from dinov2.models.vision_transformer import build_model
 
 
 def build_model_from_cfg(cfg, only_teacher=False):
-    return build_model(
-        cfg.student, only_teacher=only_teacher, img_size=cfg.student.full_image_size
-    )
+    return build_model(cfg.student, only_teacher=only_teacher)
