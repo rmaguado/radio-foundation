@@ -130,6 +130,7 @@ class CheckpointsConfig(BaseModel):
 
 
 class EmbedLayerConfig(BaseModel):
+    name: Literal["patch_2d", "patch_3d"]
     patch_size: int
     img_size: int
     in_channels: Optional[int] = None
@@ -155,7 +156,7 @@ class StudentConfig(BaseModel):
     depth: int
     num_heads: int
     mlp_ratio: int
-    embed_layers: Dict[str, EmbedLayerConfig]
+    embed_layers: List[EmbedLayerConfig]
     drop_path_rate: float
     layerscale: float
     drop_path_uniform: bool

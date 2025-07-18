@@ -57,16 +57,17 @@ def get_embedding_layers(
         nn.ModuleDict: Dictionary of embedding layers keyed by type.
     """
     embed_layers = nn.ModuleDict()
-    for layer_type, config in embed_configs.items():
+    for layer_config in embed_configs.copy():
+        layer_type = layer_config["name"]
         if layer_type not in EMBED_LAYER_REGISTRY:
             raise NotImplementedError(
                 f"Embedding layer type '{layer_type}' is not implemented. Available: {list(EMBED_LAYER_REGISTRY.keys())}"
             )
 
         patch_kwargs = {
-            "img_size": config.get("img_size", 224),
-            "patch_size": config.get("patch_size", 16),
-            "in_channels": config.get("in_channels", 1),
+            "img_size": layer_config.get("img_size", 224),
+            "patch_size": layer_config.get("patch_size", 16),
+            "in_channels": layer_config.get("in_channels", 1),
             "embed_dim": embed_dim,
             "norm_layer": norm_layer,
         }
@@ -156,7 +157,7 @@ class DinoVisionTransformer(nn.Module):
         proj_bias: bool,
         ffn_layer: str,
         num_register_tokens: int,
-        embed_configs: Dict,
+        embed_configs: List[Dict],
         drop_path_rate: float = 0.0,
         drop_path_uniform: bool = True,
         init_values: Optional[float] = None,
@@ -311,7 +312,8 @@ class DinoVisionTransformer(nn.Module):
         }
 
 
-def build_model(args, only_teacher: bool) -> Tuple[nn.Module | None, nn.Module]:
+def build_model(cfg, only_teacher: bool = False) -> Tuple[nn.Module | None, nn.Module]:
+    args = cfg.student
     vit_kwargs = dict(
         embed_dim=args.embed_dim,
         depth=args.depth,
