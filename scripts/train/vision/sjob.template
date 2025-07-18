@@ -18,10 +18,11 @@ conda activate radio
 cd $HOME/projects/radio-foundation
 
 export PYTHONPATH=$PWD
+#export NCCL_DEBUG="INFO"
 #export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 #export CUDA_LAUNCH_BLOCKING=0
 
-#export MASTER_PORT=$(find_port)
+export MASTER_PORT=$(find_port)
 #export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 
 srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS \
