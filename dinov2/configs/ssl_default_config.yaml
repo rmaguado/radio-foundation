@@ -37,11 +37,11 @@ student:
   num_heads: 16
   mlp_ratio: 4
   embed_layers:
-    patch2d:
+    patch_2d:
       patch_size: 14
       img_size: 448
       in_channels: 10
-    patch3d:
+    patch_3d:
       patch_size: 14
       img_size: 224
   drop_path_rate: 0.4

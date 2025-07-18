@@ -110,12 +110,12 @@ def setup_dataloader(cfg, inputs_dtype):
     mask_shapes = {
         "global_2d": (
             cfg.crops.crop_sizes.global_2d
-            // cfg.student.embed_layers.patch2d.patch_size,
+            // cfg.student.embed_layers.patch_2d.patch_size,
         )
         * 2,
         "global_3d": (
             cfg.crops.crop_sizes.global_3d
-            // cfg.student.embed_layers.patch3d.patch_size,
+            // cfg.student.embed_layers.patch_3d.patch_size,
         )
         * 3,
     }

@@ -270,6 +270,7 @@ class ViewsConfig(BaseModel):
     enable_3d: bool
     enable_2d: bool
 
+
 class CropsNumberConfig(BaseModel):
     global_2d: int
     local_3d: int

@@ -30,8 +30,8 @@ from dinov2.layers import (
 logger = logging.getLogger("dinov2")
 
 EMBED_LAYER_REGISTRY = {
-    "patch2d": PatchEmbed2D,
-    "patch3d": PatchEmbed3D,
+    "patch_2d": PatchEmbed2D,
+    "patch_3d": PatchEmbed3D,
 }
 
 FFN_LAYER_REGISTRY = {
@@ -43,13 +43,13 @@ FFN_LAYER_REGISTRY = {
 
 
 def get_embedding_layers(
-    embed_configs: List[Dict], embed_dim: int, norm_layer: Callable
+    embed_configs: Dict, embed_dim: int, norm_layer: Callable
 ) -> nn.ModuleDict:
     """
     Creates a ModuleDict of embedding layers from a list of configurations.
 
     Args:
-        embed_configs (List[Dict]): List of embedding layer configuration dictionaries.
+        embed_configs (Dict): Configuration dictionaries for embedding layers (2d and 3d).
         embed_dim (int): Output embedding dimension for each layer.
         norm_layer (Callable): Normalization layer constructor.
 
@@ -156,7 +156,7 @@ class DinoVisionTransformer(nn.Module):
         proj_bias: bool,
         ffn_layer: str,
         num_register_tokens: int,
-        embed_configs: List[Dict],
+        embed_configs: Dict,
         drop_path_rate: float = 0.0,
         drop_path_uniform: bool = True,
         init_values: Optional[float] = None,
@@ -272,7 +272,7 @@ class DinoVisionTransformer(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        embed_layer: str = "patch2d",
+        embed_layer: str = "patch_2d",
         masks: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         x = self._prepare_tokens(x, embed_layer, masks)
@@ -288,7 +288,7 @@ class DinoVisionTransformer(nn.Module):
     def get_intermediate_layers(
         self,
         x: torch.Tensor,
-        embed_layer: str = "patch2d",
+        embed_layer: str = "patch_2d",
         select_layers: Sequence[int] = (11,),
         norm: bool = True,
     ) -> Dict[str, List[torch.Tensor]]:
