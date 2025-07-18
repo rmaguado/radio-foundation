@@ -16,6 +16,7 @@ logger.setLevel(logging.DEBUG)
 def cfg():
     return get_cfg_from_path("dinov2/configs/tests/minimal.yaml")
 
+@pytest.fixture
 def dataloader(cfg):
     inputs_dtype = torch.bfloat16
     return setup_dataloader(cfg, inputs_dtype)
