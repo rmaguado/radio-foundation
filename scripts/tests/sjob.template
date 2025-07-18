@@ -1,0 +1,21 @@
+#!/bin/bash
+
+#SBATCH --job-name=$NAME
+#SBATCH --output=$OUT/$NAME-%j.log
+#SBATCH --nodes=1
+#SBATCH --nodelist=$NODE
+#SBATCH --cpus-per-task=$WORKERS
+
+#SBATCH --ntasks-per-node=$GPUS
+#SBATCH --gres=gpu:$GPUTYPE:$GPUS
+#SBATCH --mem=$MEM
+#SBATCH --partition=odap-gpu
+#SBATCH --signal=USR2@120
+#SBATCH --time=15-00:00:00
+
+source $HOME/.conda_rc
+conda activate radio
+cd $HOME/projects/radio-foundation
+export PYTHONPATH=$PWD
+
+pytest dinov2/tests/${TESTFILE}.py --tb=long --log-cli-level=DEBUG
