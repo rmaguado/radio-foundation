@@ -1,10 +1,11 @@
+import os
 import torch
 from typing import List, Dict, Tuple, Any, Callable
 import polars as pl
 import numpy as np
 
-# import SimpleITK as sitk
 import nibabel as nib
+import pydicom
 import logging
 
 
@@ -37,6 +38,7 @@ class VolumeDataset:
         self.df = pl.read_csv(index_path)
         self.modality = modality
         self.transform = transform
+        self.bounds = bounds
 
     def __len__(self) -> int:
         """
@@ -77,7 +79,29 @@ class DicomVolumeDataset(VolumeDataset):
     """
 
     def get_image_data(self, idx: int):
-        raise NotImplementedError
+        meta = self.df.row(idx)
+        dicom_folder_path = meta[0]
+        spacing = meta[5:8]
+
+        dicom_file_paths = [
+            x for x in os.listdir(dicom_folder_path) if x.endswith(".dcm")
+        ]
+
+        dcms = [pydicom.dcmread(x) for x in dicom_file_paths]
+        dcms.sort(key=lambda x: x.ImagePositionPatient[2])
+
+        image_array = torch.stack(
+            [torch.from_numpy(dcm.pixel_array).float() for dcm in dcms]
+        )
+
+        if self.modality == "ct":
+            slope = dcms[0].RescaleSlope
+            intercept = dcms[0].RescaleIntercept
+            image_array = image_array * slope + intercept
+
+        image_array = torch.clip(image_array, self.bounds[0], self.bounds[1])
+
+        return image_array, spacing
 
 
 class NiftiVolumeDataset(VolumeDataset):
@@ -90,10 +114,9 @@ class NiftiVolumeDataset(VolumeDataset):
     def get_image_data(self, idx: int) -> Tuple[np.ndarray, Tuple[float, ...]]:
         meta = self.df.row(idx)
         nifti_file_path = meta[0]
+        spacing = meta[5:8]
 
         image = nib.load(nifti_file_path)
-        affine = image.affine
-        spacing = np.sqrt(np.sum(affine[:3, :3] ** 2, axis=0))
 
         image_memmap = image.dataobj
 
@@ -106,14 +129,16 @@ class NiftiVolumeDataset(VolumeDataset):
 
             image_array = np.asarray(image_memmap, dtype=np.float32)
             image_array = slope * image_array + intercept
-            return image_array, spacing
 
         elif self.modality == "mri":
-            image_array = np.asarray(image_memmap, dtype=np.float32)
-            return image_array, spacing
+            image_array = torch.from_numpy(np.array(image_memmap))
 
         else:
             raise ValueError(f"Unrecognized modality: {self.modality}.")
+
+        image_array = torch.clip(image_array, self.bounds[0], self.bounds[1])
+
+        return image_array, spacing
 
 
 class MultiDataset:
