@@ -61,3 +61,21 @@ def test_dataloader_output(dataloader):
     plt.imshow(global_3d[0, 0, :, :, H // 2], cmap="gray")
     plt.colorbar()
     plt.savefig(os.path.join(output_path, "global_3d_viewC.png"))
+
+    global_2d = data["global_2d"]["images"].float().numpy()
+    _, V, D, W, H = global_2d.shape
+
+    plt.figure()
+    plt.imshow(global_2d[0, 0, D // 2, :, :], cmap="gray")
+    plt.colorbar()
+    plt.savefig(os.path.join(output_path, "global_2d_viewA.png"))
+
+    plt.figure()
+    plt.imshow(global_2d[0, 0, :, W // 2, :], cmap="gray")
+    plt.colorbar()
+    plt.savefig(os.path.join(output_path, "global_2d_viewB.png"))
+
+    plt.figure()
+    plt.imshow(global_2d[0, 0, :, :, H // 2], cmap="gray")
+    plt.colorbar()
+    plt.savefig(os.path.join(output_path, "global_2d_viewC.png"))
