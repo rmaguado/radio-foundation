@@ -34,7 +34,8 @@ def index_niftis(root_path, output_path) -> None:
                 try:
                     image = sitk.ReadImage(file_path)
 
-                    metadata = get_fields(image)
+                    metadata = {"path": filename}
+                    metadata.update(get_fields(image))
 
                     nifti_files.append(metadata)
 
@@ -75,7 +76,8 @@ def index_dicoms(root_path, output_path, target_modality) -> None:
                 modality == target_modality
             ), f"Expected modality == {target_modality}, found {modality}."
 
-            metadata = get_fields(image)
+            metadata = {"path": dirpath}
+            metadata.update(get_fields(image))
 
             dicom_folders.append(metadata)
 
