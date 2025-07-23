@@ -97,7 +97,7 @@ class NiftiVolumeDataset(VolumeDataset):
 
         image_memmap = image.dataobj
 
-        if self.modality.lower() == "ct":
+        if self.modality == "ct":
             slope = image.header.get_slope_inter()[0]
             intercept = image.header.get_slope_inter()[1]
 
@@ -108,9 +108,12 @@ class NiftiVolumeDataset(VolumeDataset):
             image_array = slope * image_array + intercept
             return image_array, spacing
 
-        else:
+        elif self.modality == "mri":
             image_array = np.asarray(image_memmap, dtype=np.float32)
             return image_array, spacing
+
+        else:
+            raise ValueError(f"Unrecognized modality: {self.modality}.")
 
 
 class MultiDataset:
