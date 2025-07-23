@@ -38,6 +38,26 @@ def get_fields(image) -> Dict:
     }
 
 
+def get_fields_mri(reader) -> Dict:
+    mri_metadata = {}
+    existing_keys = reader.GetMetaDataKeys(slice=0)
+    key_names = {
+        "0018|0080": "repetition_time",
+        "0018|0081": "echo_time",
+        "0018|0082": "inversion_time",
+        "0018|0087": "magnetic_field_strength",
+    }
+
+    for key, name in key_names.items():
+        if key in existing_keys:
+            value = reader.GetMetaData(slice=0, key=key)
+        else:
+            value = None
+        mri_metadata[name] = value
+
+    return mri_metadata
+
+
 def index_niftis(root_path, output_path) -> None:
     nifti_files = []
     for dirpath, _, filenames in tqdm(
@@ -94,6 +114,9 @@ def index_dicoms(root_path, output_path, target_modality) -> None:
 
             metadata = {"path": dirpath}
             metadata.update(get_fields(image))
+
+            if modality == "MR":
+                metadata.update(get_fields_mri(reader))
 
             dicom_folders.append(metadata)
 
