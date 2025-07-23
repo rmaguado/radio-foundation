@@ -27,16 +27,14 @@ def walk(root_dir):
 
 def get_fields(image) -> Dict:
     spacing = image.GetSpacing()
-    dimensions = image.GetDimension()
-    assert dimensions == 3, f"Expected 3 dimensions, got {dimensions}."
-    assert max(spacing) <= 5.0, f"Slice thickness is too high: {spacing}"
     return {
         "width": image.GetWidth(),
         "height": image.GetHeight(),
         "depth": image.GetDepth(),
-        "z_spacing": spacing[0],
-        "x_spacing": spacing[1],
-        "y_spacing": spacing[2],
+        "dimensions": image.GetDimension(),
+        "x_spacing": round(spacing[0], 6),
+        "y_spacing": round(spacing[1], 6),
+        "z_spacing": round(spacing[2], 6),
     }
 
 
