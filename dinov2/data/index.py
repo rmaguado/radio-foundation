@@ -16,7 +16,7 @@ def walk(root_dir):
     ignorewords = ["ignore"]
     ignore_folders = []
 
-    for dirpath, dirnames, filenames in walk(root_dir):
+    for dirpath, dirnames, filenames in os.walk(root_dir, followlinks=True):
         dirnames[:] = [d for d in dirnames if d not in ignore_folders]
 
         if any(x in filenames for x in ignorewords):
@@ -69,7 +69,7 @@ def index_niftis(root_path, output_path) -> None:
 def index_dicoms(root_path, output_path, target_modality) -> None:
     dicom_folders = []
     for dirpath, _, filenames in tqdm(
-        os.walk(root_path, followlinks=True), desc="Walking through directories"
+        walk(root_path), desc="Walking through directories"
     ):
         has_dcm = any(x.endswith(".dcm") for x in os.listdir(dirpath))
         if not has_dcm:
