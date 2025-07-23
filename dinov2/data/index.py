@@ -7,6 +7,24 @@ import polars as pl
 import SimpleITK as sitk
 
 
+def walk(root_dir):
+    """
+    Walks through the directory tree and yields directories and files.
+    Ignores directories containing "ignore" in their names and skips folders
+    that contain a file named "ignore".
+    """
+    ignorewords = ["ignore"]
+    ignore_folders = []
+
+    for dirpath, dirnames, filenames in walk(root_dir):
+        dirnames[:] = [d for d in dirnames if d not in ignore_folders]
+
+        if any(x in filenames for x in ignorewords):
+            dirnames[:] = []
+
+        yield dirpath, dirnames, filenames
+
+
 def get_fields(image) -> Dict:
     spacing = image.GetSpacing()
     dimensions = image.GetDimension()
@@ -25,7 +43,7 @@ def get_fields(image) -> Dict:
 def index_niftis(root_path, output_path) -> None:
     nifti_files = []
     for dirpath, _, filenames in tqdm(
-        os.walk(root_path, followlinks=True), desc="Walking through directories"
+        walk(root_path), desc="Walking through directories"
     ):
         for filename in filenames:
             if filename.endswith(".nii") or filename.endswith(".nii.gz"):
