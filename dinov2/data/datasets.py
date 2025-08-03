@@ -129,6 +129,7 @@ class NiftiVolumeDataset(VolumeDataset):
 
             image_array = np.asarray(image_memmap, dtype=np.float32)
             image_array = slope * image_array + intercept
+            image_array = torch.from_numpy(image_array)
 
         elif self.modality == "mri":
             image_array = torch.from_numpy(np.array(image_memmap))
