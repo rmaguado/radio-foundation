@@ -6,6 +6,8 @@ from tqdm import tqdm
 import polars as pl
 import SimpleITK as sitk
 
+sitk.ProcessObject_SetGlobalWarningDisplay(False)
+
 
 def walk(root_dir):
     """
