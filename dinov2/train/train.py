@@ -9,6 +9,8 @@ import math
 import torch
 from omegaconf import OmegaConf
 
+from typing import Tuple
+
 # from torch.profiler import profile, ProfilerActivity, record_function
 
 from dinov2.logging import MetricLogger, setup_logging
@@ -28,22 +30,22 @@ torch.backends.cuda.matmul.allow_tf32 = True
 logger = logging.getLogger("dinov2")
 
 
-def should_reset_grad(cfg, grad_accum_counter, accum_steps):
+def should_reset_grad(cfg, grad_accum_counter, accum_steps) -> bool:
     return grad_accum_counter % accum_steps == 0
 
 
-def should_apply_training_step(cfg, grad_accum_counter, accum_steps):
+def should_apply_training_step(cfg, grad_accum_counter, accum_steps) -> bool:
     return (grad_accum_counter + 1) % accum_steps == 0
 
 
-def should_eval_model(cfg, iteration):
+def should_eval_model(cfg, iteration) -> bool:
     return (
         cfg.checkpoints.save_teacher_iterations > 0
         and (iteration + 1) % cfg.checkpoints.save_teacher_iterations == 0
     )
 
 
-def get_dtype(dtype_str):
+def get_dtype(dtype_str) -> torch.dtype:
     if dtype_str == "fp16":
         return torch.half
     elif dtype_str == "bf16":
@@ -51,7 +53,7 @@ def get_dtype(dtype_str):
     return torch.float
 
 
-def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
+def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr) -> None:
     for param_group in optimizer.param_groups:
         is_last_layer = param_group["is_last_layer"]
         lr_multiplier = param_group["lr_multiplier"]
@@ -60,7 +62,7 @@ def apply_optim_scheduler(optimizer, lr, wd, last_layer_lr):
         param_group["lr"] = (last_layer_lr if is_last_layer else lr) * lr_multiplier
 
 
-def update_schedules(optimizer, schedulers, iteration):
+def update_schedules(optimizer, schedulers, iteration) -> Tuple[float, float]:
     lr = schedulers["lr"][iteration]
     wd = schedulers["wd"][iteration]
     momentum = schedulers["momentum"][iteration]
@@ -132,7 +134,6 @@ def train(
     optimizer,
     schedulers,
     checkpointer,
-    img_mode: str,
     start_iter: int,
     max_iter: int,
 ):
@@ -140,12 +141,7 @@ def train(
     grad_accum_counter = 0
     iteration = start_iter
 
-    if img_mode == "crop":
-        accum_steps = cfg.train.grad_accum_steps
-    elif img_mode == "full":
-        accum_steps = cfg.train.grad_accum_steps
-    else:
-        raise ValueError
+    accum_steps = cfg.train.grad_accum_steps
 
     for data in metric_logger.log_every(
         cfg.checkpoints.print_iterations,
@@ -206,17 +202,19 @@ def do_train(cfg, model):
         output_file=os.path.join(cfg.train.output_dir, "training_metrics.json"),
     )
 
-    train_components = [cfg, metric_logger, model, optimizer, schedulers, checkpointer]
-
     if iteration < max_iter:
         data_loader = setup_dataloader(cfg, inputs_dtype)
         metric_logger.set_dataloader(data_loader)
 
         iteration = train(
-            *train_components,
-            img_mode="crop",
-            start_iter=start_iter,
-            max_iter=max_iter,
+            cfg,
+            metric_logger,
+            model,
+            optimizer,
+            schedulers,
+            checkpointer,
+            start_iter,
+            max_iter,
         )
 
         logger.info("Finished training on resize-crop images.")
