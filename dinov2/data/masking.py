@@ -46,7 +46,7 @@ class MaskingGenerator:
         mask = np.zeros(input_shape, dtype=bool)
         num_masked = 0
 
-        max_attempts = total_num_to_mask * 10
+        max_attempts = total_num_to_mask
         attempts = 0
 
         while num_masked < total_num_to_mask and attempts < max_attempts:
