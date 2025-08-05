@@ -291,10 +291,10 @@ class SSLMetaArch(nn.Module):
                     t_tokens = t_tokens_grouped[:, v0, :, :]
 
                     for v1 in range(self.global_view_multiple):
-                        s_tokens_i = torch.cat(
+                        s_tokens_i = s_tokens[:, v1, :]
+                        t_tokens_i = torch.cat(
                             [t_tokens[:, :v1, :], t_tokens[:, v1 + 1 :, :]], dim=1
                         )
-                        t_tokens_i = s_tokens[:, v1, :]
 
                         loss = self.dino_loss(s_tokens_i, t_tokens_i)
                         total_loss += loss
