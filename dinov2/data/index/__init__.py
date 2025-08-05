@@ -63,7 +63,7 @@ def get_fields_mri(reader) -> Dict:
 def index_niftis(root_path, output_path) -> None:
     nifti_files = []
     for dirpath, _, filenames in tqdm(
-        walk(root_path), desc="Walking through directories"
+        walk(root_path), desc=f"Walking through directories of {root_path}"
     ):
         for filename in filenames:
             if filename.endswith(".nii") or filename.endswith(".nii.gz"):
@@ -72,7 +72,7 @@ def index_niftis(root_path, output_path) -> None:
                 try:
                     image = sitk.ReadImage(file_path)
 
-                    metadata = {"path": filename}
+                    metadata = {"path": file_path}
                     metadata.update(get_fields(image))
 
                     nifti_files.append(metadata)
@@ -109,15 +109,18 @@ def index_dicoms(root_path, output_path, target_modality) -> None:
             reader.LoadPrivateTagsOn()
             image = reader.Execute()
 
-            modality = reader.GetMetaData(slice=0, key="0008|0060")
-            assert (
-                modality == target_modality
-            ), f"Expected modality == {target_modality}, found {modality}."
+            if reader.HasMetaDataKey(slice=0, key="0008|0060"):
+                modality = reader.GetMetaData(slice=0, key="0008|0060")
+                assert (
+                    modality == target_modality
+                ), f"Expected modality == {target_modality}, found {modality}."
+            else:
+                logging.info(f"{dirpath} has no modality info, assuming OK")
 
             metadata = {"path": dirpath}
             metadata.update(get_fields(image))
 
-            if modality == "MR":
+            if target_modality == "MR":
                 metadata.update(get_fields_mri(reader))
 
             dicom_folders.append(metadata)
@@ -133,7 +136,7 @@ def index_dicoms(root_path, output_path, target_modality) -> None:
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_type", type=str)
-    parser.add_argument("--modality", type=str)
+    parser.add_argument("--modality", type=str, default="CT")
     parser.add_argument("--root_path", type=str)
     parser.add_argument("--output_path", type=str)
     return parser.parse_args()
@@ -148,6 +151,9 @@ if __name__ == "__main__":
     if args.dataset_type == "nifti":
         index_niftis(args.root_path, args.output_path)
     elif args.dataset_type == "dicom":
+        assert (
+            args.modality == "CT" or args.modality == "MR"
+        ), f"Modality should be CT or MR, found {args.modality}."
         index_dicoms(args.root_path, args.output_path, args.modality)
     else:
         raise ValueError(f"Unrecognized dataset_type: {args.dataset_type}.")
