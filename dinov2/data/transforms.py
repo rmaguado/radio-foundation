@@ -1,7 +1,7 @@
 import random
 import torch
 import numpy as np
-from typing import Tuple, Callable
+from typing import Tuple, List, Callable, Optional
 from torchvision.transforms.functional import gaussian_blur
 
 
@@ -56,7 +56,7 @@ class Crop:
         img: torch.Tensor | np.ndarray,
         start_indices: list,
         end_indices: list,
-        inverse_permutation: list = None,
+        inverse_permutation: Optional[list] = None,
     ) -> torch.Tensor:
         """Crops, potentially permutes, and converts the image to a tensor for interpolation."""
         if len(start_indices) == 3:  # 3D cropping
@@ -72,7 +72,7 @@ class Crop:
         else:
             raise ValueError("Unsupported number of dimensions for cropping.")
 
-        if self.preserve_axis_order and inverse_permutation:
+        if self.preserve_axis_order and inverse_permutation is not None:
             if isinstance(cropped, torch.Tensor):
                 cropped = cropped.permute(tuple(inverse_permutation))
             else:
@@ -176,7 +176,9 @@ class Crop:
         return resampled.squeeze(0).squeeze(0) if is_3d else resampled.squeeze(0)
 
     def __call__(
-        self, img: torch.Tensor | np.ndarray, spacing: Tuple[float, float, float] = None
+        self,
+        img: torch.Tensor | np.ndarray,
+        spacing: Optional[Tuple[float, float, float]] = None,
     ) -> torch.Tensor:
         """
         Applies cropping based on input image dimensions and optional spacing.
@@ -272,15 +274,13 @@ class Flip:
 
 
 class GaussianBlur:
-    def __init__(
-        self, p: float = 1.0, sigma: Tuple[float, float] | float = (0.1, 0.5)
-    ) -> None:
+    def __init__(self, p: float = 1.0, sigma: List[float] = [0.1, 0.5]) -> None:
         self.p = p
         self.sigma = sigma
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         if random.random() < self.p:
-            return gaussian_blur(img, kernel_size=3, sigma=self.sigma)
+            return gaussian_blur(img, kernel_size=[3], sigma=self.sigma)
         return img
 
 
@@ -297,12 +297,12 @@ class ImageTransforms:
     def __init__(self) -> None:
         self.transforms = []
 
-    def __iadd__(self, new_transform: Callable) -> None:
+    def __iadd__(self, new_transform: Callable):
         self.transforms.append(new_transform)
         return self
 
     def __call__(
-        self, img: torch.Tensor, spacing: Tuple[float, ...] = None
+        self, img: torch.Tensor, spacing: Optional[Tuple[float, ...]] = None
     ) -> torch.Tensor:
         for i, transform in enumerate(self.transforms):
             if i == 0 and spacing is not None:

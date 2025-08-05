@@ -5,19 +5,16 @@
 
 import logging
 from enum import Enum
-from typing import Any, Callable, Tuple, List, Optional, TypeVar
+from typing import Any, Callable, List, Optional, TypeVar
 from omegaconf import DictConfig
 from tabulate import tabulate
 
-import torch
 from torch.utils.data import Sampler, DataLoader
 
 from .datasets import MultiDataset, DicomVolumeDataset, NiftiVolumeDataset
 from .samplers import (
     InfiniteSampler,
     WeightedInfiniteSampler,
-    ShardedInfiniteSampler,
-    WeightedShardedInfiniteSampler,
 )
 from .augmentations import DataAugmentationDINO
 
@@ -149,17 +146,10 @@ def _make_sampler(
     if sampler_type == SamplerType.INFINITE:
         logger.info("sampler: infinite")
         return InfiniteSampler(sample_count=sample_count, seed=seed)
-    elif sampler_type == SamplerType.SHARDED_INFINITE:
-        logger.info("sampler: sharded infinite")
-        return ShardedInfiniteSampler(sample_count=sample_count, seed=seed)
     elif sampler_type == SamplerType.WEIGHTED_INFINITE:
         logger.info("sampler: weighted infinite")
+        assert weights is not None
         return WeightedInfiniteSampler(
-            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
-        )
-    elif sampler_type == SamplerType.WEIGHTED_SHARDED_INFINITE:
-        logger.info("sampler: weighted sharded infinite")
-        return WeightedShardedInfiniteSampler(
             dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
         )
 
@@ -191,7 +181,7 @@ def make_data_loader(
         num_workers: The number of workers to use.
         seed: The random seed to use.
         weights: The weights for each dataset if using multiple groups of data.
-        sampler_type: Which sampler to use: EPOCH, INFINITE, SHARDED_INFINITE, DISTRIBUTED or None.
+        sampler_type: Which sampler to use: EPOCH, INFINITE, DISTRIBUTED or None.
         sampler_size: The number of images per epoch (when applicable) or -1 for the entire dataset.
         drop_last: Whether the last non-full batch of data should be dropped.
         persistent_workers: maintain the workers Dataset instances alive after a dataset has been consumed once.

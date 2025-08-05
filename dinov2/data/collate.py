@@ -64,7 +64,7 @@ def collate_data_and_cast(
         images = torch.stack([torch.stack(s[name]) for s in samples]).to(dtype)
         collated_data[name] = {"images": images, **VIEW_INFO[name]}
         if name in MASKABLE_VIEW_NAMES:
-            total_maskable_views += np.prod(images.shape[:2])
+            total_maskable_views += int(np.prod(images.shape[:2]))
 
     num_to_mask = int(total_maskable_views * mask_probability)
     if num_to_mask == 0:
