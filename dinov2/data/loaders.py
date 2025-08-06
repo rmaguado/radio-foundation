@@ -23,9 +23,7 @@ logger = logging.getLogger("dinov2")
 
 class SamplerType(Enum):
     INFINITE = 0
-    SHARDED_INFINITE = 1
     WEIGHTED_INFINITE = 2
-    WEIGHTED_SHARDED_INFINITE = 3
 
 
 def make_train_dataset(
@@ -93,7 +91,8 @@ def _make_sampler(
     Creates a sampler with the specified parameters.
     A sampler is a strategy for sampling data from a dataset.
     Supported sampler types includes:
-        - INFINITE, SHARDED_INFINITE, WEIGHTED_INFINITE, WEIGHTED_SHARDED_INFINITE.
+        - INFINITE
+        - WEIGHTED_INFINITE
 
     Args:
         dataset: The dataset to create the sampler for.
@@ -112,10 +111,7 @@ def _make_sampler(
         dataset_names = [dataset.dataset_name]
     sample_count = len(dataset)
 
-    if sampler_type in [
-        SamplerType.WEIGHTED_INFINITE,
-        SamplerType.WEIGHTED_SHARDED_INFINITE,
-    ]:
+    if sampler_type == SamplerType.WEIGHTED_INFINITE:
         assert weights is not None, "Weights must be provided for weighted sampling"
 
     if weights is not None:
