@@ -24,8 +24,7 @@ VIEW_INFO = {
 
 
 def collate_data_and_cast(
-    images: List[Tuple[torch.Tensor, Tuple[float, ...]]],
-    transform: Callable,
+    samples: List[Dict[str, List[torch.Tensor]]],
     mask_ratio_range: Tuple[float, float],
     mask_probability: float,
     mask_shapes: Dict[str, Tuple[int, ...]],
@@ -41,7 +40,7 @@ def collate_data_and_cast(
     views (e.g., "global_2d", "global_3d").
 
     Args:
-
+        samples: A list of dictionaries, where each dict represents a data sample.
         mask_ratio_range: A tuple (min_ratio, max_ratio) specifying the range for
                           the masking ratio.
         mask_probability: The probability that any given maskable view will be selected
@@ -56,21 +55,16 @@ def collate_data_and_cast(
         A dictionary mapping each view name to its collated 'images' tensor
         and an optional 'masks' tensor if the view is maskable.
     """
-    samples = []
-    for image, spacing in images:
-        image = image.cuda(non_blocking=True)
-        samples.append(transform(image, spacing))
-
     batch_size = len(samples)
     view_names = samples[0].keys()
 
     collated_data = {}
     total_maskable_views = 0
     for name in view_names:
-        _images = torch.stack([torch.stack(s[name]) for s in samples]).to(dtype)
-        collated_data[name] = {"images": _images, **VIEW_INFO[name]}
+        images = torch.stack([torch.stack(s[name]) for s in samples]).to(dtype)
+        collated_data[name] = {"images": images, **VIEW_INFO[name]}
         if name in MASKABLE_VIEW_NAMES:
-            total_maskable_views += int(np.prod(_images.shape[:2]))
+            total_maskable_views += int(np.prod(images.shape[:2]))
 
     num_to_mask = int(total_maskable_views * mask_probability)
     if num_to_mask == 0:
@@ -88,8 +82,8 @@ def collate_data_and_cast(
     mask_idx_counter = 0
     for name in MASKABLE_VIEW_NAMES:
         if name in collated_data:
-            _images = collated_data[name]["images"]
-            num_views_in_batch = np.prod(_images.shape[:2])
+            images = collated_data[name]["images"]
+            num_views_in_batch = np.prod(images.shape[:2])
             mask_shape = mask_shapes[name]
 
             start, end = mask_idx_counter, mask_idx_counter + num_views_in_batch

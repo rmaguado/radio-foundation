@@ -200,7 +200,7 @@ def make_data_loader(
         pin_memory=True,
         drop_last=drop_last,
         persistent_workers=persistent_workers,
-        collate_fn=collate_fn,
+        # collate_fn=collate_fn,
     )
 
     try:

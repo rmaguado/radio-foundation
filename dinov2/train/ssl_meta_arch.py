@@ -3,7 +3,6 @@
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
 
-from encodings.punycode import T
 from functools import partial
 import logging
 from typing import Dict, List, Tuple, Any
@@ -24,9 +23,11 @@ logger = logging.getLogger("dinov2")
 
 
 class SSLMetaArch(nn.Module):
-    def __init__(self, cfg) -> None:
+    def __init__(self, cfg, transforms, collate_fn) -> None:
         super().__init__()
         self.cfg = cfg
+        self.transforms = transforms
+        self.collate_fn = collate_fn
 
         self.student = nn.ModuleDict()
         self.teacher = nn.ModuleDict()
@@ -88,27 +89,23 @@ class SSLMetaArch(nn.Module):
         self.num_local_2d = crops_cfg.local_2d
         self.global_view_multiple = crops_cfg.global_view_multiple
 
-    def _prepare_inputs(self, collated_views: Dict[str, Any]) -> None:
+    def _prepare_inputs(self, images) -> None:
         """
         Moves images and masks in the collated views dictionary to the correct device.
 
         Args:
             collated_views (Dict[str, Any]): Dictionary of collated batch data.
         """
-        for group_name, view_info in collated_views.items():
-            images = view_info["images"]
-            masks = view_info.get("masks", None)
-
-            images = images.cuda(non_blocking=True)
-            collated_views[group_name]["images"] = images
-
-            if masks is not None:
-                masks = masks.cuda(non_blocking=True)
-                collated_views[group_name]["masks"] = masks
+        augmentations = []
+        for image, spacing in images:
+            image = image.cuda(non_blocking=True)
+            image = self.transforms(image, spacing)
+            augmentations.append(image)
+        return self.collate_fn(augmentations)
 
     def _process_group(
         self,
-        model: nn.Module,
+        model: nn.ModuleDict,
         images: torch.Tensor,
         masks: torch.Tensor,
         embed_layer: int,
@@ -133,14 +130,14 @@ class SSLMetaArch(nn.Module):
         flat_images = rearrange(images, "... d w h -> (...) d w h")
         flat_masks = rearrange(masks, "... m -> (...) m") if masks is not None else None
 
-        backbone_output = model.backbone(
+        backbone_output = model["backbone"](
             flat_images,
             embed_layer=embed_layer,
             masks=flat_masks if apply_mask else None,
         )
 
         cls_tokens = backbone_output["clstoken"]
-        dino_tokens_flat = model.dino_head(cls_tokens)
+        dino_tokens_flat = model["dino_head"](cls_tokens)
         dino_tokens = dino_tokens_flat.view(*view_shape, -1)
 
         output = {"dino": dino_tokens}
@@ -150,7 +147,9 @@ class SSLMetaArch(nn.Module):
             patch_tokens = rearrange(patch_tokens, "a p d -> (a p) d")
             masked_patch_tokens = patch_tokens[masks.view(-1)]
 
-            ibot_head = model.ibot_head if self.ibot_separate_head else model.dino_head
+            ibot_head = (
+                model["ibot_head"] if self.ibot_separate_head else model["dino_head"]
+            )
             output["ibot"] = ibot_head(masked_patch_tokens)
 
             mask_weights = 1 / (masks.sum(-1).clamp(min=1.0))
@@ -472,7 +471,7 @@ class SSLMetaArch(nn.Module):
                 )
                 teacher_module = self.teacher[k]
 
-                for ms, mt in zip(student_module.modules(), teacher_module.modules()):
+                for ms, mt in zip(student_module.modules(), teacher_module.modules()):  # type: ignore
                     student_param_list += list(ms.parameters())
                     teacher_param_list += list(mt.parameters())
             torch._foreach_mul_(teacher_param_list, m)

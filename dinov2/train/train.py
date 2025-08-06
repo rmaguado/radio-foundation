@@ -20,8 +20,10 @@ from dinov2.train.parser import get_args_parser
 from dinov2.train.setup import (
     setup_training_components,
     setup_dataloader,
+    setup_collate_fn,
     fix_random_seeds,
 )
+from dinov2.data.augmentations import DataAugmentationDINO
 
 import dinov2.distributed as dist
 
@@ -185,7 +187,6 @@ def train(
 
 def do_train(cfg, model):
     model.train()
-    inputs_dtype = get_dtype(cfg.compute_precision)
 
     (
         optimizer,
@@ -203,7 +204,7 @@ def do_train(cfg, model):
     )
 
     if iteration < max_iter:
-        data_loader = setup_dataloader(cfg, inputs_dtype)
+        data_loader = setup_dataloader(cfg)
         metric_logger.set_dataloader(data_loader)
 
         iteration = train(
@@ -256,7 +257,13 @@ def main():
         == cfg.train.batch_size_total
     ), "batch_size_per_gpu x grad_accum_steps x world_size must be equal to batch_size_total"
 
-    model = SSLMetaArch(cfg).to(torch.device("cuda"))
+    inputs_dtype = get_dtype(cfg.compute_precision)
+    collate_fn = setup_collate_fn(cfg, inputs_dtype)
+
+    transforms = DataAugmentationDINO(cfg)
+
+    model = SSLMetaArch(cfg, transforms, collate_fn)
+    model = model.to(torch.device("cuda"))
     model.prepare_for_distributed_training(rank)
 
     try:

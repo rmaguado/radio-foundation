@@ -107,8 +107,7 @@ def build_schedulers(cfg):
     }
 
 
-def setup_dataloader(cfg, inputs_dtype):
-
+def setup_collate_fn(cfg, inputs_dtype):
     mask_shapes = {}
     if cfg.crops.views.enable_2d:
         mask_shapes["global_2d"] = (
@@ -126,17 +125,18 @@ def setup_dataloader(cfg, inputs_dtype):
         ) * 3
 
     mask_generator = MaskingGenerator()
-    transform = DataAugmentationDINO(cfg)
 
-    collate_fn = partial(
+    return partial(
         collate_data_and_cast,
-        transform=transform,
         mask_ratio_range=cfg.ibot.mask_ratio_min_max,
         mask_probability=cfg.ibot.mask_sample_probability,
         mask_shapes=mask_shapes,
         mask_generator=mask_generator,
         dtype=inputs_dtype,
     )
+
+
+def setup_dataloader(cfg):
 
     dataset, weights = make_train_dataset(cfg)
 
@@ -154,7 +154,6 @@ def setup_dataloader(cfg, inputs_dtype):
         sampler_type=sampler_type,
         drop_last=True,
         persistent_workers=True,
-        collate_fn=collate_fn,
     )
 
     return data_loader
