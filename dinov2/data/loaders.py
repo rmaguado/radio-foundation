@@ -166,7 +166,7 @@ def make_data_loader(
     sampler_type: Optional[SamplerType] = SamplerType.INFINITE,
     drop_last: bool = True,
     persistent_workers: bool = True,
-    collate_fn: Optional[Callable[[List[T]], Any]] = None,
+    # collate_fn: Optional[Callable[[List[T]], Any]] = None,
 ) -> DataLoader:
     """
     Creates a data loader with the specified parameters.
@@ -184,6 +184,9 @@ def make_data_loader(
         collate_fn: Function that performs batch collation
     """
 
+    def collate_fn(inputs):
+        return inputs
+
     sampler = _make_sampler(
         dataset=dataset,
         weights=weights,
@@ -200,7 +203,7 @@ def make_data_loader(
         pin_memory=True,
         drop_last=drop_last,
         persistent_workers=persistent_workers,
-        # collate_fn=collate_fn,
+        collate_fn=collate_fn,
     )
 
     try:
