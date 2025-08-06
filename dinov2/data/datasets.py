@@ -31,32 +31,26 @@ class VolumeDataset:
         dataset_name: str,
         index_path: str,
         modality: str,
-        mean: float,
-        std: float,
+        transforms: Callable,
         bounds: Tuple[float, float] = (-1000, 1900),
     ) -> None:
         self.dataset_name = dataset_name
         self.df = pl.read_csv(index_path)
         self.modality = modality
-        self.mean = mean
-        self.std = std
+        self.transforms = transforms
         self.bounds = bounds
 
     def __len__(self) -> int:
         return len(self.df)
 
-    def get_norm(self, image: torch.Tensor) -> torch.Tensor:
-        return (image - self.mean) / self.std
-
     def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
         raise NotImplementedError
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
+    def __getitem__(self, idx: int):
 
         image, spacing = self.get_image_data(idx)
-        image = self.get_norm(image)
 
-        return image, spacing
+        return self.transforms(image, spacing)
 
 
 class DicomVolumeDataset(VolumeDataset):

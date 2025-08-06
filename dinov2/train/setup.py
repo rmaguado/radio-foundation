@@ -136,7 +136,8 @@ def setup_collate_fn(cfg, inputs_dtype):
     )
 
 
-def setup_dataloader(cfg):
+def setup_dataloader(cfg, inputs_dtype):
+    collate_fn = setup_collate_fn(cfg, inputs_dtype)
 
     dataset, weights = make_train_dataset(cfg)
 
@@ -154,6 +155,7 @@ def setup_dataloader(cfg):
         sampler_type=sampler_type,
         drop_last=True,
         persistent_workers=True,
+        collate_fn=collate_fn,
     )
 
     return data_loader

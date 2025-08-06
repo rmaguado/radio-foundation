@@ -23,11 +23,9 @@ logger = logging.getLogger("dinov2")
 
 
 class SSLMetaArch(nn.Module):
-    def __init__(self, cfg, transforms, collate_fn) -> None:
+    def __init__(self, cfg) -> None:
         super().__init__()
         self.cfg = cfg
-        self.transforms = transforms
-        self.collate_fn = collate_fn
 
         self.student = nn.ModuleDict()
         self.teacher = nn.ModuleDict()
@@ -89,19 +87,23 @@ class SSLMetaArch(nn.Module):
         self.num_local_2d = crops_cfg.local_2d
         self.global_view_multiple = crops_cfg.global_view_multiple
 
-    def _prepare_inputs(self, images) -> None:
+    def _prepare_inputs(self, collated_views) -> None:
         """
         Moves images and masks in the collated views dictionary to the correct device.
 
         Args:
             collated_views (Dict[str, Any]): Dictionary of collated batch data.
         """
-        augmentations = []
-        for image, spacing in images:
-            image = image.cuda(non_blocking=True)
-            image = self.transforms(image, spacing)
-            augmentations.append(image)
-        return self.collate_fn(augmentations)
+        for group_name, view_info in collated_views.items():
+            images = view_info["images"]
+            masks = view_info.get("masks", None)
+
+            images = images.cuda(non_blocking=True)
+            collated_views[group_name]["images"] = images
+
+            if masks is not None:
+                masks = masks.cuda(non_blocking=True)
+                collated_views[group_name]["masks"] = masks
 
     def _process_group(
         self,
@@ -423,7 +425,7 @@ class SSLMetaArch(nn.Module):
         """
         Main forward pass for DINOv2 training.
         """
-        # self._prepare_inputs(collated_views)
+        self._prepare_inputs(collated_views)
 
         teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
         student_outputs = self._run_student_pass(collated_views)

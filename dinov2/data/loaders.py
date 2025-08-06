@@ -16,6 +16,7 @@ from .samplers import (
     InfiniteSampler,
     WeightedInfiniteSampler,
 )
+from .augmentations import DataAugmentationDINO
 
 
 logger = logging.getLogger("dinov2")
@@ -43,7 +44,7 @@ def make_train_dataset(
     weights = []
 
     for dataset_config in config.datasets:
-        dataset_object, weight = build_dataset_from_cfg(dataset_config)
+        dataset_object, weight = build_dataset_from_cfg(config, dataset_config)
         dataset_objects.append(dataset_object)
         weights.append(weight)
     if any(weight is None for weight in weights):
@@ -55,19 +56,19 @@ def make_train_dataset(
     return dataset_objects[0], [1.0]
 
 
-def build_dataset_from_cfg(dataset_config):
+def build_dataset_from_cfg(cfg, dataset_config):
     dataset_storage = dataset_config.storage
 
     weight = dataset_config.weight if hasattr(dataset_config, "weight") else None
     norm = dataset_config.norm
+    transforms = DataAugmentationDINO(cfg, norm.mean, norm.std)
 
     dataset_kwargs = {
         "dataset_name": dataset_config.name,
         "index_path": dataset_config.index_path,
         "modality": dataset_config.type,
+        "transforms": transforms,
         "bounds": dataset_config.bounds,
-        "mean": norm.mean,
-        "std": norm.std,
     }
 
     if dataset_storage == "dicom":
@@ -166,7 +167,7 @@ def make_data_loader(
     sampler_type: Optional[SamplerType] = SamplerType.INFINITE,
     drop_last: bool = True,
     persistent_workers: bool = True,
-    # collate_fn: Optional[Callable[[List[T]], Any]] = None,
+    collate_fn: Optional[Callable[[List[T]], Any]] = None,
 ) -> DataLoader:
     """
     Creates a data loader with the specified parameters.
@@ -183,9 +184,6 @@ def make_data_loader(
         persistent_workers: maintain the workers Dataset instances alive after a dataset has been consumed once.
         collate_fn: Function that performs batch collation
     """
-
-    def collate_fn(inputs):
-        return inputs
 
     sampler = _make_sampler(
         dataset=dataset,

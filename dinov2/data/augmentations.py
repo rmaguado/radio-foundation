@@ -22,8 +22,9 @@ class DataAugmentationDINO:
     global and local views from an input image, which can be either 2D or 3D.
     """
 
-    def __init__(self, config: DictConfig) -> None:
+    def __init__(self, config: DictConfig, mean: float, std: float) -> None:
         self.config = config
+        self.norm_cfg = {"mean": mean, "std": std}
 
         crops_cfg = config.crops
         self.enable_3d = crops_cfg.views.enable_3d
@@ -45,7 +46,6 @@ class DataAugmentationDINO:
     def _create_transforms(self) -> Dict[str, Callable]:
         """Builds the dictionary of transformation functions based on config."""
         transforms: Dict[str, Callable] = {}
-        # norm_cfg = self.dataset_config.norm
         crop_sizes = self.config.crops.crop_sizes
 
         if self.enable_3d:
@@ -57,7 +57,7 @@ class DataAugmentationDINO:
 
             general_crop_3d = ImageTransforms()
             general_crop_3d += Crop(scale=(0.3, 1.0), size=g_3d_size)
-            # general_crop_3d += Norm()
+            general_crop_3d += Norm(**self.norm_cfg)
             transforms["general_crop_3d"] = general_crop_3d
 
             transforms["global_3d"] = self._create_base_augmentations(skip_first=False)
@@ -84,7 +84,7 @@ class DataAugmentationDINO:
             else:
                 global_2d_augment = ImageTransforms()
                 global_2d_augment += Crop(scale=(0.3, 1.0), size=g_2d_size)
-                # global_2d_augment += Norm()
+                global_2d_augment += Norm(**self.norm_cfg)
                 transforms["global_crop_2d"] = global_2d_augment
 
             transforms["global_2d_augment"] = self._create_base_augmentations(
