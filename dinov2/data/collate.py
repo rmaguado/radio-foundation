@@ -24,7 +24,7 @@ VIEW_INFO = {
 
 
 def collate_data_and_cast(
-    images,
+    images: List[Tuple[torch.Tensor, Tuple[float, ...]]],
     transform: Callable,
     mask_ratio_range: Tuple[float, float],
     mask_probability: float,
@@ -58,7 +58,7 @@ def collate_data_and_cast(
     """
     samples = []
     for image, spacing in images:
-        image = image.cuda()
+        image = image.cuda(non_blocking=True)
         samples.append(transform(image, spacing))
 
     batch_size = len(samples)
@@ -67,10 +67,10 @@ def collate_data_and_cast(
     collated_data = {}
     total_maskable_views = 0
     for name in view_names:
-        images = torch.stack([torch.stack(s[name]) for s in samples]).to(dtype)
-        collated_data[name] = {"images": images, **VIEW_INFO[name]}
+        _images = torch.stack([torch.stack(s[name]) for s in samples]).to(dtype)
+        collated_data[name] = {"images": _images, **VIEW_INFO[name]}
         if name in MASKABLE_VIEW_NAMES:
-            total_maskable_views += int(np.prod(images.shape[:2]))
+            total_maskable_views += int(np.prod(_images.shape[:2]))
 
     num_to_mask = int(total_maskable_views * mask_probability)
     if num_to_mask == 0:
@@ -88,8 +88,8 @@ def collate_data_and_cast(
     mask_idx_counter = 0
     for name in MASKABLE_VIEW_NAMES:
         if name in collated_data:
-            images = collated_data[name]["images"]
-            num_views_in_batch = np.prod(images.shape[:2])
+            _images = collated_data[name]["images"]
+            num_views_in_batch = np.prod(_images.shape[:2])
             mask_shape = mask_shapes[name]
 
             start, end = mask_idx_counter, mask_idx_counter + num_views_in_batch
