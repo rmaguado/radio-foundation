@@ -481,9 +481,10 @@ class SSLMetaArch(nn.Module):
         self.dino_loss.apply_center_update()
         self.ibot_patch_loss.apply_center_update()
 
-    def train(self) -> None:
-        super().train()
+    def train(self, mode=True):
+        super().train(mode)
         self.teacher.eval()
+        return self
 
     def get_params_groups(self) -> List[Any]:
         all_params_groups = []
