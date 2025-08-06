@@ -24,7 +24,8 @@ VIEW_INFO = {
 
 
 def collate_data_and_cast(
-    samples: List[Dict[str, List[torch.Tensor]]],
+    images,
+    transform: Callable,
     mask_ratio_range: Tuple[float, float],
     mask_probability: float,
     mask_shapes: Dict[str, Tuple[int, ...]],
@@ -40,7 +41,7 @@ def collate_data_and_cast(
     views (e.g., "global_2d", "global_3d").
 
     Args:
-        samples: A list of dictionaries, where each dict represents a data sample.
+
         mask_ratio_range: A tuple (min_ratio, max_ratio) specifying the range for
                           the masking ratio.
         mask_probability: The probability that any given maskable view will be selected
@@ -55,6 +56,11 @@ def collate_data_and_cast(
         A dictionary mapping each view name to its collated 'images' tensor
         and an optional 'masks' tensor if the view is maskable.
     """
+    samples = []
+    for image, spacing in images:
+        image = image.cuda()
+        samples.append(transform(image, spacing))
+
     batch_size = len(samples)
     view_names = samples[0].keys()
 

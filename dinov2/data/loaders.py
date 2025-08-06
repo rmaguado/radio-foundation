@@ -16,7 +16,6 @@ from .samplers import (
     InfiniteSampler,
     WeightedInfiniteSampler,
 )
-from .augmentations import DataAugmentationDINO
 
 
 logger = logging.getLogger("dinov2")
@@ -46,7 +45,7 @@ def make_train_dataset(
     weights = []
 
     for dataset_config in config.datasets:
-        dataset_object, weight = build_dataset_from_cfg(config, dataset_config)
+        dataset_object, weight = build_dataset_from_cfg(dataset_config)
         dataset_objects.append(dataset_object)
         weights.append(weight)
     if any(weight is None for weight in weights):
@@ -58,18 +57,19 @@ def make_train_dataset(
     return dataset_objects[0], [1.0]
 
 
-def build_dataset_from_cfg(config, dataset_config):
+def build_dataset_from_cfg(dataset_config):
     dataset_storage = dataset_config.storage
-    transform = DataAugmentationDINO(config, dataset_config)
 
     weight = dataset_config.weight if hasattr(dataset_config, "weight") else None
+    norm = dataset_config.norm
 
     dataset_kwargs = {
         "dataset_name": dataset_config.name,
         "index_path": dataset_config.index_path,
         "modality": dataset_config.type,
         "bounds": dataset_config.bounds,
-        "transform": transform,
+        "mean": norm.mean,
+        "std": norm.std,
     }
 
     if dataset_storage == "dicom":

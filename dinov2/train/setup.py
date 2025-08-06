@@ -9,6 +9,7 @@ from dinov2.train.checkpointer import DDPCheckpointer, DDPPeriodicCheckpointer
 
 from dinov2.data import collate_data_and_cast, MaskingGenerator
 from dinov2.data import SamplerType, make_data_loader, make_train_dataset
+from dinov2.data.augmentations import DataAugmentationDINO
 
 
 class CosineScheduler(object):
@@ -125,9 +126,11 @@ def setup_dataloader(cfg, inputs_dtype):
         ) * 3
 
     mask_generator = MaskingGenerator()
+    transform = DataAugmentationDINO(cfg)
 
     collate_fn = partial(
         collate_data_and_cast,
+        transform=transform,
         mask_ratio_range=cfg.ibot.mask_ratio_min_max,
         mask_probability=cfg.ibot.mask_sample_probability,
         mask_shapes=mask_shapes,

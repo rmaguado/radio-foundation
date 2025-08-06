@@ -31,44 +31,32 @@ class VolumeDataset:
         dataset_name: str,
         index_path: str,
         modality: str,
-        transform: Callable = lambda x: x,
+        mean: float,
+        std: float,
         bounds: Tuple[float, float] = (-1000, 1900),
     ) -> None:
         self.dataset_name = dataset_name
         self.df = pl.read_csv(index_path)
         self.modality = modality
-        self.transform = transform
+        self.mean = mean
+        self.std = std
         self.bounds = bounds
 
     def __len__(self) -> int:
-        """
-        Returns the number of samples in the dataset.
-
-        Returns:
-            int: Number of samples.
-        """
         return len(self.df)
 
-    def get_image_data(
-        self, idx: int
-    ) -> Tuple[torch.Tensor | np.ndarray, Tuple[float, ...]]:
+    def get_norm(self, image: torch.Tensor) -> torch.Tensor:
+        return (image - self.mean) / self.std
+
+    def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
         raise NotImplementedError
 
-    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        """
-        Loads and processes a sample from the dataset.
-        Returns a dictionary of transformed image views.
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
 
-        Args:
-            idx (int): Index of the sample.
+        image, spacing = self.get_image_data(idx)
+        image = self.get_norm(image)
 
-        Returns:
-            Dict[str, torch.Tensor]: Dictionary of transformed image views.
-        """
-
-        image_memmap, spacing = self.get_image_data(idx)
-
-        return self.transform(image_memmap, spacing)
+        return image, spacing
 
 
 class DicomVolumeDataset(VolumeDataset):
@@ -111,18 +99,18 @@ class NiftiVolumeDataset(VolumeDataset):
     Inherits from VolumeDataset and implements get_image_data for NIfTI files.
     """
 
-    def get_image_data(self, idx: int) -> Tuple[np.ndarray, Tuple[float, ...]]:
+    def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
         meta = self.df.row(idx)
         nifti_file_path = meta[0]
         spacing = meta[5:8]
 
-        image = nib.load(nifti_file_path)
+        image = nib.loadsave.load(nifti_file_path)
 
-        image_memmap = image.dataobj
+        image_memmap = image.dataobj  # pyright: ignore[reportAttributeAccessIssue]
 
         if self.modality == "ct":
-            slope = image.header.get_slope_inter()[0]
-            intercept = image.header.get_slope_inter()[1]
+            slope = image_memmap.slope
+            intercept = image_memmap.inter
 
             slope = 1.0 if slope is None else slope
             intercept = 0.0 if intercept is None else intercept

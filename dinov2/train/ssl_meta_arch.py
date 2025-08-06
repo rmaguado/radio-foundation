@@ -424,7 +424,7 @@ class SSLMetaArch(nn.Module):
         """
         Main forward pass for DINOv2 training.
         """
-        self._prepare_inputs(collated_views)
+        # self._prepare_inputs(collated_views)
 
         teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
         student_outputs = self._run_student_pass(collated_views)
