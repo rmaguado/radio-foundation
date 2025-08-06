@@ -100,14 +100,14 @@ class DataAugmentationDINO:
         return transforms
 
     def __call__(
-        self, image_memmap: torch.Tensor, spacing: Tuple[float, float, float]
+        self, images: torch.Tensor, spacing: Tuple[float, float, float]
     ) -> Dict[str, List[torch.Tensor]]:
         """Applies the configured augmentations to an image."""
         output_crops: Dict[str, List[torch.Tensor]] = {}
         general_crop_3d: Optional[torch.Tensor] = None
 
         if self.enable_3d:
-            general_crop_3d = self.transforms["general_crop_3d"](image_memmap, spacing)
+            general_crop_3d = self.transforms["general_crop_3d"](images, spacing)
 
             global_3d_input = (
                 self.transforms["global_3d_resize"](general_crop_3d)
@@ -132,7 +132,7 @@ class DataAugmentationDINO:
                 ]
             else:
                 global_2d_source_crops = [
-                    self.transforms["global_crop_2d"](image_memmap, spacing)
+                    self.transforms["global_crop_2d"](images, spacing)
                     for _ in range(self.num_global_2d)
                 ]
 

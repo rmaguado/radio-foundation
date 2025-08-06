@@ -1,6 +1,4 @@
-import random
 import torch
-import numpy as np
 from typing import Tuple, List, Callable, Optional
 from torchvision.transforms.functional import gaussian_blur
 
@@ -17,15 +15,14 @@ class Crop:
         self.preserve_axis_order = preserve_axis_order
 
     def _get_scale(self) -> float:
-        """Returns a random scale factor within the initialized range."""
-        return random.uniform(self.crop_scale[0], self.crop_scale[1])
+        return torch.empty(1).uniform_(self.crop_scale[0], self.crop_scale[1]).item()
 
     def _get_crop_indices(
         self, original_shape: torch.Tensor, crop_dims_voxels: torch.Tensor
     ) -> Tuple[list, list, list]:
         permutation = list(range(len(original_shape)))
         if self.preserve_axis_order:
-            random.shuffle(permutation)
+            permutation = torch.randperm(len(original_shape)).tolist()
 
         perm_crop_dims_voxels = crop_dims_voxels[permutation]
         perm_original_shape = original_shape[permutation]
@@ -34,7 +31,8 @@ class Crop:
             min=0
         )
         start = [
-            random.randint(0, int(max_start[i])) for i in range(len(original_shape))
+            torch.randint(0, int(max_start[i]) + 1, (1,)).item()
+            for i in range(len(original_shape))
         ]
         end = [start[i] + perm_crop_dims_voxels[i] for i in range(len(original_shape))]
 
@@ -53,19 +51,18 @@ class Crop:
 
     def _process_image(
         self,
-        img: torch.Tensor | np.ndarray,
+        img: torch.Tensor | torch.Tensor,
         start_indices: list,
         end_indices: list,
         inverse_permutation: Optional[list] = None,
     ) -> torch.Tensor:
-        """Crops, potentially permutes, and converts the image to a tensor for interpolation."""
-        if len(start_indices) == 3:  # 3D cropping
+        if len(start_indices) == 3:
             cropped = img[
                 start_indices[0] : end_indices[0],
                 start_indices[1] : end_indices[1],
                 start_indices[2] : end_indices[2],
             ]
-        elif len(start_indices) == 2:  # 2D cropping (assuming channel-first for 2D)
+        elif len(start_indices) == 2:
             cropped = img[
                 :, start_indices[0] : end_indices[0], start_indices[1] : end_indices[1]
             ]
@@ -73,23 +70,15 @@ class Crop:
             raise ValueError("Unsupported number of dimensions for cropping.")
 
         if self.preserve_axis_order and inverse_permutation is not None:
-            if isinstance(cropped, torch.Tensor):
-                cropped = cropped.permute(tuple(inverse_permutation))
-            else:
-                cropped = np.transpose(cropped, tuple(inverse_permutation))
+            cropped = cropped.permute(tuple(inverse_permutation))
 
-        if isinstance(cropped, np.ndarray):
-            cropped = torch.tensor(cropped, dtype=torch.float32)
-        return cropped
+        return cropped.float()
 
     def crop_anisotropic(
         self,
-        img: torch.Tensor | np.ndarray,
+        img: torch.Tensor,
         spacing: Tuple[float, float, float],
     ) -> torch.Tensor:
-        """
-        Crops an image anisotropically based on spacing and then resamples it.
-        """
         original_shape = torch.tensor(img.shape, dtype=torch.float32)
         spacing_tensor = torch.tensor(spacing, dtype=torch.float32)
         min_spacing = spacing_tensor.min()
@@ -123,31 +112,24 @@ class Crop:
 
     def _crop_and_resample(
         self,
-        img: torch.Tensor | np.ndarray,
+        img: torch.Tensor,
         target_size: Tuple[int, ...],
         mode: str,
         is_3d: bool,
     ) -> torch.Tensor:
-        """
-        Generic helper for 2D and 3D cropping and resampling.
-        """
         img_shape = torch.tensor(img.shape, dtype=torch.float32)
         scale = self._get_scale()
 
         if is_3d:
             crop_shape = torch.floor(img_shape * scale)
-        else:  # For 2D, assuming channel-first, so shape refers to spatial dims
+        else:
             crop_shape = torch.floor(img_shape[1:] * scale)
 
         crop_dims_voxels = crop_shape.to(torch.int32)
-
-        # Ensure crop dimensions are at least 1
         crop_dims_voxels = torch.maximum(
             crop_dims_voxels,
             torch.tensor([1] * len(crop_dims_voxels), dtype=torch.int32),
         )
-
-        # Adjust original_shape for _get_crop_indices depending on 2D or 3D
         effective_original_shape = img_shape if is_3d else img_shape[1:]
 
         start, end, inverse_permutation = self._get_crop_indices(
@@ -158,13 +140,10 @@ class Crop:
             img, start, end, inverse_permutation if is_3d else None
         )
 
-        # Unsqueeze for batch and channel dimensions for interpolate
         if is_3d:
             cropped_tensor = cropped_tensor.unsqueeze(0).unsqueeze(0)
         else:
-            cropped_tensor = cropped_tensor.unsqueeze(
-                0
-            )  # For 2D, only batch dim needed
+            cropped_tensor = cropped_tensor.unsqueeze(0)
 
         resampled = torch.nn.functional.interpolate(
             cropped_tensor,
@@ -177,12 +156,9 @@ class Crop:
 
     def __call__(
         self,
-        img: torch.Tensor | np.ndarray,
+        img: torch.Tensor | torch.Tensor,
         spacing: Optional[Tuple[float, float, float]] = None,
     ) -> torch.Tensor:
-        """
-        Applies cropping based on input image dimensions and optional spacing.
-        """
         if spacing is not None:
             return self.crop_anisotropic(img, spacing)
 
@@ -203,23 +179,19 @@ class Resize:
         self.output_size = output_size
 
     def _resize_2d(self, img: torch.Tensor) -> torch.Tensor:
-        mode = "bilinear"
-        img = img.unsqueeze(0)
         return torch.nn.functional.interpolate(
-            img,
+            img.unsqueeze(0),
             size=self.output_size,
-            mode=mode,
+            mode="bilinear",
             align_corners=False,
         ).squeeze(0)
 
     def _resize_3d(self, img: torch.Tensor) -> torch.Tensor:
-        mode = "trilinear"
-        img = img.unsqueeze(0).unsqueeze(0)
         return (
             torch.nn.functional.interpolate(
-                img,
+                img.unsqueeze(0).unsqueeze(0),
                 size=self.output_size,
-                mode=mode,
+                mode="trilinear",
                 align_corners=False,
             )
             .squeeze(0)
@@ -237,8 +209,8 @@ class Slice:
         self.c = channels
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        axis = random.randint(0, 2)
-        idx = random.randint(0, img.shape[axis] - 1 - self.c)
+        axis = torch.randint(0, 3, (1,)).item()
+        idx = torch.randint(0, img.shape[axis] - self.c, (1,)).item()
 
         if axis == 0:
             return img[idx : idx + self.c, :, :]
@@ -254,13 +226,9 @@ class Permute:
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         if self.skip_first:
-            dims_order = [1, 2]
-            random.shuffle(dims_order)
-            dims_order = [0] + dims_order
+            dims_order = [0] + torch.randperm(2).add(1).tolist()
         else:
-            dims_order = [0, 1, 2]
-            random.shuffle(dims_order)
-
+            dims_order = torch.randperm(3).tolist()
         return img.permute(dims_order)
 
 
@@ -269,8 +237,8 @@ class Flip:
         self.flip_dims = [1, 2] if skip_first else [0, 1, 2]
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        flip_dims = [dim for dim in self.flip_dims if random.random() < 0.5]
-        return img.flip(dims=flip_dims)
+        flip_dims = [dim for dim in self.flip_dims if torch.rand(1).item() < 0.5]
+        return img.flip(dims=flip_dims) if flip_dims else img
 
 
 class GaussianBlur:
@@ -279,8 +247,8 @@ class GaussianBlur:
         self.sigma = sigma
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        if random.random() < self.p:
-            return gaussian_blur(img, kernel_size=[3], sigma=self.sigma)
+        if torch.rand(1).item() < self.p:
+            return gaussian_blur(img, kernel_size=3, sigma=self.sigma)
         return img
 
 

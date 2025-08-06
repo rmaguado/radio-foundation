@@ -196,19 +196,19 @@ def make_data_loader(
     )
 
     logger.info("using PyTorch data loader")
-    # data_loader = DataLoader(
-    #    dataset,
-    #    sampler=sampler,
-    #    batch_size=batch_size,
-    #    num_workers=num_workers,
-    #    pin_memory=True,
-    #    drop_last=drop_last,
-    #    persistent_workers=persistent_workers,
-    #    collate_fn=collate_fn,
-    # )
-    data_loader = CollaborativeLoader(
-        dataset, batch_size, num_workers, sampler, collate_fn=collate_fn
+    data_loader = DataLoader(
+        dataset,
+        sampler=sampler,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=drop_last,
+        persistent_workers=persistent_workers,
+        collate_fn=collate_fn,
     )
+    # data_loader = CollaborativeLoader(
+    #    dataset, batch_size, num_workers, sampler, collate_fn=collate_fn
+    # )
 
     try:
         logger.info(f"# of batches: {len(data_loader):,d}")
