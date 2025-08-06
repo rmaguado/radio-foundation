@@ -43,8 +43,8 @@ FFN_LAYER_REGISTRY = {
 
 
 def get_embedding_layers(
-    embed_configs: Dict, embed_dim: int, norm_layer: Callable
-) -> nn.ModuleDict:
+    embed_configs: List[Dict], embed_dim: int, norm_layer: Callable
+):
     """
     Creates a ModuleDict of embedding layers from a list of configurations.
 
@@ -143,7 +143,6 @@ class DinoVisionTransformer(nn.Module):
         drop_path_uniform (bool): If True, use uniform drop path rate.
         init_values (Optional[float]): Initial value for LayerScale.
         act_layer (Callable): Activation function constructor.
-        block_fn (Callable): Transformer block constructor.
     """
 
     def __init__(
@@ -162,10 +161,10 @@ class DinoVisionTransformer(nn.Module):
         drop_path_uniform: bool = True,
         init_values: Optional[float] = None,
         act_layer: Callable = nn.GELU,
-        block_fn: Callable = Block,
     ):
         super().__init__()
         norm_layer = partial(nn.LayerNorm, eps=1e-6)
+        block_fn = partial(Block, attn_class=MemEffAttention)
 
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -234,7 +233,7 @@ class DinoVisionTransformer(nn.Module):
             nn.init.normal_(self.register_tokens, std=1e-6)
 
         for embed_layer in self.embed_layers.values():
-            trunc_normal_(embed_layer.pos_embed, std=0.02)
+            trunc_normal_(embed_layer.pos_embed, std=0.02)  # type: ignore
 
         named_apply(init_weights_vit_timm, self)
 
@@ -312,7 +311,7 @@ class DinoVisionTransformer(nn.Module):
         }
 
 
-def build_model(cfg, only_teacher: bool = False) -> Tuple[nn.Module | None, nn.Module]:
+def build_model(cfg) -> Tuple[nn.Module, nn.Module]:
     args = cfg.student
     vit_kwargs = dict(
         embed_dim=args.embed_dim,
@@ -326,11 +325,8 @@ def build_model(cfg, only_teacher: bool = False) -> Tuple[nn.Module | None, nn.M
         num_register_tokens=args.num_register_tokens,
         embed_configs=args.embed_layers,
         init_values=args.layerscale,
-        block_fn=partial(Block, attn_class=MemEffAttention),
     )
     teacher = DinoVisionTransformer(**vit_kwargs)
-    if only_teacher:
-        return None, teacher
     student = DinoVisionTransformer(
         **vit_kwargs,
         drop_path_rate=args.drop_path_rate,
