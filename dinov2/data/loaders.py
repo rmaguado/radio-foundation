@@ -11,12 +11,15 @@ from tabulate import tabulate
 
 from torch.utils.data import Sampler, DataLoader
 
+from dinov2.data import collate
+
 from .datasets import MultiDataset, DicomVolumeDataset, NiftiVolumeDataset
 from .samplers import (
     InfiniteSampler,
     WeightedInfiniteSampler,
 )
 from .augmentations import DataAugmentationDINO
+from .dataloader import CollaborativeLoader
 
 
 logger = logging.getLogger("dinov2")
@@ -168,7 +171,7 @@ def make_data_loader(
     drop_last: bool = True,
     persistent_workers: bool = True,
     collate_fn: Optional[Callable[[List[T]], Any]] = None,
-) -> DataLoader:
+):
     """
     Creates a data loader with the specified parameters.
 
@@ -193,15 +196,18 @@ def make_data_loader(
     )
 
     logger.info("using PyTorch data loader")
-    data_loader = DataLoader(
-        dataset,
-        sampler=sampler,
-        batch_size=batch_size,
-        num_workers=num_workers,
-        pin_memory=True,
-        drop_last=drop_last,
-        persistent_workers=persistent_workers,
-        collate_fn=collate_fn,
+    # data_loader = DataLoader(
+    #    dataset,
+    #    sampler=sampler,
+    #    batch_size=batch_size,
+    #    num_workers=num_workers,
+    #    pin_memory=True,
+    #    drop_last=drop_last,
+    #    persistent_workers=persistent_workers,
+    #    collate_fn=collate_fn,
+    # )
+    data_loader = CollaborativeLoader(
+        dataset, batch_size, num_workers, sampler, collate_fn=collate_fn
     )
 
     try:
