@@ -41,18 +41,25 @@ def model(cfg, device):
 def test_train_speed(model, dataloader, inputs_dtype):
     dataloader_iter = iter(dataloader)
 
-    for idx in range(16):
+    total = 0
+    n = 128
+
+    for idx in range(n):
         data = next(dataloader_iter)
 
         t0 = time.time()
         with torch.autocast(device_type="cuda", enabled=True, dtype=inputs_dtype):
             loss_accumulator, loss_dict = model.forward(data, teacher_temp=0.99)
         tf = time.time() - t0
+        total += tf
 
         logger.info(f"Batch {idx}: forward took {tf:.06f} seconds.")
 
         t0 = time.time()
         loss_accumulator.backward()
         tf = time.time() - t0
+        total += tf
 
         logger.info(f"Batch {idx}: backward took {tf:.06f} seconds.")
+
+    logger.info(f"Total: {total/n}")
