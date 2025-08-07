@@ -71,14 +71,22 @@ class DicomVolumeDataset(VolumeDataset):
             x for x in os.listdir(dicom_folder_path) if x.endswith(".dcm")
         ]
 
-        dcms = [pydicom.dcmread(x) for x in dicom_file_paths]
+        dcms = [
+            pydicom.dcmread(os.path.join(dicom_folder_path, x))
+            for x in dicom_file_paths
+        ]
         dcms.sort(key=lambda x: x.ImagePositionPatient[2])
 
-        image_array = torch.stack(
-            [torch.from_numpy(dcm.pixel_array).to(self.dtype) for dcm in dcms]
-        )
+        image_array = [
+            torch.from_numpy(dcm.pixel_array.astype("float32", copy=False)).to(
+                self.dtype
+            )
+            for dcm in dcms
+        ]
 
-        if self.modality == "ct":
+        image_array = torch.stack(image_array)
+
+        if self.modality.lower() == "ct":
             slope = dcms[0].RescaleSlope
             intercept = dcms[0].RescaleIntercept
             image_array = image_array * slope + intercept
@@ -114,7 +122,7 @@ class NiftiVolumeDataset(VolumeDataset):
             image_array = torch.tensor(image_memmap[:], dtype=self.dtype)
             image_array = slope * image_array + intercept
 
-        elif self.modality == "mri":
+        elif self.modality.lower() == "mri":
             image_array = torch.from_numpy(np.array(image_memmap))
 
         else:
