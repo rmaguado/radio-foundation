@@ -8,7 +8,7 @@ import logging
 from dinov2.configs import get_cfg_from_path
 from dinov2.train.setup import setup_dataloader
 
-logger = logging.getLogger("test")
+logger = logging.getLogger("dinov2")
 logger.setLevel(logging.DEBUG)
 
 
@@ -23,16 +23,23 @@ def dataloader(cfg):
     return setup_dataloader(cfg, inputs_dtype)
 
 
-def test_dataloader_speed(cfg, dataloader):
+def test_dataloader_speed(cfg):
     num_workers = cfg.train.num_workers
     logger.info(f"Using {num_workers} workers.")
-    dataloader_iter = iter(dataloader)
 
-    for idx in range(32):
+    inputs_dtype = torch.bfloat16
+    t0 = time.time()
+    dataloader = setup_dataloader(cfg, inputs_dtype)
+    dataloader_iter = iter(dataloader)
+    tf = time.time() - t0
+    logger.info(f"Created dataloader in {tf:.06f} seconds.")
+
+    for idx in range(128):
         t0 = time.time()
         data = next(dataloader_iter)
         tf = time.time() - t0
         logger.info(f"Batch {idx}: waited {tf:.06f} seconds.")
+        time.sleep(0.6)
 
     assert all(
         x in data.keys() for x in ["global_3d", "local_3d", "global_2d", "local_2d"]
