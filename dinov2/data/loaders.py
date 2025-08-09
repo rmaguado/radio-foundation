@@ -11,15 +11,19 @@ from tabulate import tabulate
 
 from torch.utils.data import Sampler, DataLoader
 
-from dinov2.data import collate
-
-from .datasets import MultiDataset, DicomVolumeDataset, NiftiVolumeDataset
+from .datasets import (
+    MultiDataset,
+    DicomVolumeDataset,
+    NiftiVolumeDataset,
+    TorchVolumeDataset,
+)
 from .samplers import (
     InfiniteSampler,
     WeightedInfiniteSampler,
 )
 from .augmentations import DataAugmentationDINO
-from .dataloader import CollaborativeLoader
+
+# from .dataloader import CollaborativeLoader
 
 
 logger = logging.getLogger("dinov2")
@@ -78,6 +82,8 @@ def build_dataset_from_cfg(cfg, dataset_config):
         dataset_object = DicomVolumeDataset(**dataset_kwargs)
     elif dataset_storage == "nifti":
         dataset_object = NiftiVolumeDataset(**dataset_kwargs)
+    elif dataset_storage == "torch":
+        dataset_object = TorchVolumeDataset(**dataset_kwargs)
     else:
         raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
 
@@ -157,9 +163,6 @@ def _make_sampler(
     return None
 
 
-T = TypeVar("T")
-
-
 def make_data_loader(
     *,
     dataset,
@@ -170,7 +173,7 @@ def make_data_loader(
     sampler_type: Optional[SamplerType] = SamplerType.INFINITE,
     drop_last: bool = True,
     persistent_workers: bool = True,
-    collate_fn: Optional[Callable[[List[T]], Any]] = None,
+    collate_fn: Optional[Callable] = None,
 ):
     """
     Creates a data loader with the specified parameters.

@@ -372,7 +372,7 @@ class DatasetConfig(BaseModel):
     weight: float
     index_path: str
     type: Literal["ct", "mri"]
-    storage: Literal["dicom", "nifti"]
+    storage: Literal["dicom", "nifti", "torch"]
     bounds: Tuple[float, float]
     norm: NormConfig
 
@@ -412,5 +412,5 @@ def validate_config(conf: DictConfig) -> bool:
         conf (DictConfig): The configuration dictionary to validate loaded from a YAML file using omegaconf.
     """
     conf_dict = OmegaConf.to_container(conf, resolve=True)
-    MainConfig(**conf_dict)
+    MainConfig(**conf_dict)  # type: ignore
     return True

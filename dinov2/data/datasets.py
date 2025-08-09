@@ -1,6 +1,6 @@
 import os
 import torch
-from typing import List, Dict, Tuple, Any, Callable
+from typing import List, Dict, Tuple, Optional, Callable
 import polars as pl
 import numpy as np
 
@@ -10,6 +10,9 @@ import logging
 
 
 logger = logging.getLogger("dinov2")
+
+
+Spacing = Tuple[float, ...]
 
 
 class VolumeDataset:
@@ -45,7 +48,7 @@ class VolumeDataset:
     def __len__(self) -> int:
         return len(self.df)
 
-    def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
+    def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Optional[Spacing]]:
         raise NotImplementedError
 
     def __getitem__(self, idx: int):
@@ -77,16 +80,16 @@ class DicomVolumeDataset(VolumeDataset):
         ]
         dcms.sort(key=lambda x: x.ImagePositionPatient[2])
 
-        image_array = [
-            torch.from_numpy(dcm.pixel_array.astype("float32", copy=False)).to(
-                self.dtype
-            )
-            for dcm in dcms
-        ]
+        image_array = torch.stack(
+            [
+                torch.from_numpy(dcm.pixel_array.astype("float32", copy=False)).to(
+                    self.dtype
+                )
+                for dcm in dcms
+            ]
+        )
 
-        image_array = torch.stack(image_array)
-
-        if self.modality.lower() == "ct":
+        if self.modality == "ct":
             slope = dcms[0].RescaleSlope
             intercept = dcms[0].RescaleIntercept
             image_array = image_array * slope + intercept
@@ -131,6 +134,19 @@ class NiftiVolumeDataset(VolumeDataset):
         image_array = torch.clip(image_array, self.bounds[0], self.bounds[1])
 
         return image_array, spacing
+
+
+class TorchVolumeDataset(VolumeDataset):
+    """
+    Dataset class for loading volumetric image saved as torch pth.
+
+    Inherits from VolumeDataset and implements get_image_data for torch pth.
+    """
+
+    def get_image_data(self, idx: int):
+        file_path = self.df[idx, "path"]
+        image_array = torch.load(file_path)
+        return image_array, None
 
 
 class MultiDataset:

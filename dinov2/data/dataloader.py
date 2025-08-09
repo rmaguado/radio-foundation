@@ -4,6 +4,7 @@ from torch.utils.data import Dataset, Sampler
 from queue import Empty
 import threading
 import uuid
+from typing import Optional
 
 
 def _sample_worker_loop(dataset, task_queue):
@@ -22,11 +23,11 @@ def _sample_worker_loop(dataset, task_queue):
 class ParallelSampleDataLoader:
     def __init__(
         self,
-        dataset: Dataset,
+        dataset,
         batch_size: int,
         collate_fn,
         num_workers: int = 4,
-        sampler: Sampler = None,
+        sampler: Optional[Sampler] = None,
         prefetch_batches: int = 2,
         timeout: float = 10.0,
     ):
@@ -92,7 +93,7 @@ class ParallelSampleDataLoader:
                 batch_id = uuid.uuid4().hex
                 if not hasattr(self, "_manager"):
                     self._manager = mp.Manager()
-                    result_queue = self._manager.Queue()
+                    result_queue = self._manager.Queue()  # type: ignore
                 else:
                     result_queue = mp.Queue()
 
