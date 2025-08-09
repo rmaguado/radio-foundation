@@ -21,7 +21,7 @@ class SwiGLUFFN(nn.Module):
         in_features: int,
         hidden_features: Optional[int] = None,
         out_features: Optional[int] = None,
-        act_layer: Callable[..., nn.Module] = None,
+        act_layer: Optional[Callable] = None,
         drop: float = 0.0,
         bias: bool = True,
     ) -> None:
@@ -42,7 +42,7 @@ XFORMERS_ENABLED = os.environ.get("XFORMERS_DISABLED") is None
 
 try:
     if XFORMERS_ENABLED:
-        from xformers.ops import SwiGLU
+        from xformers.ops import SwiGLU  # type: ignore
 
         XFORMERS_AVAILABLE = True
     else:
@@ -57,13 +57,13 @@ if not XFORMERS_AVAILABLE:
     warnings.warn("xFormers is not available (SwiGLU)")
 
 
-class SwiGLUFFNFused(SwiGLU):
+class SwiGLUFFNFused(SwiGLU):  # type: ignore
     def __init__(
         self,
         in_features: int,
         hidden_features: Optional[int] = None,
         out_features: Optional[int] = None,
-        act_layer: Callable[..., nn.Module] = None,
+        act_layer: Optional[Callable] = None,
         drop: float = 0.0,
         bias: bool = True,
     ) -> None:

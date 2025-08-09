@@ -42,7 +42,7 @@ def test_dataloader_speed(cfg):
         time.sleep(0.6)
 
     assert all(
-        x in data.keys() for x in ["global_3d", "local_3d", "global_2d", "local_2d"]
+        x in data.keys() for x in ["global_3d", "local_3d", "global_2d", "local_2d"]  # type: ignore
     )
 
 

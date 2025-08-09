@@ -159,7 +159,7 @@ def train(
             optimizer.zero_grad(set_to_none=True)
 
         with torch.autocast(device_type="cuda", enabled=True, dtype=dtype):
-            loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)
+            loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)  # type: ignore
 
         loss_accumulator.backward()
 
@@ -167,7 +167,7 @@ def train(
 
         if should_apply_training_step(cfg, grad_accum_counter, accum_steps):
             apply_gradient_operations(cfg, model, optimizer, accum_steps)
-            model.update_teacher(mom)
+            model.update_teacher(mom)  # type: ignore
 
             log_training_step(metric_logger, loss_dict, schedulers, iteration)
 

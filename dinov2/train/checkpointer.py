@@ -37,7 +37,7 @@ class DDPCheckpointer(Checkpointer):
         if hasattr(self, "logger"):
             self.logger.info(f"Saving checkpoint to {save_file}")
         with self.path_manager.open(save_file, "wb") as f:
-            torch.save(data, f)
+            torch.save(data, f=f)  # type: ignore
         self.tag_last_checkpoint(basename)
 
     def load(
@@ -64,7 +64,7 @@ class DDPCheckpointer(Checkpointer):
 
         return checkpoint
 
-    def resume_or_load(self, path: Optional[str] = None) -> int:
+    def resume_or_load(self, path: Optional[str] = None) -> int:  # type: ignore
         if self.has_checkpoint():
             path = self.get_checkpoint_file()
             return self.load(path).get("iteration", -1) + 1
@@ -94,7 +94,7 @@ class DDPCheckpointer(Checkpointer):
             # if file doesn't exist, maybe because it has just been
             # deleted by a separate process
             return ""
-        return os.path.join(self.save_dir, last_saved)
+        return os.path.join(self.save_dir, last_saved)  # type: ignore
 
     def tag_last_checkpoint(self, last_filename_basename: str) -> None:
         """
@@ -104,7 +104,7 @@ class DDPCheckpointer(Checkpointer):
             return
         save_file = os.path.join(self.save_dir, "last_checkpoint")
         with self.path_manager.open(save_file, "w") as f:
-            f.write(last_filename_basename)
+            f.write(last_filename_basename)  # type: ignore
 
     def _load_file(self, f: str) -> Dict[str, Any]:
         return torch.load(f, map_location=torch.device("cpu"), weights_only=False)

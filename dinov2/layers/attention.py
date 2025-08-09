@@ -21,7 +21,7 @@ logger = logging.getLogger("dinov2")
 XFORMERS_ENABLED = os.environ.get("XFORMERS_DISABLED") is None
 try:
     if XFORMERS_ENABLED:
-        from xformers.ops import memory_efficient_attention, unbind
+        from xformers.ops import memory_efficient_attention, unbind  # type: ignore
 
         XFORMERS_AVAILABLE = True
     else:
@@ -84,9 +84,9 @@ class MemEffAttention(Attention):
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads)
 
-        q, k, v = unbind(qkv, 2)
+        q, k, v = unbind(qkv, 2)  # type: ignore
 
-        x = memory_efficient_attention(q, k, v, attn_bias=attn_bias)
+        x = memory_efficient_attention(q, k, v, attn_bias=attn_bias)  # type: ignore
         x = x.reshape([B, N, C])
 
         x = self.proj(x)

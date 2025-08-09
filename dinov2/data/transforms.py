@@ -209,7 +209,7 @@ class Slice:
         self.c = channels
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        axis = torch.randint(0, 3, (1,)).item()
+        axis = torch.randint(0, 3, (1,))
         idx = torch.randint(0, img.shape[axis] - self.c, (1,)).item()
 
         if axis == 0:
@@ -248,7 +248,7 @@ class GaussianBlur:
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         if torch.rand(1).item() < self.p:
-            return gaussian_blur(img, kernel_size=3, sigma=self.sigma)
+            return gaussian_blur(img, kernel_size=3, sigma=self.sigma)  # type: ignore
         return img
 
 
