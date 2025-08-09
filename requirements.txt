@@ -16,3 +16,4 @@ einops
 pickleshare
 tensorboard
 polars
+pydantic
