@@ -107,7 +107,7 @@ class DataAugmentationDINO:
         general_crop_3d: Optional[torch.Tensor] = None
 
         if self.enable_3d:
-            general_crop_3d = self.transforms["general_crop_3d"](images, spacing)
+            general_crop_3d = self.transforms["general_crop_3d"](images)
 
             global_3d_input = (
                 self.transforms["global_3d_resize"](general_crop_3d)
@@ -132,7 +132,7 @@ class DataAugmentationDINO:
                 ]
             else:
                 global_2d_source_crops = [
-                    self.transforms["global_crop_2d"](images, spacing)
+                    self.transforms["global_crop_2d"](images)
                     for _ in range(self.num_global_2d)
                 ]
 

@@ -448,14 +448,9 @@ class ImageTransforms:
         self.transforms.append(new_transform)
         return self
 
-    def __call__(
-        self, img: torch.Tensor, spacing: Optional[Tuple[float, ...]] = None
-    ) -> torch.Tensor:
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
         for i, transform in enumerate(self.transforms):
-            if i == 0 and spacing is not None:
-                img = transform(img, spacing)
-            else:
-                img = transform(img)
+            img = transform(img)
         return img
 
 
