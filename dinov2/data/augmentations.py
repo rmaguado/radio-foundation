@@ -50,31 +50,27 @@ class DataAugmentationDINO:
 
         if self.enable_3d:
             if self.enable_2d:
-                g_3d_size = (crop_sizes.global_2d,) * 3
+                g_3d_size = crop_sizes.global_2d
             else:
-                g_3d_size = (crop_sizes.global_3d,) * 3
-            l_3d_size = (crop_sizes.local_3d,) * 3
+                g_3d_size = crop_sizes.global_3d
+            l_3d_size = crop_sizes.local_3d
 
             general_crop_3d = ImageTransforms()
-            general_crop_3d += Crop(scale=(0.3, 1.0), size=g_3d_size)
+            general_crop_3d += RandomCrop3D(size=g_3d_size, scale=(0.3, 1.0))
             general_crop_3d += Norm(**self.norm_cfg)
             transforms["general_crop_3d"] = general_crop_3d
 
             transforms["global_3d"] = self._create_base_augmentations(skip_first=False)
 
             local_3d_augment = ImageTransforms()
-            local_3d_augment += Crop(scale=(0.1, 0.5), size=l_3d_size)
+            local_3d_augment += RandomCrop3D(size=l_3d_size, scale=(0.1, 0.5))
             local_3d_augment += self._create_base_augmentations(skip_first=False)
             local_3d_augment += GaussianBlur()
             transforms["local_3d"] = local_3d_augment
 
         if self.enable_2d:
-            g_2d_size = (
-                crop_sizes.channels,
-                crop_sizes.global_2d,
-                crop_sizes.global_2d,
-            )
-            l_2d_size = (crop_sizes.channels, crop_sizes.local_2d, crop_sizes.local_2d)
+            g_2d_size = crop_sizes.global_2d
+            l_2d_size = crop_sizes.local_2d
 
             if self.enable_3d:
                 transforms["global_3d_resize"] = Resize(
@@ -83,7 +79,9 @@ class DataAugmentationDINO:
                 transforms["slice_to_2d"] = Slice(channels=crop_sizes.channels)
             else:
                 global_2d_augment = ImageTransforms()
-                global_2d_augment += Crop(scale=(0.3, 1.0), size=g_2d_size)
+                global_2d_augment += RandomSliceCrop(
+                    size=g_2d_size, channels=crop_sizes.channels, scale=(0.3, 1.0)
+                )
                 global_2d_augment += Norm(**self.norm_cfg)
                 transforms["global_crop_2d"] = global_2d_augment
 
@@ -92,7 +90,9 @@ class DataAugmentationDINO:
             )
 
             local_2d_augment = ImageTransforms()
-            local_2d_augment += Crop(scale=(0.1, 0.5), size=l_2d_size)
+            local_2d_augment += RandomCrop2D(
+                size=l_2d_size, channels=crop_sizes.channels, scale=(0.1, 0.5)
+            )
             local_2d_augment += self._create_base_augmentations(skip_first=True)
             local_2d_augment += GaussianBlur()
             transforms["local_2d"] = local_2d_augment
