@@ -90,9 +90,7 @@ class DataAugmentationDINO:
             )
 
             local_2d_augment = ImageTransforms()
-            local_2d_augment += RandomCrop2D(
-                size=l_2d_size, channels=crop_sizes.channels, scale=(0.1, 0.5)
-            )
+            local_2d_augment += RandomCrop2D(size=l_2d_size, scale=(0.1, 0.5))
             local_2d_augment += self._create_base_augmentations(skip_first=True)
             local_2d_augment += GaussianBlur()
             transforms["local_2d"] = local_2d_augment
