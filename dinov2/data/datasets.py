@@ -36,14 +36,12 @@ class VolumeDataset:
         modality: str,
         transforms: Callable,
         bounds: Tuple[float, float] = (-1000, 1900),
-        dtype=torch.bfloat16,
     ) -> None:
         self.dataset_name = dataset_name
         self.df = pl.read_csv(index_path)
         self.modality = modality
         self.transforms = transforms
         self.bounds = bounds
-        self.dtype = dtype
 
     def __len__(self) -> int:
         return len(self.df)
@@ -82,9 +80,7 @@ class DicomVolumeDataset(VolumeDataset):
 
         image_array = torch.stack(
             [
-                torch.from_numpy(dcm.pixel_array.astype("float32", copy=False)).to(
-                    self.dtype
-                )
+                torch.from_numpy(dcm.pixel_array.astype("float32", copy=False))
                 for dcm in dcms
             ]
         )
@@ -122,7 +118,7 @@ class NiftiVolumeDataset(VolumeDataset):
             slope = 1.0 if slope is None else slope
             intercept = 0.0 if intercept is None else intercept
 
-            image_array = torch.tensor(image_memmap[:], dtype=self.dtype)
+            image_array = torch.tensor(image_memmap[:], dtype=torch.float32)
             image_array = slope * image_array + intercept
 
         elif self.modality.lower() == "mri":
