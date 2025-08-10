@@ -98,19 +98,32 @@ class RandomCrop3D(BaseRandomCrop):
                 f"Input image must be 3D (D, H, W), but got shape {img.shape}"
             )
 
-        min_required_shape = [s * self.scale[0] / 2 for s in self.crop_size]
-        for i, dim_size in enumerate(img.shape):
-            if dim_size < min_required_shape[i]:
-                msg = (
-                    f"Input image dimension {i} with size {dim_size} is smaller than the minimum "
-                    f"required size of {min_required_shape[i]:.2f} (size * min_scale). "
-                    "The resulting crop may be excessively upscaled."
-                )
-                logger.warning(msg)
+        min_spatial_dim = min(img.shape)
 
-        starts, ends = self._get_crop_params(img.shape)
+        min_required_size = int(max(self.crop_size) * self.scale[0])
+        if min_spatial_dim < min_required_size:
+            logger.warning(
+                f"Minimum spatial dimension {min_spatial_dim} is smaller than "
+                f"the minimum required size for a cubic crop of {min_required_size}. "
+                "The resulting crop may be upscaled or smaller than intended."
+            )
+
+        scale = self._get_scale()
+        crop_dim = int(min_spatial_dim * scale)
+
+        crop_dim = min(min_spatial_dim, max(1, crop_dim))
+
+        max_start_d = img.shape[0] - crop_dim
+        start_d = random.randint(0, max_start_d)
+        max_start_h = img.shape[1] - crop_dim
+        start_h = random.randint(0, max_start_h)
+        max_start_w = img.shape[2] - crop_dim
+        start_w = random.randint(0, max_start_w)
+
         cropped_img = img[
-            starts[0] : ends[0], starts[1] : ends[1], starts[2] : ends[2]
+            start_d : start_d + crop_dim,
+            start_h : start_h + crop_dim,
+            start_w : start_w + crop_dim,
         ].float()
 
         resampled_img = torch.nn.functional.interpolate(
@@ -148,39 +161,57 @@ class RandomSliceCrop(BaseRandomCrop):
             )
 
         img_shape = img.shape
-        long_enough_axes = [
-            i for i, dim_size in enumerate(img_shape) if dim_size >= self.channels
+
+        min_length = max(self.crop_size[0] * self.scale[0] / 2, self.channels)
+        too_short_axes = [
+            i for i, dim_size in enumerate(img_shape) if dim_size < min_length
         ]
 
-        if not long_enough_axes:
-            raise ValueError(
-                f"No dimension in image of shape {img_shape} is long enough "
-                f"to extract a slice of depth {self.channels}."
+        if len(too_short_axes) > 1:
+            logger.warning(
+                f"Image has more than one dimension shorter than the required spatial crop size "
+                f"of {min_length}: {img_shape}. A valid 2D plane cannot be formed."
             )
 
-        slice_axis = random.choice(long_enough_axes)
+        if too_short_axes:
+            slice_axis = too_short_axes[0]
+        else:
+            slice_axis = random.choice([0, 1, 2])
+
+        spatial_axes = [i for i in range(3) if i != slice_axis]
+
+        if img_shape[slice_axis] < self.channels:
+            raise ValueError(
+                f"The chosen slice axis (index {slice_axis}) has size {img_shape[slice_axis]}, "
+                f"which is smaller than the required depth of {self.channels}."
+            )
 
         max_start = img_shape[slice_axis] - self.channels
         start_idx = random.randint(0, max_start)
 
         slicer = [slice(None)] * 3
         slicer[slice_axis] = slice(start_idx, start_idx + self.channels)
+        sub_volume = img[tuple(slicer)]
 
-        sub_volume = img[tuple(slicer)].movedim(slice_axis, 0)
+        spatial_shape = (img_shape[spatial_axes[0]], img_shape[spatial_axes[1]])
 
-        spatial_shape = sub_volume.shape[1:]
-        min_required_shape = [s * self.scale[0] / 2 for s in self.crop_size]
-        for i, dim_size in enumerate(spatial_shape):
-            if dim_size < min_required_shape[i]:
-                msg = (
-                    f"A spatial dimension of the extracted slice with size {dim_size} is smaller "
-                    f"than the minimum required size of {min_required_shape[i]:.2f}. "
-                    "The resulting crop may be excessively upscaled."
-                )
-                logger.warning(msg)
+        min_spatial_dim = min(spatial_shape)
 
-        starts, ends = self._get_crop_params(spatial_shape)
-        cropped_plane = sub_volume[:, starts[0] : ends[0], starts[1] : ends[1]].float()
+        scaled_crop_dim = int(min_spatial_dim * self._get_scale())
+        crop_dim = min(min_spatial_dim, max(1, scaled_crop_dim))
+
+        max_start_0 = spatial_shape[0] - crop_dim
+        start_0 = random.randint(0, max_start_0)
+        max_start_1 = spatial_shape[1] - crop_dim
+        start_1 = random.randint(0, max_start_1)
+
+        spatial_slicer = [slice(None)] * 3
+        spatial_slicer[slice_axis] = slice(None)
+        spatial_slicer[spatial_axes[0]] = slice(start_0, start_0 + crop_dim)
+        spatial_slicer[spatial_axes[1]] = slice(start_1, start_1 + crop_dim)
+
+        cropped_plane = sub_volume[tuple(spatial_slicer)]
+        cropped_plane = cropped_plane.movedim(slice_axis, 0)
 
         resampled_img = torch.nn.functional.interpolate(
             cropped_plane.unsqueeze(0),
@@ -212,18 +243,29 @@ class RandomCrop2D(BaseRandomCrop):
             )
 
         spatial_shape = img.shape[1:]
-        min_required_shape = [s * self.scale[0] / 2 for s in self.crop_size]
-        for i, dim_size in enumerate(spatial_shape):
-            if dim_size < min_required_shape[i]:
-                msg = (
-                    f"Input image spatial dimension {i} (shape index {i+1}) with size {dim_size} "
-                    f"is smaller than the minimum required size of {min_required_shape[i]:.2f}. "
-                    "The resulting crop may be excessively upscaled."
-                )
-                logger.warning(msg)
+        min_required_size = int(max(self.crop_size) * self.scale[0])
 
-        starts, ends = self._get_crop_params(spatial_shape)
-        cropped_img = img[:, starts[0] : ends[0], starts[1] : ends[1]].float()
+        if min(spatial_shape) < min_required_size:
+            logger.warning(
+                f"Minimum spatial dimension {min(spatial_shape)} is smaller than "
+                f"the minimum required size for a square crop of {min_required_size}. "
+                "The resulting crop may be upscaled or smaller than intended."
+            )
+
+        min_spatial_dim = min(spatial_shape)
+        scale = self._get_scale()
+        crop_dim = int(min_spatial_dim * scale)
+
+        crop_dim = min(min_spatial_dim, max(1, crop_dim))
+
+        max_start_h = spatial_shape[0] - crop_dim
+        start_h = random.randint(0, max_start_h)
+        max_start_w = spatial_shape[1] - crop_dim
+        start_w = random.randint(0, max_start_w)
+
+        cropped_img = img[
+            :, start_h : start_h + crop_dim, start_w : start_w + crop_dim
+        ].float()
 
         resampled_img = torch.nn.functional.interpolate(
             cropped_img.unsqueeze(0),
@@ -339,7 +381,7 @@ class ImageTransforms:
 if __name__ == "__main__":
     print("3D -> 3D Crop")
     transform_3d = RandomCrop3D(size=64, scale=(0.8, 1.0))
-    input_3d = torch.randn(20, 128, 256)
+    input_3d = torch.randn(44, 128, 256)
     output_3d = transform_3d(input_3d)
     print(f"Input shape: {input_3d.shape}")
     print(f"Output shape: {output_3d.shape}\n")
@@ -348,21 +390,12 @@ if __name__ == "__main__":
     transform_slice = RandomSliceCrop(size=128, channels=5)
     input_3d_long = torch.randn(96, 5, 160)
     output_slice_1 = transform_slice(input_3d_long)
-    print(f"Input shape (long): {input_3d_long.shape}")
-    print(f"Output shape (long): {output_slice_1.shape}\n")
+    print(f"Input shape: {input_3d_long.shape}")
+    print(f"Output shape: {output_slice_1.shape}\n")
 
     print("2D -> 2D Crop")
-    transform_2d = RandomCrop2D(size=224, scale=(0.5, 0.9))
-    input_2d = torch.randn(3, 256, 256)
+    transform_2d = RandomCrop2D(size=112, scale=(0.5, 0.9))
+    input_2d = torch.randn(3, 100, 256)
     output_2d = transform_2d(input_2d)
     print(f"Input shape: {input_2d.shape}")
     print(f"Output shape: {output_2d.shape}")
-
-    print("3D -> 3D Crop Anisotropic")
-    transform = AnisotropicCrop(size=128, scale=(0.8, 1.0))
-    anisotropic_image = torch.randn(200, 512, 512)
-    anisotropic_spacing = (1.5, 0.8, 0.8)
-    output_crop = transform(anisotropic_image, anisotropic_spacing)
-    print(f"Input shape: {anisotropic_image.shape}")
-    print(f"Input spacing: {anisotropic_spacing}\n")
-    print(f"Output shape: {output_crop.shape}")
