@@ -7,6 +7,28 @@ import logging
 logger = logging.getLogger("dinov2")
 
 
+class AnisotropicCrop:
+    def __init__(self, size: int, scale: Tuple[float, float] = (0.7, 1.0)) -> None:
+        if not isinstance(size, int) or size <= 0:
+            raise ValueError(f"size must be a positive integer, but got {size}")
+        if not (0 < scale[0] <= scale[1]):
+            raise ValueError(
+                f"Scale range must be positive and ordered, but got {scale}"
+            )
+        self.size = size
+        self.crop_size = (size, size, size)
+        self.scale = scale
+
+    def _get_scale(self) -> float:
+        """Generates a random scale factor from the specified range."""
+        return torch.empty(1).uniform_(self.scale[0], self.scale[1]).item()
+
+    def __call__(
+        self, img: torch.Tensor, spacing: Tuple[float, float, float]
+    ) -> torch.Tensor:
+        raise NotImplementedError
+
+
 class BaseRandomCrop:
     """
     An abstract base class for random cropping operations.
@@ -57,148 +79,6 @@ class BaseRandomCrop:
         raise NotImplementedError("Subclasses must implement the `__call__` method.")
 
 
-class AnisotropicCrop:
-    """
-    Performs a conservative 3D crop from an anisotropic image by resampling
-    only the necessary sub-volume to an isotropic grid before the final crop.
-
-    This is a three-stage process:
-    1. A sub-volume is cropped from the original anisotropic image. This volume
-       is calculated to be just large enough to contain the final crop at any
-       random scale.
-    2. This smaller sub-volume is resampled to an isotropic grid (using the
-       finest original spacing).
-    3. A final random scaled crop is performed on the new isotropic volume,
-       which is then resized to the fixed target output size.
-
-    This method is memory and computationally efficient for large anisotropic
-    images, as it avoids resampling the entire volume.
-    """
-
-    def __init__(self, size: int, scale: Tuple[float, float] = (0.7, 1.0)) -> None:
-        if not isinstance(size, int) or size <= 0:
-            raise ValueError(f"size must be a positive integer, but got {size}")
-        if not (0 < scale[0] <= scale[1]):
-            raise ValueError(
-                f"Scale range must be positive and ordered, but got {scale}"
-            )
-        self.size = size
-        self.crop_size = (size, size, size)
-        self.scale = scale
-
-    def _get_scale(self) -> float:
-        """Generates a random scale factor from the specified range."""
-        return torch.empty(1).uniform_(self.scale[0], self.scale[1]).item()
-
-    def __call__(
-        self, img: torch.Tensor, spacing: Tuple[float, float, float]
-    ) -> torch.Tensor:
-        """
-        Applies the conservative anisotropic crop and resample transformation.
-
-        Args:
-            img: The input 3D tensor with shape (D, H, W).
-            spacing: The physical spacing of voxels for (D, H, W) in mm.
-
-        Returns:
-            The transformed cubic 3D tensor of shape (`size`, `size`, `size`).
-        """
-        if img.ndim != 3:
-            raise ValueError(
-                f"Input image must be 3D (D, H, W), but got shape {img.shape}"
-            )
-        if len(spacing) != 3:
-            raise ValueError(f"Spacing must have 3 elements, but got {len(spacing)}")
-
-        device = img.device
-        original_shape_voxels = torch.tensor(
-            img.shape, dtype=torch.float32, device=device
-        )
-        original_spacing_mm = torch.tensor(spacing, dtype=torch.float32, device=device)
-        target_spacing_mm = torch.min(original_spacing_mm)
-        final_crop_size_voxels = torch.tensor(
-            self.crop_size, dtype=torch.float32, device=device
-        )
-
-        max_scale = self.scale[1]
-        max_physical_size_mm = final_crop_size_voxels * target_spacing_mm * max_scale
-
-        initial_crop_dims = torch.ceil(max_physical_size_mm / original_spacing_mm).to(
-            torch.int32
-        )
-        initial_crop_dims = torch.minimum(
-            initial_crop_dims, original_shape_voxels.to(torch.int32)
-        )
-
-        max_starts = torch.clamp(
-            original_shape_voxels.to(torch.int32) - initial_crop_dims, min=0
-        )
-        starts = torch.tensor(
-            [random.randint(0, max_s) for max_s in max_starts.tolist()],
-            dtype=torch.int32,
-        )
-        ends = starts + initial_crop_dims
-
-        initial_crop = img[
-            starts[0] : ends[0], starts[1] : ends[1], starts[2] : ends[2]
-        ]
-
-        resampled_shape = torch.floor(
-            (
-                torch.tensor(initial_crop.shape, dtype=torch.float32, device=device)
-                * original_spacing_mm
-            )
-            / target_spacing_mm
-        ).to(torch.int32)
-
-        isotropic_volume = (
-            torch.nn.functional.interpolate(
-                initial_crop.unsqueeze(0).unsqueeze(0),
-                size=tuple(resampled_shape.tolist()),
-                mode="trilinear",
-                align_corners=False,
-            )
-            .squeeze(0)
-            .squeeze(0)
-        )
-
-        final_crop_scale = self._get_scale()
-
-        iso_vol_shape = torch.tensor(
-            isotropic_volume.shape, dtype=torch.int32, device=device
-        )
-        final_crop_window_dims = torch.clamp(
-            (iso_vol_shape.float() * final_crop_scale).to(torch.int32), min=1
-        )
-        final_crop_window_dims = torch.minimum(final_crop_window_dims, iso_vol_shape)
-
-        final_max_starts = torch.clamp(iso_vol_shape - final_crop_window_dims, min=0)
-        final_starts = torch.tensor(
-            [random.randint(0, max_s) for max_s in final_max_starts.tolist()],
-            dtype=torch.int32,
-        )
-        final_ends = final_starts + final_crop_window_dims
-
-        final_crop = isotropic_volume[
-            final_starts[0] : final_ends[0],
-            final_starts[1] : final_ends[1],
-            final_starts[2] : final_ends[2],
-        ]
-
-        output = (
-            torch.nn.functional.interpolate(
-                final_crop.unsqueeze(0).unsqueeze(0),
-                size=self.crop_size,
-                mode="trilinear",
-                align_corners=False,
-            )
-            .squeeze(0)
-            .squeeze(0)
-        )
-
-        return output
-
-
 class RandomCrop3D(BaseRandomCrop):
     """
     Crops a 3D image to a random size and resamples it to a target cubic 3D size.
@@ -218,7 +98,7 @@ class RandomCrop3D(BaseRandomCrop):
                 f"Input image must be 3D (D, H, W), but got shape {img.shape}"
             )
 
-        min_required_shape = [s * self.scale[0] for s in self.crop_size]
+        min_required_shape = [s * self.scale[0] / 2 for s in self.crop_size]
         for i, dim_size in enumerate(img.shape):
             if dim_size < min_required_shape[i]:
                 msg = (
@@ -229,7 +109,9 @@ class RandomCrop3D(BaseRandomCrop):
                 logger.warning(msg)
 
         starts, ends = self._get_crop_params(img.shape)
-        cropped_img = img[starts[0] : ends[0], starts[1] : ends[1], starts[2] : ends[2]]
+        cropped_img = img[
+            starts[0] : ends[0], starts[1] : ends[1], starts[2] : ends[2]
+        ].float()
 
         resampled_img = torch.nn.functional.interpolate(
             cropped_img.unsqueeze(0).unsqueeze(0),
@@ -287,7 +169,7 @@ class RandomSliceCrop(BaseRandomCrop):
         sub_volume = img[tuple(slicer)].movedim(slice_axis, 0)
 
         spatial_shape = sub_volume.shape[1:]
-        min_required_shape = [s * self.scale[0] for s in self.crop_size]
+        min_required_shape = [s * self.scale[0] / 2 for s in self.crop_size]
         for i, dim_size in enumerate(spatial_shape):
             if dim_size < min_required_shape[i]:
                 msg = (
@@ -298,7 +180,7 @@ class RandomSliceCrop(BaseRandomCrop):
                 logger.warning(msg)
 
         starts, ends = self._get_crop_params(spatial_shape)
-        cropped_plane = sub_volume[:, starts[0] : ends[0], starts[1] : ends[1]]
+        cropped_plane = sub_volume[:, starts[0] : ends[0], starts[1] : ends[1]].float()
 
         resampled_img = torch.nn.functional.interpolate(
             cropped_plane.unsqueeze(0),
@@ -330,7 +212,7 @@ class RandomCrop2D(BaseRandomCrop):
             )
 
         spatial_shape = img.shape[1:]
-        min_required_shape = [s * self.scale[0] for s in self.crop_size]
+        min_required_shape = [s * self.scale[0] / 2 for s in self.crop_size]
         for i, dim_size in enumerate(spatial_shape):
             if dim_size < min_required_shape[i]:
                 msg = (
@@ -341,7 +223,7 @@ class RandomCrop2D(BaseRandomCrop):
                 logger.warning(msg)
 
         starts, ends = self._get_crop_params(spatial_shape)
-        cropped_img = img[:, starts[0] : ends[0], starts[1] : ends[1]]
+        cropped_img = img[:, starts[0] : ends[0], starts[1] : ends[1]].float()
 
         resampled_img = torch.nn.functional.interpolate(
             cropped_img.unsqueeze(0),
