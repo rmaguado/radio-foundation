@@ -211,7 +211,7 @@ class RandomSliceCrop(BaseRandomCrop):
         spatial_slicer[spatial_axes[1]] = slice(start_1, start_1 + crop_dim)
 
         cropped_plane = sub_volume[tuple(spatial_slicer)]
-        cropped_plane = cropped_plane.movedim(slice_axis, 0)
+        cropped_plane = cropped_plane.movedim(slice_axis, 0).float()
 
         resampled_img = torch.nn.functional.interpolate(
             cropped_plane.unsqueeze(0),
