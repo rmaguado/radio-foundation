@@ -2,6 +2,9 @@ import torch
 import random
 from typing import Tuple, List, Callable, Optional
 from torchvision.transforms.functional import gaussian_blur
+import logging
+
+logger = logging.getLogger("dinov2")
 
 
 class BaseRandomCrop:
@@ -210,22 +213,22 @@ class RandomCrop3D(BaseRandomCrop):
         self.crop_size = (size, size, size)
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        """
-        Applies the random 3D crop and resample transformation.
-
-        Args:
-            img: The input 3D tensor with shape (D, H, W).
-
-        Returns:
-            The transformed cubic 3D tensor of shape `self.crop_size`.
-        """
         if img.ndim != 3:
             raise ValueError(
                 f"Input image must be 3D (D, H, W), but got shape {img.shape}"
             )
 
-        starts, ends = self._get_crop_params(img.shape)
+        min_required_shape = [s * self.scale[0] for s in self.crop_size]
+        for i, dim_size in enumerate(img.shape):
+            if dim_size < min_required_shape[i]:
+                msg = (
+                    f"Input image dimension {i} with size {dim_size} is smaller than the minimum "
+                    f"required size of {min_required_shape[i]:.2f} (size * min_scale). "
+                    "The resulting crop may be excessively upscaled."
+                )
+                logger.warning(msg)
 
+        starts, ends = self._get_crop_params(img.shape)
         cropped_img = img[starts[0] : ends[0], starts[1] : ends[1], starts[2] : ends[2]]
 
         resampled_img = torch.nn.functional.interpolate(
@@ -242,13 +245,13 @@ class RandomSliceCrop(BaseRandomCrop):
     """
     Extracts a thick 2D slice from a 3D image along a random axis and
     crops it, producing a square 2.5D output.
-
-    The slice axis is chosen randomly from dimensions that are long enough. If a
-    dimension is too short, it is prioritized to become the depth of the output slice.
     """
 
     def __init__(
-        self, size: int, channels: int, scale: Tuple[float, float] = (0.7, 1.0)
+        self,
+        size: int,
+        channels: int,
+        scale: Tuple[float, float] = (0.7, 1.0),
     ) -> None:
         super().__init__(scale)
         if not isinstance(size, int) or size <= 0:
@@ -257,15 +260,6 @@ class RandomSliceCrop(BaseRandomCrop):
         self.channels = channels
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        """
-        Applies the random slice extraction and crop transformation.
-
-        Args:
-            img: The input 3D tensor with shape (D, H, W).
-
-        Returns:
-            The transformed 2.5D tensor of shape (`channels`, `size`, `size`).
-        """
         if img.ndim != 3:
             raise ValueError(
                 f"Input image must be 3D (D, H, W), but got shape {img.shape}"
@@ -290,13 +284,20 @@ class RandomSliceCrop(BaseRandomCrop):
         slicer = [slice(None)] * 3
         slicer[slice_axis] = slice(start_idx, start_idx + self.channels)
 
-        sub_volume = img[tuple(slicer)]
-
-        sub_volume = sub_volume.movedim(slice_axis, 0)
+        sub_volume = img[tuple(slicer)].movedim(slice_axis, 0)
 
         spatial_shape = sub_volume.shape[1:]
-        starts, ends = self._get_crop_params(spatial_shape)
+        min_required_shape = [s * self.scale[0] for s in self.crop_size]
+        for i, dim_size in enumerate(spatial_shape):
+            if dim_size < min_required_shape[i]:
+                msg = (
+                    f"A spatial dimension of the extracted slice with size {dim_size} is smaller "
+                    f"than the minimum required size of {min_required_shape[i]:.2f}. "
+                    "The resulting crop may be excessively upscaled."
+                )
+                logger.warning(msg)
 
+        starts, ends = self._get_crop_params(spatial_shape)
         cropped_plane = sub_volume[:, starts[0] : ends[0], starts[1] : ends[1]]
 
         resampled_img = torch.nn.functional.interpolate(
@@ -314,7 +315,6 @@ class RandomCrop2D(BaseRandomCrop):
     Crops a 2D image (or 2.5D) to a random size and resamples it to a target square 2D size.
 
     Takes a tensor (C, H, W) and produces a tensor of (`C`, `size`, `size`).
-    The cropping is only applied to the spatial (H, W) dimensions.
     """
 
     def __init__(self, size: int, scale: Tuple[float, float] = (0.7, 1.0)) -> None:
@@ -324,23 +324,23 @@ class RandomCrop2D(BaseRandomCrop):
         self.crop_size = (size, size)
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        """
-        Applies the random 2D crop and resample transformation.
-
-        Args:
-            img: The input 2D/2.5D tensor with shape (C, H, W).
-
-        Returns:
-            The transformed tensor of shape (C, `size`, `size`).
-        """
         if img.ndim != 3:
             raise ValueError(
                 f"Input image must be 2.5D (C, H, W), but got shape {img.shape}"
             )
 
-        spatial_shape = img.shape[1:]  # We only crop H and W
-        starts, ends = self._get_crop_params(spatial_shape)
+        spatial_shape = img.shape[1:]
+        min_required_shape = [s * self.scale[0] for s in self.crop_size]
+        for i, dim_size in enumerate(spatial_shape):
+            if dim_size < min_required_shape[i]:
+                msg = (
+                    f"Input image spatial dimension {i} (shape index {i+1}) with size {dim_size} "
+                    f"is smaller than the minimum required size of {min_required_shape[i]:.2f}. "
+                    "The resulting crop may be excessively upscaled."
+                )
+                logger.warning(msg)
 
+        starts, ends = self._get_crop_params(spatial_shape)
         cropped_img = img[:, starts[0] : ends[0], starts[1] : ends[1]]
 
         resampled_img = torch.nn.functional.interpolate(
