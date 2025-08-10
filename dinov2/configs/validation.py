@@ -278,9 +278,6 @@ class CropsNumberConfig(BaseModel):
     global_view_multiple: int
 
     @field_validator(
-        "global_2d",
-        "local_3d",
-        "local_2d",
         "global_view_multiple",
         mode="before",
     )
@@ -288,6 +285,18 @@ class CropsNumberConfig(BaseModel):
     def validate_positive_integers(cls, v):
         if v <= 0:
             raise ValueError("Value must be a positive integer")
+        return v
+
+    @field_validator(
+        "global_2d",
+        "local_3d",
+        "local_2d",
+        mode="before",
+    )
+    @classmethod
+    def validate_integers(cls, v):
+        if v < 0:
+            raise ValueError("Value must be a non-negative integer")
         return v
 
 
