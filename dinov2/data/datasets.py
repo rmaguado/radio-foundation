@@ -164,7 +164,7 @@ class TorchVolumeDataset(VolumeDataset):
             except:
                 return False
 
-        df_valid = pl.Series("valid", [is_valid_shape(p) for p in ~df_exists["shape"]])
+        df_valid = pl.Series("valid", [is_valid_shape(p) for p in df_exists["shape"]])
 
         df_final = df_exists.filter(df_valid)
         len_final = len(df_final)
