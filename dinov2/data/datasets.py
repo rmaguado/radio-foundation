@@ -43,8 +43,13 @@ class VolumeDataset:
         self.transforms = transforms
         self.bounds = bounds
 
+        self._check_df()
+
     def __len__(self) -> int:
         return len(self.df)
+
+    def _check_df(self):
+        raise NotImplementedError
 
     def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Optional[Spacing]]:
         raise NotImplementedError
@@ -62,6 +67,9 @@ class DicomVolumeDataset(VolumeDataset):
 
     Inherits from VolumeDataset and implements get_image_data for DICOM folders.
     """
+
+    def _check_df(self):
+        return
 
     def get_image_data(self, idx: int):
         meta = self.df.row(idx)
@@ -102,6 +110,9 @@ class NiftiVolumeDataset(VolumeDataset):
     Inherits from VolumeDataset and implements get_image_data for NIfTI files.
     """
 
+    def _check_df(self):
+        return
+
     def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
         meta = self.df.row(idx)
         nifti_file_path = meta[0]
@@ -138,6 +149,36 @@ class TorchVolumeDataset(VolumeDataset):
 
     Inherits from VolumeDataset and implements get_image_data for torch pth.
     """
+
+    def _check_df(self):
+        len_init = len(self.df)
+        path_exists = pl.Series("exists", [os.path.exists(p) for p in self.df["path"]])
+
+        df_exists = self.df.filter(path_exists)
+        len_exists = len(df_exists)
+
+        def is_valid_shape(shape_str):
+            try:
+                dims = [int(d) for d in shape_str.strip("[]").split(",")]
+                return all(d >= 10 for d in dims)
+            except:
+                return False
+
+        df_valid = pl.Series("valid", [is_valid_shape(p) for p in ~df_exists["shape"]])
+
+        df_final = df_exists.filter(df_valid)
+        len_final = len(df_final)
+
+        if len_exists < len_init:
+            logger.warning(
+                f"Dropped {len_init - len_exists} samples due to file not found (dataset: {self.dataset_name})."
+            )
+        if len_final < len_exists:
+            logger.warning(
+                f"Dropped {len_exists - len_final} samples due to inappropriate size (dataset: {self.dataset_name})."
+            )
+
+        self.df = df_final.select("path")
 
     def get_image_data(self, idx: int):
         file_path = self.df[int(idx), "path"]
