@@ -141,7 +141,7 @@ class TorchVolumeDataset(VolumeDataset):
 
     def get_image_data(self, idx: int):
         file_path = self.df[int(idx), "path"]
-        image_array = torch.load(file_path)
+        image_array = torch.load(file_path, mmap=True)
         return image_array, None
 
 
