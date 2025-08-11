@@ -100,15 +100,19 @@ class RandomCrop3D(BaseRandomCrop):
 
         min_spatial_dim = min(img.shape)
 
-        min_required_size = int(max(self.crop_size) * self.scale[0])
-        if min_spatial_dim < min_required_size:
+        min_required_size = int(max(self.crop_size) / 2)
+        if min_spatial_dim * self.scale[0] >= min_required_size:
+            scale = self._get_scale()
+        elif min_spatial_dim >= min_required_size:
+            scale = 1.0
+        else:
+            scale = 1.0
             logger.warning(
                 f"Minimum spatial dimension {min_spatial_dim} is smaller than "
                 f"the minimum required size for a cubic crop of {min_required_size}. "
                 "The resulting crop may be upscaled or smaller than intended."
             )
 
-        scale = self._get_scale()
         crop_dim = int(min_spatial_dim * scale)
 
         crop_dim = min(min_spatial_dim, max(1, crop_dim))
@@ -162,15 +166,15 @@ class RandomSliceCrop(BaseRandomCrop):
 
         img_shape = img.shape
 
-        min_length = max(self.crop_size[0] * self.scale[0] / 2, self.channels)
+        min_required_size = int(max(self.crop_size) / 2)
         too_short_axes = [
-            i for i, dim_size in enumerate(img_shape) if dim_size < min_length
+            i for i, dim_size in enumerate(img_shape) if dim_size < min_required_size
         ]
 
         if len(too_short_axes) > 1:
             logger.warning(
                 f"Image has more than one dimension shorter than the required spatial crop size "
-                f"of {min_length}: {img_shape}. A valid 2D plane cannot be formed."
+                f"of {min_required_size}: {img_shape}. A valid 2D plane cannot be formed."
             )
 
         if too_short_axes:
@@ -186,6 +190,20 @@ class RandomSliceCrop(BaseRandomCrop):
                 f"which is smaller than the required depth of {self.channels}."
             )
 
+        min_spatial_dim = min([img_shape[i] for i in spatial_axes])
+
+        if min_spatial_dim * self.scale[0] >= min_required_size:
+            scale = self._get_scale()
+        elif min_spatial_dim >= min_required_size:
+            scale = 1.0
+        else:
+            scale = 1.0
+            logger.warning(
+                f"Minimum spatial dimension {min_spatial_dim} is smaller than "
+                f"the minimum required size for a cubic crop of {min_required_size}. "
+                "The resulting crop may be upscaled or smaller than intended."
+            )
+
         max_start = img_shape[slice_axis] - self.channels
         start_idx = random.randint(0, max_start)
 
@@ -197,7 +215,7 @@ class RandomSliceCrop(BaseRandomCrop):
 
         min_spatial_dim = min(spatial_shape)
 
-        scaled_crop_dim = int(min_spatial_dim * self._get_scale())
+        scaled_crop_dim = int(min_spatial_dim * scale)
         crop_dim = min(min_spatial_dim, max(1, scaled_crop_dim))
 
         max_start_0 = spatial_shape[0] - crop_dim
@@ -243,17 +261,24 @@ class RandomCrop2D(BaseRandomCrop):
             )
 
         spatial_shape = img.shape[1:]
-        min_required_size = int(max(self.crop_size) * self.scale[0])
+        min_required_size = int(max(self.crop_size) / 2)
 
-        if min(spatial_shape) < min_required_size:
+        min_spatial_dim = min(img.shape[1:])
+
+        if min_spatial_dim * self.scale[0] >= min_required_size:
+            scale = self._get_scale()
+        elif min_spatial_dim >= min_required_size:
+            scale = 1.0
+        else:
+            scale = 1.0
             logger.warning(
-                f"Minimum spatial dimension {min(spatial_shape)} is smaller than "
-                f"the minimum required size for a square crop of {min_required_size}. "
+                f"Minimum spatial dimension {min_spatial_dim} is smaller than "
+                f"the minimum required size for a cubic crop of {min_required_size}. "
                 "The resulting crop may be upscaled or smaller than intended."
             )
 
         min_spatial_dim = min(spatial_shape)
-        scale = self._get_scale()
+
         crop_dim = int(min_spatial_dim * scale)
 
         crop_dim = min(min_spatial_dim, max(1, crop_dim))
@@ -380,8 +405,8 @@ class ImageTransforms:
 
 if __name__ == "__main__":
     print("3D -> 3D Crop")
-    transform_3d = RandomCrop3D(size=64, scale=(0.8, 1.0))
-    input_3d = torch.randn(44, 128, 256)
+    transform_3d = RandomCrop3D(size=112, scale=(0.3, 1.0))
+    input_3d = torch.randn(56, 128, 256)
     output_3d = transform_3d(input_3d)
     print(f"Input shape: {input_3d.shape}")
     print(f"Output shape: {output_3d.shape}\n")
