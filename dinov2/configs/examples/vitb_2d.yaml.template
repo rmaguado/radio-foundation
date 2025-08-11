@@ -37,9 +37,10 @@ student:
   num_heads: 12
   mlp_ratio: 4
   embed_layers:
-    - name: patch_3d
+    - name: patch_2d
       patch_size: 14
       img_size: 224
+      in_channels: 1
   drop_path_rate: 0.1
   layerscale: 1.0e-05
   drop_path_uniform: true
