@@ -134,6 +134,7 @@ class EmbedLayerConfig(BaseModel):
     patch_size: int
     img_size: int
     in_channels: Optional[int] = None
+    layer_norm: Optional[bool] = False
 
     @field_validator("patch_size", "img_size", mode="before")
     @classmethod

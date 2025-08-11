@@ -41,9 +41,11 @@ student:
       patch_size: 14
       img_size: 448
       in_channels: 10
+      layer_norm: false
     - name: patch_3d
       patch_size: 14
       img_size: 224
+      layer_norm: false
   drop_path_rate: 0.4
   layerscale: 1.0e-05
   drop_path_uniform: true

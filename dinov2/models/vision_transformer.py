@@ -42,16 +42,13 @@ FFN_LAYER_REGISTRY = {
 }
 
 
-def get_embedding_layers(
-    embed_configs: List[Dict], embed_dim: int, norm_layer: Callable
-):
+def get_embedding_layers(embed_configs: List[Dict], embed_dim: int):
     """
     Creates a ModuleDict of embedding layers from a list of configurations.
 
     Args:
         embed_configs (Dict): Configuration dictionaries for embedding layers (2d and 3d).
         embed_dim (int): Output embedding dimension for each layer.
-        norm_layer (Callable): Normalization layer constructor.
 
     Returns:
         nn.ModuleDict: Dictionary of embedding layers keyed by type.
@@ -69,7 +66,7 @@ def get_embedding_layers(
             "patch_size": layer_config.get("patch_size", 16),
             "in_channels": layer_config.get("in_channels", 1),
             "embed_dim": embed_dim,
-            "norm_layer": norm_layer,
+            "layer_norm": layer_config.get("layer_norm", False),
         }
         embed_layers[layer_type] = EMBED_LAYER_REGISTRY[layer_type](**patch_kwargs)
 
@@ -163,7 +160,6 @@ class DinoVisionTransformer(nn.Module):
         act_layer: Callable = nn.GELU,
     ):
         super().__init__()
-        norm_layer = partial(nn.LayerNorm, eps=1e-6)
         block_fn = partial(Block, attn_class=MemEffAttention)
 
         self.embed_dim = embed_dim
@@ -173,7 +169,6 @@ class DinoVisionTransformer(nn.Module):
         self.embed_layers = get_embedding_layers(
             embed_configs=embed_configs,
             embed_dim=embed_dim,
-            norm_layer=norm_layer,
         )
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -208,7 +203,7 @@ class DinoVisionTransformer(nn.Module):
                     proj_bias=proj_bias,
                     ffn_bias=ffn_bias,
                     drop_path=dpr[i],
-                    norm_layer=norm_layer,
+                    norm_layer=partial(nn.LayerNorm, eps=1e-6),
                     act_layer=act_layer,
                     ffn_layer=ffn_layer_class,
                     init_values=init_values,
@@ -218,7 +213,7 @@ class DinoVisionTransformer(nn.Module):
             ]
         )
 
-        self.norm = norm_layer(embed_dim)
+        self.norm = nn.LayerNorm(embed_dim, eps=1e-6)
         self.head = nn.Identity()
 
         self.init_weights()

@@ -1,5 +1,3 @@
-from typing import Callable, Optional
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,7 +11,7 @@ class PatchEmbed(nn.Module):
         patch_size: int = 16,
         embed_dim: int = 768,
         in_channels: int = 1,
-        norm_layer: Optional[Callable] = None,
+        layer_norm: bool = False,
     ) -> None:
         super().__init__()
         self.img_size = img_size
@@ -26,7 +24,7 @@ class PatchEmbed(nn.Module):
         self.proj = self._get_projection_layer()
         self.num_patches = self._calculate_num_patches()
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim))
-        self.norm = norm_layer(embed_dim) if norm_layer is not None else nn.Identity()
+        self.norm = nn.LayerNorm(embed_dim, eps=1e-6) if layer_norm else nn.Identity()
 
     def _get_projection_layer(self) -> nn.Module:
         """Return the appropriate projection layer (e.g., nn.Conv2d, nn.Conv3d)."""
@@ -80,7 +78,7 @@ class PatchEmbed2D(PatchEmbed):
         num_patches = H * W
         if num_patches == self.num_patches:
             return self.pos_embed
-        
+
         pos_embed = self.pos_embed[0]
         orig_size = int(self.num_patches**0.5)
         pos_embed_2d = rearrange(
