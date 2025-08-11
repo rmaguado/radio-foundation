@@ -379,7 +379,7 @@ class NormConfig(BaseModel):
 
 class DatasetConfig(BaseModel):
     name: str
-    weight: float
+    weight: Optional[float]
     index_path: str
     type: Literal["ct", "mri"]
     storage: Literal["dicom", "nifti", "torch"]
@@ -389,8 +389,9 @@ class DatasetConfig(BaseModel):
     @field_validator("weight", mode="before")
     @classmethod
     def validate_weight(cls, v):
-        if v <= 0:
-            raise ValueError("Dataset weight must be positive floats.")
+        if v is not None:
+            if v <= 0:
+                raise ValueError("Dataset weight must be positive floats.")
         return v
 
     @field_validator("bounds", mode="before")
