@@ -301,11 +301,11 @@ class CropsNumberConfig(BaseModel):
 
 
 class CropSizesConfig(BaseModel):
-    global_3d: int
-    global_2d: int
-    local_3d: int
-    local_2d: int
-    channels: int
+    global_3d: Optional[int]
+    global_2d: Optional[int]
+    local_3d: Optional[int]
+    local_2d: Optional[int]
+    channels: Optional[int]
 
     @field_validator(
         "global_3d",
@@ -317,8 +317,9 @@ class CropSizesConfig(BaseModel):
     )
     @classmethod
     def validate_positive_integers(cls, v):
-        if v <= 0:
-            raise ValueError("Value must be a positive integer")
+        if v is not None:
+            if v <= 0:
+                raise ValueError("Value must be a positive integer")
         return v
 
 
