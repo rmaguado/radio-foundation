@@ -20,7 +20,7 @@ def cfg():
 @pytest.fixture
 def dataloader(cfg):
     inputs_dtype = torch.bfloat16
-    return setup_dataloader(cfg, inputs_dtype)
+    return setup_dataloader(cfg, inputs_dtype, 0)
 
 
 def test_dataloader_speed(cfg):
@@ -29,7 +29,7 @@ def test_dataloader_speed(cfg):
 
     inputs_dtype = torch.bfloat16
     t0 = time.time()
-    dataloader = setup_dataloader(cfg, inputs_dtype)
+    dataloader = setup_dataloader(cfg, inputs_dtype, 0)
     dataloader_iter = iter(dataloader)
     tf = time.time() - t0
     logger.info(f"Created dataloader in {tf:.06f} seconds.")

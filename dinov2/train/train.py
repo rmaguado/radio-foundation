@@ -203,7 +203,7 @@ def do_train(cfg, model):
     )
 
     if iteration < max_iter:
-        data_loader = setup_dataloader(cfg, inputs_dtype)
+        data_loader = setup_dataloader(cfg, inputs_dtype, iteration)
         metric_logger.set_dataloader(data_loader)
 
         iteration = train(

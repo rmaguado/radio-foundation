@@ -84,21 +84,20 @@ def check_weighted_sampler_params(
 
 
 class InfiniteSampler(Sampler):
-    def __init__(
-        self,
-        *,
-        sample_count: int,
-        seed: int = 0,
-    ):
+    def __init__(self, *, sample_count: int, seed: int = 0, advance: int = 0):
         self._sample_count = sample_count
         self._seed = seed
         self._start = dist.get_rank()
         self._step = dist.get_world_size()
 
+        self._advance = advance
+
     def __iter__(self):
         iterator = self._iterator()
 
-        yield from itertools.islice(iterator, 0, None)
+        num_samples_to_skip = self._advance // self._step
+
+        yield from itertools.islice(iterator, num_samples_to_skip, None)
 
     def _iterator(self):
         # Instantiate a generator here (rather than in the ctor) to keep the class
@@ -121,18 +120,23 @@ class WeightedInfiniteSampler(Sampler):
         sizes: List[int],
         weights: List[float],
         seed: int = 0,
+        advance: int = 0,
     ):
         self._dataset_sizes = sizes
         self._weights = weights
         self._seed = seed
         self._start = dist.get_rank()
         self._step = dist.get_world_size()
+        self._advance = advance
 
         check_weighted_sampler_params(dataset_names, sizes, weights)
 
     def __iter__(self):
         iterator = self._iterator()
-        yield from itertools.islice(iterator, 0, None)
+
+        num_samples_to_skip = self._advance // self._step
+
+        yield from itertools.islice(iterator, num_samples_to_skip, None)
 
     def _iterator(self):
         generator = torch.Generator()

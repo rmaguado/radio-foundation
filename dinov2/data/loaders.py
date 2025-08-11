@@ -92,11 +92,11 @@ def build_dataset_from_cfg(cfg, dataset_config):
 
 
 def _make_sampler(
-    *,
     dataset,
     weights: Optional[List[float]] = None,
     sampler_type: Optional[SamplerType] = None,
     seed: int = 0,
+    advance: int = 0,
 ) -> Optional[Sampler]:
     """
     Creates a sampler with the specified parameters.
@@ -110,6 +110,7 @@ def _make_sampler(
         weights (Optional[List[float]]): The weights for each dataset if using multiple groups of data. Defaults to None.
         sampler_type (Optional[SamplerType]): The type of sampler to create. Defaults to None.
         seed (int): The random seed for shuffling. Defaults to 0.
+        advance (int): number of sampler steps to skip.
 
     Returns:
         Optional[Sampler]: The created sampler or None if no sampler is created.
@@ -152,12 +153,16 @@ def _make_sampler(
 
     if sampler_type == SamplerType.INFINITE:
         logger.info("sampler: infinite")
-        return InfiniteSampler(sample_count=sample_count, seed=seed)
+        return InfiniteSampler(sample_count=sample_count, seed=seed, advance=advance)
     elif sampler_type == SamplerType.WEIGHTED_INFINITE:
         logger.info("sampler: weighted infinite")
         assert weights is not None
         return WeightedInfiniteSampler(
-            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
+            dataset_names=dataset_names,
+            sizes=dataset_sizes,
+            weights=weights,
+            seed=seed,
+            advance=advance,
         )
 
     logger.info("sampler: none")
@@ -165,10 +170,11 @@ def _make_sampler(
 
 
 def make_data_loader(
-    *,
     dataset,
-    batch_size: int,
+    batch_size_per_gpu: int,
+    batch_size_total: int,
     num_workers: int,
+    iteration: int = 0,
     seed: int = 0,
     weights: Optional[List[float]] = None,
     sampler_type: Optional[SamplerType] = SamplerType.INFINITE,
@@ -197,13 +203,14 @@ def make_data_loader(
         weights=weights,
         sampler_type=sampler_type,
         seed=seed,
+        advance=iteration * batch_size_total,
     )
 
     logger.info("using PyTorch data loader")
     data_loader = DataLoader(
         dataset,
         sampler=sampler,
-        batch_size=batch_size,
+        batch_size=batch_size_per_gpu,
         num_workers=num_workers,
         pin_memory=True,
         drop_last=drop_last,

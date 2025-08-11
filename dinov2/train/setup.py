@@ -136,20 +136,22 @@ def setup_collate_fn(cfg, inputs_dtype):
     )
 
 
-def setup_dataloader(cfg, inputs_dtype):
+def setup_dataloader(cfg, inputs_dtype, iteration):
     collate_fn = setup_collate_fn(cfg, inputs_dtype)
 
     dataset, weights = make_train_dataset(cfg)
 
-    batch_size_per_gpu = cfg.train.batch_size_per_gpu
     if weights is not None:
         sampler_type = SamplerType.WEIGHTED_INFINITE
     else:
         sampler_type = SamplerType.INFINITE
+
     data_loader = make_data_loader(
         dataset=dataset,
-        batch_size=batch_size_per_gpu,
+        batch_size_per_gpu=cfg.train.batch_size_per_gpu,
+        batch_size_total=cfg.train.batch_size_total,
         num_workers=cfg.train.num_workers,
+        iteration=iteration,
         seed=cfg.train.seed,
         weights=weights,
         sampler_type=sampler_type,
