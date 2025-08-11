@@ -30,7 +30,7 @@ checkpoints:
   save_checkpoint_iterations: 1000
   save_teacher_iterations: 10000
 student:
-  model_name: vitl14_3d
+  model_name: vitb14_3d
   pretrained_weights: ''
   embed_dim: 768
   depth: 12
