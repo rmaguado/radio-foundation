@@ -46,10 +46,10 @@ def main(hosts, reports_file):
     load_dotenv()
     project_path, data_path = os.getenv("PROJECTPATH"), os.getenv("DATAPATH")
     reports_file = os.path.join(
-        data_path,
+        data_path,  # type: ignore
         f"niftis/CT-RATE/dataset/radiology_text_reports/{reports_file}",
-    )
-    output_path = os.path.join(project_path, "mllm/preprocessing/out")
+    )  # type: ignore
+    output_path = os.path.join(project_path, "mllm/preprocessing/out")  # type: ignore
     mapping_file = os.path.join(output_path, "report_mapping.csv")
 
     os.makedirs(output_path, exist_ok=True)

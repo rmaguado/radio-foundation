@@ -8,7 +8,7 @@ def main():
     load_dotenv()
     project_path = os.getenv("PROJECTPATH")
 
-    generated_reports_path = os.path.join(project_path, "mllm/preprocessing/out")
+    generated_reports_path = os.path.join(project_path, "mllm/preprocessing/out")  # type: ignore
     report_files = glob(
         os.path.join(generated_reports_path, "restructured_reports_*.csv")
     )

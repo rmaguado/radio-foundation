@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import pandas as pd
 import ollama
 import re
-import time
 from tqdm import tqdm
 
 
@@ -72,10 +71,10 @@ def label_reports():
     data_path = os.getenv("DATAPATH")
 
     path_to_reports = os.path.join(
-        data_path, "niftis/CT-RATE/dataset/radiology_text_reports/train_reports.csv"
+        data_path, "niftis/CT-RATE/dataset/radiology_text_reports/train_reports.csv"  # type: ignore
     )
 
-    output_path = os.path.join(project_path, "vqa/data/train")
+    output_path = os.path.join(project_path, "vqa/data/train")  # type: ignore
     os.makedirs(output_path, exist_ok=True)
 
     df = pd.read_csv(path_to_reports)
@@ -104,7 +103,7 @@ def generate_report_qa():
     project_path = os.getenv("PROJECTPATH")
     data_path = os.getenv("DATAPATH")
 
-    report_data_path = os.path.join(project_path, "vqa/data/train")
+    report_data_path = os.path.join(project_path, "vqa/data/train")  # type: ignore
     report_names = os.listdir(report_data_path)
 
     for report_name in tqdm(report_names):

@@ -84,14 +84,14 @@ def load_train_config():
     output_dir = os.path.join(args.output_path, "checkpoints")
     os.makedirs(output_dir, exist_ok=True)
 
-    model_args = cfg["model"]
-    data_args = cfg["data"]
-    training_args = cfg["train"]
+    model_args = cfg.model
+    data_args = cfg.data
+    training_args = cfg.train
     training_args.logging_dir = os.path.join(
         training_args.logging_dir, datetime.now().strftime("%Y%m%d_%H%M%S")
     )
     training_args = TrainingArguments(
-        **cfg["train"],
+        **cfg.train,
         deepspeed=args.deepspeed,
         output_dir=output_dir,
         label_names=["labels"],
@@ -127,12 +127,12 @@ def load_generate_config():
     output_dir = args.output_path
     os.makedirs(output_dir, exist_ok=True)
 
-    model_args = cfg["model"]
-    data_args = cfg["data"]
-    training_args = cfg["train"]
+    model_args = cfg.model
+    data_args = cfg.data
+    training_args = cfg.train
 
     training_args = TrainingArguments(
-        **cfg["train"], output_dir=output_dir, label_names=["labels"]
+        **cfg.train, output_dir=output_dir, label_names=["labels"]
     )
 
     model_args.pretrain_checkpoint_path = model_checkpoint_path
