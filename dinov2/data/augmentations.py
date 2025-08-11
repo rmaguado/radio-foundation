@@ -63,7 +63,7 @@ class DataAugmentationDINO:
             transforms["global_3d"] = self._create_base_augmentations(skip_first=False)
 
             local_3d_augment = ImageTransforms()
-            local_3d_augment += RandomCrop3D(size=l_3d_size, scale=(0.1, 0.5))
+            local_3d_augment += RandomCrop3D(size=l_3d_size, scale=(0.2, 0.5))
             local_3d_augment += self._create_base_augmentations(skip_first=False)
             local_3d_augment += GaussianBlur()
             transforms["local_3d"] = local_3d_augment
@@ -90,7 +90,7 @@ class DataAugmentationDINO:
             )
 
             local_2d_augment = ImageTransforms()
-            local_2d_augment += RandomCrop2D(size=l_2d_size, scale=(0.1, 0.5))
+            local_2d_augment += RandomCrop2D(size=l_2d_size, scale=(0.2, 0.5))
             local_2d_augment += self._create_base_augmentations(skip_first=True)
             local_2d_augment += GaussianBlur()
             transforms["local_2d"] = local_2d_augment
