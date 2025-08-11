@@ -71,6 +71,7 @@ def build_dataset_from_cfg(cfg, dataset_config):
     transforms = DataAugmentationDINO(cfg, norm.mean, norm.std)
 
     dataset_kwargs = {
+        "config": cfg,
         "dataset_name": dataset_config.name,
         "index_path": dataset_config.index_path,
         "modality": dataset_config.type,

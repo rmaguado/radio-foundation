@@ -31,12 +31,14 @@ class VolumeDataset:
 
     def __init__(
         self,
+        config,
         dataset_name: str,
         index_path: str,
         modality: str,
         transforms: Callable,
         bounds: Tuple[float, float] = (-1000, 1900),
     ) -> None:
+        self.config = config
         self.dataset_name = dataset_name
         self.df = pl.read_csv(index_path)
         self.modality = modality
@@ -157,10 +159,15 @@ class TorchVolumeDataset(VolumeDataset):
         df_exists = self.df.filter(path_exists)
         len_exists = len(df_exists)
 
+        if self.config.crops.views.enable_3d:
+            min_required_size = int(self.config.crops.crop_sizes.global_3d * 0.3)
+        else:
+            min_required_size = self.config.crops.crop_sizes.channels
+
         def is_valid_shape(shape_str):
             try:
                 dims = [int(d) for d in shape_str.strip("[]").split(",")]
-                return all(d >= 10 for d in dims)
+                return all(d >= min_required_size for d in dims)
             except:
                 return False
 
