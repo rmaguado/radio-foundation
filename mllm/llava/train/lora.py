@@ -5,14 +5,14 @@ https://github.com/2U1/Llama3.2-Vision-Finetune/blob/master/src/training/train.p
 
 import torch
 import logging
-from peft import LoraConfig, PeftModel, get_peft_model
+from peft import LoraConfig, get_peft_model
 
 
 logger = logging.getLogger("DeepSpeed")
 
 
 def find_target_linear_names(
-    model, exclude_modules=None, include_modules=None, must_have_keywords=None
+    model, exclude_modules, include_modules=None, must_have_keywords=None
 ):
     linear_cls = torch.nn.modules.Linear
     embedding_cls = torch.nn.modules.Embedding
@@ -87,7 +87,6 @@ def configure_lora(model, model_args):
         task_type="CAUSAL_LM",
         rank_pattern=rank_pattern,
         alpha_pattern=alpha_pattern,
-        
     )
 
     model = get_peft_model(model, config)

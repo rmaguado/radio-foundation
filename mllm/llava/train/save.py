@@ -2,8 +2,6 @@ import deepspeed
 import torch
 import os
 
-from peft import PeftModel
-
 
 def save_model(training_args, model, output_dir):
     os.makedirs(output_dir, exist_ok=True)

@@ -1,5 +1,5 @@
 import torch
-from typing import Dict, Sequence
+from typing import Dict, Sequence, Any
 from dataclasses import dataclass
 from transformers import PreTrainedTokenizer
 
@@ -13,7 +13,7 @@ class DataCollatorForSupervisedDataset(object):
 
     tokenizer: PreTrainedTokenizer
 
-    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+    def __call__(self, instances: Sequence[Dict]):
         input_ids, labels = tuple(
             [instance[key] for instance in instances] for key in ("input_ids", "labels")
         )
@@ -25,7 +25,7 @@ class DataCollatorForSupervisedDataset(object):
         )
         input_ids = input_ids[:, : self.tokenizer.model_max_length]
         labels = labels[:, : self.tokenizer.model_max_length]
-        batch = dict(
+        batch: Dict[str, Any] = dict(
             input_ids=input_ids,
             labels=labels,
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),

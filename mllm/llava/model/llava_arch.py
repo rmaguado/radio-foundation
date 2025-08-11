@@ -27,9 +27,6 @@ from .multimodal_projector.builder import build_vision_projector
 from mllm.llava.constants import (
     IGNORE_INDEX,
     IMAGE_TOKEN_INDEX,
-    DEFAULT_IMAGE_PATCH_TOKEN,
-    DEFAULT_IM_START_TOKEN,
-    DEFAULT_IM_END_TOKEN,
 )
 
 logger = logging.getLogger("DeepSpeed")
@@ -38,7 +35,7 @@ logger = logging.getLogger("DeepSpeed")
 class LlavaMetaModel:
 
     def __init__(self, config):
-        super().__init__(config)
+        super().__init__(config)  # type: ignore
 
     def get_vision_tower(self):
         vision_tower = getattr(self, "vision_tower", None)
@@ -55,34 +52,32 @@ class LlavaMetaModel:
     def initialize_vision_modules(self, model_args, torch_dtype):
         mm_vision_hidden_size = model_args.mm_vision_hidden_size
         mm_projector_hidden_size = model_args.mm_projector_hidden_size
-        mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
-        checkpoint_path = model_args.pretrain_checkpoint_path
 
-        self.config.mm_vision_tower = model_args.vision_tower
-        self.config.image_tokens = model_args.image_tokens
+        self.config.mm_vision_tower = model_args.vision_tower  # type: ignore
+        self.config.image_tokens = model_args.image_tokens  # type: ignore
 
         if model_args.use_vision_tower:
             vision_tower = build_vision_tower(model_args, torch_dtype=torch_dtype)
             vision_tower.requires_grad_(False)
             self.vision_tower = vision_tower
 
-        self.config.use_mm_proj = True
-        self.config.mm_projector_type = getattr(
+        self.config.use_mm_proj = True  # type: ignore
+        self.config.mm_projector_type = getattr(  # type: ignore
             model_args, "mm_projector_type", "attn_pool"
         )
-        self.config.mm_vision_hidden_size = mm_vision_hidden_size
-        self.config.mm_projector_hidden_size = mm_projector_hidden_size
-        self.config.mm_vision_select_feature = mm_vision_select_feature
+        self.config.mm_vision_hidden_size = mm_vision_hidden_size  # type: ignore
+        self.config.mm_projector_hidden_size = mm_projector_hidden_size  # type: ignore
+        self.config.mm_vision_select_feature = mm_vision_select_feature  # type: ignore
 
-        self.mm_projector = build_vision_projector(self.config)
+        self.mm_projector = build_vision_projector(self.config)  # type: ignore
 
 
 class LlavaMetaForCausalLM(ABC):
 
     @abstractmethod
     def get_model(self):
-        pass
+        raise NotImplementedError
 
     def get_vision_tower(self):
         return self.get_model().get_vision_tower()
@@ -91,7 +86,7 @@ class LlavaMetaForCausalLM(ABC):
         return self.get_model().get_mm_projector()
 
     def select_embed_features(self, embed_memmap, dtype):
-        select_feature = self.config.mm_vision_select_feature
+        select_feature = self.config.mm_vision_select_feature  # type: ignore
 
         if select_feature == "cls":
             features = [torch.from_numpy(x[:, :1, :]) for x in embed_memmap]
@@ -109,7 +104,7 @@ class LlavaMetaForCausalLM(ABC):
             ]
         else:
             features = [torch.from_numpy(x[:, :, :]) for x in embed_memmap]
-        return [f.to(device=self.device, dtype=dtype) for f in features]
+        return [f.to(device=self.device, dtype=dtype) for f in features]  # type: ignore
 
     def prepare_inputs_labels_for_multimodal(
         self,
@@ -183,8 +178,8 @@ class LlavaMetaForCausalLM(ABC):
             before_labels = cur_labels[:image_token_index]
             after_labels = cur_labels[image_token_index + 1 :]
 
-            before_embed = self.get_model().embed_tokens(before_ids.to(self.device))
-            after_embed = self.get_model().embed_tokens(after_ids.to(self.device))
+            before_embed = self.get_model().embed_tokens(before_ids.to(self.device))  # type: ignore
+            after_embed = self.get_model().embed_tokens(after_ids.to(self.device))  # type: ignore
             cur_image_features = image_features[batch_idx]
 
             cur_input_embeds = torch.cat(
@@ -196,7 +191,7 @@ class LlavaMetaForCausalLM(ABC):
                     torch.full(
                         (cur_image_features.shape[0],),
                         IGNORE_INDEX,
-                        device=self.device,
+                        device=self.device,  # type: ignore
                         dtype=cur_labels.dtype,
                     ),
                     after_labels,
@@ -208,7 +203,7 @@ class LlavaMetaForCausalLM(ABC):
             new_labels.append(cur_label_ids)
 
         tokenizer_model_max_length = getattr(
-            self.config, "tokenizer_model_max_length", None
+            self.config, "tokenizer_model_max_length", None  # type: ignore
         )
         if tokenizer_model_max_length is not None:
             new_input_embeds = [
@@ -227,10 +222,10 @@ class LlavaMetaForCausalLM(ABC):
             device=new_labels[0].device,
         )
         attention_mask_out = torch.zeros(
-            (batch_size, max_len), dtype=attention_mask.dtype, device=self.device
+            (batch_size, max_len), dtype=attention_mask.dtype, device=self.device  # type: ignore
         )
         position_ids = torch.zeros(
-            (batch_size, max_len), dtype=torch.long, device=self.device
+            (batch_size, max_len), dtype=torch.long, device=self.device  # type: ignore
         )
 
         for i, (cur_new_embed, cur_new_labels) in enumerate(
@@ -239,7 +234,7 @@ class LlavaMetaForCausalLM(ABC):
             cur_len = cur_new_embed.shape[0]
             assert cur_len > 0, f"[ERROR] Got empty embed sequence at index {i}"
 
-            if getattr(self.config, "tokenizer_padding_side", "right") == "left":
+            if getattr(self.config, "tokenizer_padding_side", "right") == "left":  # type: ignore
                 new_input_embeds_padded.append(
                     torch.cat(
                         [
@@ -256,7 +251,7 @@ class LlavaMetaForCausalLM(ABC):
                 new_labels_padded[i, -cur_len:] = cur_new_labels
                 attention_mask_out[i, -cur_len:] = True
                 position_ids[i, -cur_len:] = torch.arange(
-                    0, cur_len, dtype=position_ids.dtype, device=self.device
+                    0, cur_len, dtype=position_ids.dtype, device=self.device  # type: ignore
                 )
             else:
                 new_input_embeds_padded.append(
@@ -275,10 +270,10 @@ class LlavaMetaForCausalLM(ABC):
                 new_labels_padded[i, :cur_len] = cur_new_labels
                 attention_mask_out[i, :cur_len] = True
                 position_ids[i, :cur_len] = torch.arange(
-                    0, cur_len, dtype=position_ids.dtype, device=self.device
+                    0, cur_len, dtype=position_ids.dtype, device=self.device  # type: ignore
                 )
 
-        new_input_embeds = torch.stack(new_input_embeds_padded, dim=0).to(self.device)
+        new_input_embeds = torch.stack(new_input_embeds_padded, dim=0).to(self.device)  # type: ignore
 
         if _labels is None:
             new_labels = None

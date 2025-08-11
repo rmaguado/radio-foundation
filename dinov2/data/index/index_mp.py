@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 sitk.ProcessObject_SetGlobalWarningDisplay(False)
 
+
 # ---------- NIFTI ----------
 def _process_one_nifti(file_path: str) -> Dict:
     """Executed in a child process."""
@@ -41,12 +42,11 @@ def _process_one_dicom_folder(dirpath: str, target_modality: str) -> Dict:
 
         if reader.HasMetaDataKey(slice=0, key="0008|0060"):
             modality = reader.GetMetaData(slice=0, key="0008|0060")
-            assert modality == target_modality, f"Expected {target_modality}, got {modality}"
+            assert (
+                modality == target_modality
+            ), f"Expected {target_modality}, got {modality}"
         else:
             logging.info(f"{dirpath} has no modality info, assuming OK")
-
-        if target_modality == "CT":
-            
 
         meta = {"path": dirpath}
         meta.update(get_fields(image))
@@ -109,7 +109,8 @@ def get_fields_mri(reader) -> Dict:
 
     return mri_metadata
 
-def index_niftis(root_path: str, output_path: str, max_workers: int = None) -> None:
+
+def index_niftis(root_path: str, output_path: str, max_workers: int) -> None:
     # Collect file paths first (cheap I/O)
     file_paths = []
     for dirpath, _, filenames in walk(root_path):
@@ -131,8 +132,9 @@ def index_niftis(root_path: str, output_path: str, max_workers: int = None) -> N
     logging.info(f"NIfTI metadata saved to {output_path}")
 
 
-def index_dicoms(root_path: str, output_path: str, target_modality: str,
-                 max_workers: int = None) -> None:
+def index_dicoms(
+    root_path: str, output_path: str, target_modality: str, max_workers: int
+) -> None:
     # Collect candidate folders
     folders = []
     for dirpath, _, filenames in walk(root_path):
@@ -157,7 +159,7 @@ def index_dicoms(root_path: str, output_path: str, target_modality: str,
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_type", type=str)
-    parser.add_argument("--modality", type=str, default='CT')
+    parser.add_argument("--modality", type=str, default="CT")
     parser.add_argument("--root_path", type=str)
     parser.add_argument("--output_path", type=str)
     parser.add_argument("--workers", type=int, default=1, help="Parallel workers")
@@ -166,15 +168,17 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s"
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
     args = get_args()
     if args.dataset_type == "nifti":
         index_niftis(args.root_path, args.output_path, args.workers)
     elif args.dataset_type == "dicom":
-        assert args.modality in ("CT", "MR"), f"Modality must be CT or MR, got {args.modality}"
+        assert args.modality in (
+            "CT",
+            "MR",
+        ), f"Modality must be CT or MR, got {args.modality}"
         index_dicoms(args.root_path, args.output_path, args.modality, args.workers)
     else:
         raise ValueError(f"Unrecognized dataset_type: {args.dataset_type}")

@@ -306,7 +306,7 @@ class DinoVisionTransformer(nn.Module):
         }
 
 
-def build_model(cfg) -> Tuple[nn.Module, nn.Module]:
+def build_model(cfg, teacher_only=False):
     args = cfg.student
     vit_kwargs = dict(
         embed_dim=args.embed_dim,
@@ -322,6 +322,8 @@ def build_model(cfg) -> Tuple[nn.Module, nn.Module]:
         init_values=args.layerscale,
     )
     teacher = DinoVisionTransformer(**vit_kwargs)
+    if teacher_only:
+        return None, teacher
     student = DinoVisionTransformer(
         **vit_kwargs,
         drop_path_rate=args.drop_path_rate,

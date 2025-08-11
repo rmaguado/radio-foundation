@@ -21,6 +21,7 @@ import transformers
 import os
 
 import torch.distributed as dist
+from peft import PeftModel
 
 from mllm.llava.train.trainer import LLaVATrainer
 

@@ -31,7 +31,7 @@ class SSLMetaArch(nn.Module):
         self.teacher = nn.ModuleDict()
 
         student_backbone, teacher_backbone = build_model(cfg)
-        self.student["backbone"] = student_backbone
+        self.student["backbone"] = student_backbone  # type: ignore
         self.teacher["backbone"] = teacher_backbone
 
         self.embed_dim = cfg.student.embed_dim

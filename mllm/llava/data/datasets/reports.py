@@ -1,3 +1,4 @@
+from functools import cache
 import os
 import copy
 import torch
@@ -173,7 +174,7 @@ class ImageReportDataset(NiftiCtVolumesFull):
     def process_report(self, report_text):
         return report_text
 
-    def get_image_data(self, index: int) -> torch.Tensor:
+    def get_image_data(self, index: int):
         rowid, map_id, _, _ = self.entries[index]
         self.cursor.execute(
             """
@@ -184,9 +185,9 @@ class ImageReportDataset(NiftiCtVolumesFull):
         dataset, axial_dim, nifti_path, report, slice_thickness = self.cursor.fetchone()
 
         abs_path_to_nifti = os.path.join(self.root_path, dataset, nifti_path)
-        nifti_file = nib.load(abs_path_to_nifti)
+        nifti_file = nib.loadsave.load(abs_path_to_nifti)
 
-        volume_data = nifti_file.get_fdata().astype(np.float32)
+        volume_data = nifti_file.get_fdata().astype(np.float32)  # type: ignore
         volume_data = np.moveaxis(volume_data, axial_dim, 0)
         volume_data = torch.from_numpy(volume_data)
         volume_data = self.process_ct(volume_data)
@@ -194,7 +195,7 @@ class ImageReportDataset(NiftiCtVolumesFull):
 
         return map_id, volume_data, report
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, Any]:
+    def __getitem__(self, index: int):
         try:
             map_id, image, report = self.get_image_data(index)
         except Exception as e:
@@ -237,7 +238,7 @@ class CachedEmbedReportDataset(NiftiCtVolumesFull):
         np.save(entries_dir, entries_array)
         return np.load(entries_dir, mmap_mode="r")
 
-    def get_image_embed(self, index: int) -> torch.Tensor:
+    def get_image_embed(self, index: int):
         rowid, map_id, _, _ = self.entries[index]
         self.cursor.execute(
             """
@@ -271,7 +272,7 @@ def preprocess(
 ) -> Dict:
     conversation.messages = []
     for source in sources:
-        conversation.append_message(source["from"], source["value"])
+        conversation.append_message(source["from"], source["value"])  # type: ignore
     prompt_chunks = conversation.get_prompt()
 
     input_ids = []
@@ -282,7 +283,7 @@ def preprocess(
         if not is_target:
             targets.append(torch.tensor([IGNORE_INDEX] * len(ids)))
         else:
-            targets.append(ids.clone())
+            targets.append(ids.clone())  # type: ignore
 
     input_ids = torch.cat(input_ids, dim=0)
     targets = torch.cat(targets, dim=0)
@@ -304,6 +305,7 @@ class RadiologyReportDataset(Dataset):
         self.cache_embed = data_args.cache_embed
 
         if data_args.cache_embed:
+            assert cache_path is not None
             self.dataset = CachedEmbedReportDataset(
                 root_path=data_args.root_path,
                 dataset_name=dataset_name,
@@ -340,7 +342,7 @@ class RadiologyReportDataset(Dataset):
             return min(8, len(self.dataset))
         return len(self.dataset)
 
-    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, i):
 
         data_dict = {}
 

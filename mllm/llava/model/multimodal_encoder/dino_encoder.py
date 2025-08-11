@@ -1,11 +1,9 @@
 import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
-from functools import partial
 import logging
 
-from dinov2.models import build_model_from_cfg
-from dinov2.utils.utils import load_pretrained_weights
+from dinov2.models import build_model
 
 
 logger = logging.getLogger("DeepSpeed")
@@ -54,10 +52,12 @@ class DINOVisionTower(nn.Module):
             )
             return
 
-        self.vision_tower, _ = build_model_from_cfg(
-            self.model_config, only_teacher=True
-        )
-        load_pretrained_weights(self.vision_tower, self.path_to_checkpoint, "teacher")
+        _, self.vision_tower = build_model(self.model_config, teacher_only=True)
+        state_dict = torch.load(self.path_to_checkpoint, map_location="cpu")["teacher"]
+        state_dict = {
+            k: v for k, v in state_dict.items() if not k.startswith("dino_head")
+        }
+        self.vision_tower.load_state_dict(state_dict)
 
         if self.select_layer < 0:
             self.select_layer = self.vision_tower.n_blocks + self.select_layer
@@ -94,10 +94,10 @@ class DINOVisionTower(nn.Module):
 
         for img in images:
 
-            img_features = []
-
             x_tokens = self.vision_tower.get_intermediate_layers(
-                img, [self.select_layer], return_class_token=True
+                img,
+                embed_layer="patch_2d",
+                select_layers=self.select_layer,
             )
             feat = self.extract_fnc(x_tokens)
             features.append(feat)
@@ -111,7 +111,7 @@ class DINOVisionTower(nn.Module):
             num_tokens += 1
 
         return torch.zeros(
-            1, num_tokens, self.hidden_size, device=self.device, dtype=self.dtype
+            1, num_tokens, self.hidden_size, device=self.device, dtype=self.dtype  # type: ignore
         )
 
     @property

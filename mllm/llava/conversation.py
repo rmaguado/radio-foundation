@@ -16,9 +16,9 @@ class Conversation:
 
     system: str
     roles: Dict[str, str]
-    messages: List[List[str]]
     offset: int
     sep_style: SeparatorStyle
+    messages: List[List[str]] = []
 
     def parse_plain(self, messages):
         chunks = []
@@ -80,7 +80,6 @@ class Conversation:
 conv_llava_plain = Conversation(
     system="",
     roles={"human": "", "gpt": ""},
-    messages=(),
     offset=0,
     sep_style=SeparatorStyle.PLAIN,
 )
@@ -88,7 +87,6 @@ conv_llava_plain = Conversation(
 conv_llama_3 = Conversation(
     system="A chat between a curious user and an artificial intelligence assistant. The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.",
     roles={"human": "user", "gpt": "assistant"},
-    messages=(),
     offset=0,
     sep_style=SeparatorStyle.LLAMA_3,
 )
@@ -96,7 +94,6 @@ conv_llama_3 = Conversation(
 report_llama_3 = Conversation(
     system="You are a radiology assistant specialized in interpreting chest CT scans and generating concise, accurate radiology reports. Using the provided visual tokens, identify relevant findings, describe them using standard radiological terminology, and produce a clear, well-structured report.",
     roles={"human": "user", "gpt": "assistant"},
-    messages=(),
     offset=0,
     sep_style=SeparatorStyle.LLAMA_3,
 )

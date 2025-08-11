@@ -142,7 +142,7 @@ class LLaVATrainer(Trainer):
         return self.optimizer
 
     def create_scheduler(
-        self, num_training_steps: int, optimizer: torch.optim.Optimizer = None
+        self, num_training_steps: int, optimizer: torch.optim.Optimizer
     ):
         num_warmup_steps = self.args.get_warmup_steps(num_training_steps)
         min_lr = self.args.min_lr

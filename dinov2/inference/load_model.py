@@ -7,8 +7,7 @@ from omegaconf import OmegaConf
 from torchvision import transforms
 from einops import rearrange
 
-from dinov2.models import build_model_from_cfg
-from dinov2.utils.utils import load_pretrained_weights
+from dinov2.models import build_model
 
 
 class ImageTransform:
@@ -110,7 +109,7 @@ class ModelWithIntermediateLayers(nn.Module):
     found in the LICENSE file in the root directory of this source tree.
     """
 
-    def __init__(self, feature_model, select_layers: int | List[int], autocast_ctx):
+    def __init__(self, feature_model, select_layers, autocast_ctx):
         super().__init__()
         self.feature_model = feature_model
         self.feature_model.eval()
@@ -175,8 +174,12 @@ def get_autocast_dtype(cfg):
 
 
 def load_model_eval(path_to_checkpoint, config, device, select_layers):
-    model, _ = build_model_from_cfg(config, only_teacher=True)
-    load_pretrained_weights(model, path_to_checkpoint, "teacher")
+    _, model = build_model(config, teacher_only=True)
+
+    state_dict = torch.load(path_to_checkpoint, map_location="cpu")["teacher"]
+    state_dict = {k: v for k, v in state_dict.items() if not k.startswith("dino_head")}
+    model.load_state_dict(state_dict)
+
     model.eval()
     model.to(device)
 
@@ -191,6 +194,7 @@ def load_model_eval(path_to_checkpoint, config, device, select_layers):
 
 if __name__ == "__main__":
     path_to_run = "runs/test"
+    checkpoint_name = "training_99999"
     path_to_checkpoint = os.path.join(
         path_to_run, "eval", checkpoint_name, "teacher_checkpoint.pth"
     )
