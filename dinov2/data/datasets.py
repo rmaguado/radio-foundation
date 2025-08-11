@@ -160,7 +160,7 @@ class TorchVolumeDataset(VolumeDataset):
         len_exists = len(df_exists)
 
         if self.config.crops.views.enable_3d:
-            min_required_size = int(self.config.crops.crop_sizes.global_3d * 0.3 / 2)
+            min_required_size = int(self.config.crops.crop_sizes.global_3d / 2)
         else:
             min_required_size = self.config.crops.crop_sizes.channels
 
