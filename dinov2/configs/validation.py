@@ -388,8 +388,8 @@ class DatasetConfig(BaseModel):
     @field_validator("weight", mode="before")
     @classmethod
     def validate_weight(cls, v):
-        if not 0.0 <= v <= 1.0:
-            raise ValueError("Dataset weight must be between 0.0 and 1.0")
+        if v <= 0:
+            raise ValueError("Dataset weight must be positive floats.")
         return v
 
     @field_validator("bounds", mode="before")
