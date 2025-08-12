@@ -23,7 +23,7 @@ from .samplers import (
 )
 from .augmentations import DataAugmentationDINO
 
-# from .dataloader import CollaborativeLoader
+# from .dataloader import ParallelSampleDataLoader
 
 
 logger = logging.getLogger("dinov2")
@@ -207,19 +207,25 @@ def make_data_loader(
     )
 
     logger.info("using PyTorch data loader")
-    data_loader = DataLoader(
-        dataset,
-        sampler=sampler,
-        batch_size=batch_size_per_gpu,
-        num_workers=num_workers,
-        pin_memory=True,
-        drop_last=drop_last,
-        persistent_workers=persistent_workers,
-        collate_fn=collate_fn,
-    )
-    # data_loader = CollaborativeLoader(
-    #    dataset, batch_size, num_workers, sampler, collate_fn=collate_fn
+    # data_loader = DataLoader(
+    #    dataset,
+    #    sampler=sampler,
+    #    batch_size=batch_size_per_gpu,
+    #    num_workers=num_workers,
+    #    pin_memory=True,
+    #    drop_last=drop_last,
+    #    persistent_workers=persistent_workers,
+    #    collate_fn=collate_fn,
     # )
+    data_loader = ParallelSampleDataLoader(
+        dataset,
+        batch_size=batch_size_per_gpu,
+        collate_fn=collate_fn,
+        num_workers=num_workers,
+        sampler=sampler,
+        pin_memory=False,
+        shared_memory=False,
+    )
 
     try:
         logger.info(f"# of batches: {len(data_loader):,d}")
