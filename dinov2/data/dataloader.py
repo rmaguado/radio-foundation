@@ -116,7 +116,7 @@ class ParallelSampleDataLoader:
                     self.pin_memory,
                 ),
             )
-            p.daemon = True
+            # p.daemon = True
             p.start()
             self.workers.append(p)
 
@@ -131,7 +131,7 @@ class ParallelSampleDataLoader:
         self._stop_event = threading.Event()
         self.batch_queue = mp.Queue(maxsize=self.prefetch_batches)
         self._prefetch_thread = threading.Thread(
-            target=self._prefetch_loop, daemon=True
+            target=self._prefetch_loop, daemon=False
         )
 
         self._sampler_exhausted = False
