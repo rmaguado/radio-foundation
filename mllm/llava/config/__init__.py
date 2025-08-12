@@ -11,7 +11,7 @@ import os
 class TrainingArguments(transformers.TrainingArguments):
     transformers_cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
-    remove_unused_columns: bool = field(default=False)
+    remove_unused_columns: bool = field(default=False)  # type: ignore
     model_max_length: int = field(default=1024)
     bits: int = field(default=16, metadata={"help": "How many bits to use."})
     min_lr: Optional[float] = 1e-6
