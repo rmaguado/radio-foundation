@@ -3,6 +3,7 @@ import torch
 from typing import List, Dict, Tuple, Optional, Callable
 import polars as pl
 import numpy as np
+import random
 
 import nibabel as nib
 import pydicom
@@ -37,6 +38,7 @@ class VolumeDataset:
         modality: str,
         transforms: Callable,
         bounds: Tuple[float, float] = (-1000, 1900),
+        channels: Optional[int] = None,
     ) -> None:
         self.config = config
         self.dataset_name = dataset_name
@@ -44,6 +46,7 @@ class VolumeDataset:
         self.modality = modality
         self.transforms = transforms
         self.bounds = bounds
+        self.channels = channels
 
         self._check_df()
 
@@ -70,6 +73,11 @@ class DicomVolumeDataset(VolumeDataset):
     Inherits from VolumeDataset and implements get_image_data for DICOM folders.
     """
 
+    def __init__(self, *args, **kwargs):
+        super.__init__(*args, **kwargs)
+
+        assert isinstance(self.channels, int)
+
     def _check_df(self):
         return
 
@@ -83,10 +91,14 @@ class DicomVolumeDataset(VolumeDataset):
         ]
 
         dcms = [
-            pydicom.dcmread(os.path.join(dicom_folder_path, x))
+            pydicom.dcmread(os.path.join(dicom_folder_path, x), stop_before_pixels=True)
             for x in dicom_file_paths
         ]
         dcms.sort(key=lambda x: x.ImagePositionPatient[2])
+
+        num_dcms = len(dcms)
+        start_index = random.randint(0, num_dcms - self.channels)  # type: ignore
+        dcms = dcms[start_index : start_index + self.channels]  # type: ignore
 
         image_array = torch.stack(
             [
