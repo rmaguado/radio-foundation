@@ -5,6 +5,7 @@ from queue import Empty
 import threading
 import uuid
 from typing import Optional
+import time
 
 
 def _sample_worker_loop(dataset, task_queue):
@@ -40,9 +41,9 @@ class ParallelSampleDataLoader:
 
         self.sampler = sampler or list(range(len(dataset)))
         self.task_queue = mp.Queue()
-
         self.workers = []
         self._init_workers()
+        self._shutdown_called = False
 
     def _init_workers(self):
         for _ in range(self.num_workers):
@@ -61,7 +62,7 @@ class ParallelSampleDataLoader:
             while pending:
                 bid, idx, sample = result_queue.get(timeout=self.timeout)
                 if bid != batch_id:
-                    continue  # skip stray messages
+                    continue
                 if isinstance(sample, Exception):
                     raise sample
                 samples[idx] = sample
@@ -85,56 +86,80 @@ class ParallelSampleDataLoader:
         self.prefetch_threads = []
 
         def spawn_batches():
-            while not self._stop_event.is_set():
-                try:
+            try:
+                while not self._stop_event.is_set():
                     indices = [next(self._iterator) for _ in range(self.batch_size)]
-                except StopIteration:
-                    break
+                    batch_id = uuid.uuid4().hex
+                    result_queue = self._manager.Queue()
 
-                batch_id = uuid.uuid4().hex
-                result_queue = self._manager.Queue()
+                    for idx in indices:
+                        self.task_queue.put((batch_id, idx, result_queue))
 
-                for idx in indices:
-                    self.task_queue.put((batch_id, idx, result_queue))
+                    t = threading.Thread(
+                        target=self._batch_collector,
+                        args=(batch_id, indices, result_queue),
+                        daemon=True,
+                    )
+                    t.start()
+                    self.prefetch_threads.append(t)
 
-                t = threading.Thread(
-                    target=self._batch_collector,
-                    args=(batch_id, indices, result_queue),
-                    daemon=True,
-                )
-                t.start()
-                self.prefetch_threads.append(t)
+                    while (
+                        len([t for t in self.prefetch_threads if t.is_alive()])
+                        >= self.prefetch_batches
+                    ):
+                        time.sleep(0.01)
 
-                # Limit number of concurrent batches
-                while len(self.prefetch_threads) >= self.prefetch_batches:
-                    self.prefetch_threads = [
-                        t for t in self.prefetch_threads if t.is_alive()
-                    ]
-                    if len(self.prefetch_threads) >= self.prefetch_batches:
-                        threading.Event().wait(0.01)
+            except StopIteration:
+                pass
+            finally:
+                self._stop_event.set()
 
         self._prefetch_controller = threading.Thread(target=spawn_batches, daemon=True)
         self._prefetch_controller.start()
 
     def __next__(self):
-        if self.batch_queue.empty() and not self._prefetch_controller.is_alive():
-            raise StopIteration
-        try:
-            return self.batch_queue.get(timeout=self.timeout)
-        except Empty:
+        if self._shutdown_called:
             raise StopIteration
 
-    def __del__(self):
+        try:
+            batch = self.batch_queue.get(timeout=self.timeout)
+            return batch
+        except Empty:
+            if self._prefetch_controller.is_alive() or any(
+                t.is_alive() for t in self.prefetch_threads
+            ):
+                raise RuntimeError("Batch queue timeout, but workers are still active.")
+            else:
+                self._shutdown()
+                raise StopIteration
+
+    def _shutdown(self):
+        if self._shutdown_called:
+            return
+
+        self._shutdown_called = True
         self._stop_event.set()
+
+        if self._prefetch_controller.is_alive():
+            self._prefetch_controller.join()
+
+        for t in self.prefetch_threads:
+            if t.is_alive():
+                t.join(timeout=self.timeout)
+
         for _ in self.workers:
             self.task_queue.put(None)
+
         for w in self.workers:
             if w.is_alive():
-                w.terminate()
+                w.join(timeout=self.timeout)
 
+        self.task_queue.close()
+        self.batch_queue.close()
+        self._manager.shutdown()
 
-import time
-from torch.utils.data import Dataset
+    def __del__(self):
+        self._shutdown()
 
 
 class DummyDataset(Dataset):
@@ -142,7 +167,7 @@ class DummyDataset(Dataset):
         self.data = list(range(size))
 
     def __getitem__(self, index):
-        time.sleep(0.5)
+        time.sleep(0.01)
         return self.data[index] * 2
 
     def __len__(self):
@@ -170,3 +195,5 @@ if __name__ == "__main__":
         tf = time.time() - t0
         print(f"{idx} | {tf:.4f} sec | {batch}")
         t0 = time.time()
+
+    dataloader._shutdown()
