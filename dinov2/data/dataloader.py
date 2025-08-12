@@ -77,6 +77,7 @@ class ParallelSampleDataLoader:
         self._iterator = iter(self.sampler)
         self._stop_event = threading.Event()
         self.batch_queue = mp.Queue(maxsize=self.prefetch_batches)
+        self._manager = mp.Manager()
         self._start_prefetch_threads()
         return self
 
@@ -91,11 +92,7 @@ class ParallelSampleDataLoader:
                     break
 
                 batch_id = uuid.uuid4().hex
-                if not hasattr(self, "_manager"):
-                    self._manager = mp.Manager()
-                    result_queue = self._manager.Queue()  # type: ignore
-                else:
-                    result_queue = mp.Queue()
+                result_queue = self._manager.Queue()
 
                 for idx in indices:
                     self.task_queue.put((batch_id, idx, result_queue))
@@ -169,7 +166,7 @@ if __name__ == "__main__":
     )
 
     t0 = time.time()
-    for batch in dataloader:
+    for idx, batch in enumerate(dataloader):
         tf = time.time() - t0
-        print(f"{tf:.4f} sec | {batch}")
+        print(f"{idx} | {tf:.4f} sec | {batch}")
         t0 = time.time()
