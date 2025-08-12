@@ -158,15 +158,7 @@ class RandomSliceCrop(BaseRandomCrop):
         self.crop_size = (size, size)
         self.channels = channels
 
-    def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        if img.ndim != 3:
-            raise ValueError(
-                f"Input image must be 3D (D, H, W), but got shape {img.shape}"
-            )
-
-        img_shape = img.shape
-
-        min_required_size = int(max(self.crop_size) / 2)
+    def _get_slice_axis(self, img_shape, min_required_size):
         too_short_axes = [
             i for i, dim_size in enumerate(img_shape) if dim_size < min_required_size
         ]
@@ -177,10 +169,27 @@ class RandomSliceCrop(BaseRandomCrop):
                 f"of {min_required_size}: {img_shape}. A valid 2D plane cannot be formed."
             )
 
+        if min(img_shape) == self.channels:
+
+            return img_shape.index(self.channels)
+
         if too_short_axes:
             slice_axis = too_short_axes[0]
         else:
             slice_axis = random.choice([0, 1, 2])
+        return slice_axis
+
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        if img.ndim != 3:
+            raise ValueError(
+                f"Input image must be 3D (D, H, W), but got shape {img.shape}"
+            )
+
+        img_shape = img.shape
+
+        min_required_size = int(max(self.crop_size) / 2)
+
+        slice_axis = self._get_slice_axis(img_shape, min_required_size)
 
         spatial_axes = [i for i in range(3) if i != slice_axis]
 
