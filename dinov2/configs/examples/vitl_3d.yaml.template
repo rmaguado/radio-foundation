@@ -30,20 +30,20 @@ checkpoints:
   save_checkpoint_iterations: 1000
   save_teacher_iterations: 10000
 student:
-  model_name: vitb14_3d
+  model_name: vitl14_3d
   pretrained_weights: ''
-  embed_dim: 768
-  depth: 12
-  num_heads: 12
+  embed_dim: 1024
+  depth: 24
+  num_heads: 16
   mlp_ratio: 4
   embed_layers:
     - name: patch_3d
       patch_size: 14
       img_size: 112
-  drop_path_rate: 0.1
+  drop_path_rate: 0.4
   layerscale: 1.0e-05
   drop_path_uniform: true
-  ffn_layer: "mlp"
+  ffn_layer: "swiglu"
   qkv_bias: true
   proj_bias: true
   ffn_bias: true
