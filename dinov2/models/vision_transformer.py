@@ -276,7 +276,6 @@ class DinoVisionTransformer(nn.Module):
         x_norm = self.norm(x)
         return {
             "clstoken": x_norm[:, 0],
-            "regtokens": x_norm[:, 1 : self.num_register_tokens + 1],
             "patchtokens": x_norm[:, self.num_register_tokens + 1 :],
         }
 
@@ -301,8 +300,10 @@ class DinoVisionTransformer(nn.Module):
         ), f"Found {len(outputs)}/{len(select_layers)} layers."
 
         return {
-            "clstoken": [out[:, 0] for out in outputs],
-            "patchtokens": [out[:, 1 + self.num_register_tokens :] for out in outputs],
+            "clstoken": torch.stack([out[:, 0] for out in outputs]),
+            "patchtokens": torch.stack(
+                [out[:, 1 + self.num_register_tokens :] for out in outputs]
+            ),
         }
 
 
