@@ -23,9 +23,6 @@ from .samplers import (
 )
 from .augmentations import DataAugmentationDINO
 
-# from .dataloader import ParallelSampleDataLoader
-
-
 logger = logging.getLogger("dinov2")
 
 
@@ -207,24 +204,15 @@ def make_data_loader(
     )
 
     logger.info("using PyTorch data loader")
-    # data_loader = DataLoader(
-    #    dataset,
-    #    sampler=sampler,
-    #    batch_size=batch_size_per_gpu,
-    #    num_workers=num_workers,
-    #    pin_memory=True,
-    #    drop_last=drop_last,
-    #    persistent_workers=persistent_workers,
-    #    collate_fn=collate_fn,
-    # )
-    data_loader = ParallelSampleDataLoader(
+    data_loader = DataLoader(
         dataset,
-        batch_size=batch_size_per_gpu,
-        collate_fn=collate_fn,
-        num_workers=num_workers,
         sampler=sampler,
-        pin_memory=False,
-        shared_memory=False,
+        batch_size=batch_size_per_gpu,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=drop_last,
+        persistent_workers=persistent_workers,
+        collate_fn=collate_fn,
     )
 
     try:
