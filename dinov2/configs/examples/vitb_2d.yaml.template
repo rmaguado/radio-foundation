@@ -50,7 +50,7 @@ student:
   ffn_bias: true
   num_register_tokens: 4
 teacher:
-  momentum_teacher: 0.992
+  momentum_teacher: 0.994
   final_momentum_teacher: 1.0
   warmup_teacher_temp: 0.04
   teacher_temp: 0.07
