@@ -27,13 +27,26 @@ class ModelWithIntermediateLayers(nn.Module):
         with torch.inference_mode():
             with self.autocast_ctx():
                 features = self.feature_model.get_intermediate_layers(
-                    images, self.select_layers, return_class_token=True
+                    images, select_layers=self.select_layers
                 )
         return features
 
 
-def get_config(path_to_run):
-    path_to_config = os.path.join(path_to_run, "config.yaml")
+class Model(nn.Module):
+    def __init__(self, feature_model, autocast_ctx):
+        super().__init__()
+        self.feature_model = feature_model
+        self.feature_model.eval()
+        self.autocast_ctx = autocast_ctx
+
+    def forward(self, images):
+        with torch.inference_mode():
+            with self.autocast_ctx():
+                features = self.feature_model(images)
+        return features
+
+
+def get_config(path_to_config):
     return OmegaConf.load(path_to_config)
 
 
@@ -70,19 +83,21 @@ def load_model(path_to_checkpoint, config, device):
     _, model = build_model(config, teacher_only=True)
 
     state_dict = torch.load(path_to_checkpoint, map_location="cpu")["teacher"]
-    state_dict = {k: v for k, v in state_dict.items() if not k.startswith("dino_head")}
+    state_dict = {
+        k.removeprefix("backbone."): v
+        for k, v in state_dict.items()
+        if not k.startswith("dino_head")
+    }
     model.load_state_dict(state_dict)
 
     model.eval()
     model.to(device)
 
-    depth = config.student.depth
-
     autocast_dtype = get_autocast_dtype(config)
     autocast_ctx = partial(
         torch.autocast, enabled=True, dtype=autocast_dtype, device_type="cuda"
     )
-    feature_model = ModelWithIntermediateLayers(model, (depth - 1), autocast_ctx)
+    feature_model = Model(model, autocast_ctx)
 
     return feature_model
 
