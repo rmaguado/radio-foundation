@@ -39,7 +39,7 @@ student:
   embed_layers:
     - name: patch_2d
       patch_size: 14
-      img_size: 224
+      img_size: 112
       in_channels: 1
   drop_path_rate: 0.1
   layerscale: 1.0e-05
