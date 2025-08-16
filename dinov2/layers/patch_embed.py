@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from einops import rearrange, repeat
 
 
@@ -73,23 +72,6 @@ class PatchEmbed2D(PatchEmbed):
     def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
         return rearrange(x, "b e h w -> b (h w) e")
 
-    def get_pos_embed(self, *patch_dims: int) -> torch.Tensor:
-        H, W = patch_dims
-        num_patches = H * W
-        if num_patches == self.num_patches:
-            return self.pos_embed
-
-        pos_embed = self.pos_embed[0]
-        orig_size = int(self.num_patches**0.5)
-        pos_embed_2d = rearrange(
-            pos_embed, "(h w) d -> 1 d h w", h=orig_size, w=orig_size
-        )
-        pos_embed_2d = F.interpolate(
-            pos_embed_2d, size=(H, W), mode="bicubic", align_corners=False
-        )
-        pos_embed_2d = rearrange(pos_embed_2d, "1 d h w -> 1 (h w) d")
-        return pos_embed_2d
-
 
 class PatchEmbed3D(PatchEmbed):
     def _get_projection_layer(self) -> nn.Module:
@@ -107,22 +89,6 @@ class PatchEmbed3D(PatchEmbed):
 
     def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
         return rearrange(x, "b e d h w -> b (d h w) e")
-
-    def get_pos_embed(self, *patch_dims: int) -> torch.Tensor:
-        D, H, W = patch_dims
-        num_patches = D * H * W
-        if num_patches == self.num_patches:
-            return self.pos_embed
-        pos_embed = self.pos_embed[0]
-        orig_size = int(round(self.num_patches ** (1 / 3)))
-        pos_embed_3d = rearrange(
-            pos_embed, "(d h w) c -> 1 c d h w", d=orig_size, h=orig_size, w=orig_size
-        )
-        pos_embed_3d = F.interpolate(
-            pos_embed_3d, size=(D, H, W), mode="trilinear", align_corners=False
-        )
-        pos_embed_3d = rearrange(pos_embed_3d, "1 c d h w -> 1 (d h w) c")
-        return pos_embed_3d
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.proj(x.unsqueeze(1))
