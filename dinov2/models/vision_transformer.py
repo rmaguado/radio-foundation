@@ -29,16 +29,21 @@ from dinov2.layers import (
 
 logger = logging.getLogger("dinov2")
 
-EMBED_LAYER_REGISTRY = {
+embed_layer_dict = {
     "patch_2d": PatchEmbed2D,
     "patch_3d": PatchEmbed3D,
 }
 
-FFN_LAYER_REGISTRY = {
+ffn_layer_dict = {
     "mlp": Mlp,
     "swiglu": SwiGLUFFNFused,
     "swiglufused": SwiGLUFFNFused,
     "identity": nn.Identity,
+}
+
+norm_layer_dict = {
+    "layernorm": partial(nn.LayerNorm, eps=1e-6),
+    "layernormbf16": partial(nn.LayerNorm, eps=1e-5),
 }
 
 
@@ -183,7 +188,7 @@ class DinoVisionTransformer(nn.Module):
         )
 
         try:
-            ffn_layer_class = FFN_LAYER_REGISTRY[ffn_layer]
+            ffn_layer_class = ffn_layer_dict[ffn_layer]
         except KeyError:
             raise NotImplementedError(f"FFN layer '{ffn_layer}' is not implemented.")
 
