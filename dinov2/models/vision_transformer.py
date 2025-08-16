@@ -69,7 +69,7 @@ def get_embedding_layer(embed_config: Dict, embed_dim: int):
         "layer_norm": layer_config.get("layer_norm", False),
     }
 
-    return EMBED_LAYER_REGISTRY[layer_type](**patch_kwargs)
+    return embed_layer_dict[layer_type](**patch_kwargs)
 
 
 def named_apply(
@@ -171,7 +171,6 @@ class DinoVisionTransformer(nn.Module):
         )
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-        self.cls_pos_embed = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
         self.register_tokens = (
             nn.Parameter(torch.zeros(1, num_register_tokens, embed_dim))
@@ -222,7 +221,6 @@ class DinoVisionTransformer(nn.Module):
         Initializes all learnable parameters in the transformer, including tokens and embeddings.
         """
         nn.init.normal_(self.cls_token, std=1e-6)
-        nn.init.normal_(self.cls_pos_embed, std=0.02)
         if self.register_tokens is not None:
             nn.init.normal_(self.register_tokens, std=1e-6)
 
@@ -252,7 +250,7 @@ class DinoVisionTransformer(nn.Module):
                 masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x
             )
 
-        cls_tokens = repeat(self.cls_token + self.cls_pos_embed, "1 1 e -> b 1 e", b=B)
+        cls_tokens = repeat(self.cls_token, "1 1 e -> b 1 e", b=B)
         x = torch.cat([cls_tokens, x], dim=1)
 
         if self.register_tokens is not None:
