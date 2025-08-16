@@ -97,7 +97,7 @@ class RopePositionEmbedding(nn.Module):
         self.dtype = dtype  # Don't rely on self.periods.dtype
         self.register_buffer(
             "periods",
-            torch.empty(D_head // 4, device=device, dtype=dtype),
+            torch.empty(D_head // (2 * ndims), device=device, dtype=dtype),
             persistent=True,
         )
         self._init_weights()
