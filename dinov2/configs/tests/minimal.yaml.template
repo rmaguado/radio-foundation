@@ -30,21 +30,18 @@ checkpoints:
   save_checkpoint_iterations: 1000
   save_teacher_iterations: 10000
 student:
-  model_name: vitb14_2d3d
+  model_name: vitb14_3d
   pretrained_weights: ''
   embed_dim: 768
   depth: 12
   num_heads: 12
   mlp_ratio: 4
-  embed_layers:
-    - name: patch_2d
-      patch_size: 14
-      img_size: 448
-      in_channels: 10
-    - name: patch_3d
-      patch_size: 14
-      img_size: 224
-  drop_path_rate: 0.4
+  embed_layer:
+    type: patch_3d
+    patch_size: 14
+    img_size: 448
+    layer_norm: false
+  drop_path_rate: 0.0
   layerscale: 1.0e-05
   drop_path_uniform: true
   ffn_layer: "mlp"
@@ -52,40 +49,6 @@ student:
   proj_bias: true
   ffn_bias: true
   num_register_tokens: 4
-teacher:
-  momentum_teacher: 0.994
-  final_momentum_teacher: 1.0
-  warmup_teacher_temp: 0.04
-  teacher_temp: 0.07
-  warmup_teacher_temp_epochs: 30
-optim:
-  epochs: 100
-  warmup_epochs: 10
-  base_lr: 3.5e-4
-  min_lr: 1.0e-05
-  weight_decay: 0.04
-  weight_decay_end: 0.2
-  clip_grad: 3.0
-  freeze_last_layer_epochs: 1
-  patch_embed_lr_mult: 0.2
-  layerwise_decay: 0.9
-  adamw_beta1: 0.9
-  adamw_beta2: 0.999
-crops:
-  views:
-    enable_3d: true
-    enable_2d: true
-  crops_number:
-    global_2d: 3
-    local_3d: 4
-    local_2d: 4
-    global_view_multiple: 2
-  crop_sizes:
-    global_3d: 112
-    global_2d: 224
-    local_3d: 56
-    local_2d: 112
-    channels: 10
 datasets:
   - name: default_dataset
     weight: 1.0

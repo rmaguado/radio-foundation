@@ -42,7 +42,7 @@ FFN_LAYER_REGISTRY = {
 }
 
 
-def get_embedding_layers(embed_configs: List[Dict], embed_dim: int):
+def get_embedding_layer(embed_config: Dict, embed_dim: int):
     """
     Creates a ModuleDict of embedding layers from a list of configurations.
 
@@ -51,26 +51,20 @@ def get_embedding_layers(embed_configs: List[Dict], embed_dim: int):
         embed_dim (int): Output embedding dimension for each layer.
 
     Returns:
-        nn.ModuleDict: Dictionary of embedding layers keyed by type.
+        nn.Module: Dictionary of embedding layers keyed by type.
     """
-    embed_layers = nn.ModuleDict()
-    for layer_config in embed_configs.copy():
-        layer_type = layer_config["name"]
-        if layer_type not in EMBED_LAYER_REGISTRY:
-            raise NotImplementedError(
-                f"Embedding layer type '{layer_type}' is not implemented. Available: {list(EMBED_LAYER_REGISTRY.keys())}"
-            )
+    layer_config = embed_config.copy()
+    layer_type = layer_config["type"]
 
-        patch_kwargs = {
-            "img_size": layer_config.get("img_size", 224),
-            "patch_size": layer_config.get("patch_size", 16),
-            "in_channels": layer_config.get("in_channels", 1),
-            "embed_dim": embed_dim,
-            "layer_norm": layer_config.get("layer_norm", False),
-        }
-        embed_layers[layer_type] = EMBED_LAYER_REGISTRY[layer_type](**patch_kwargs)
+    patch_kwargs = {
+        "img_size": layer_config.get("img_size", 224),
+        "patch_size": layer_config.get("patch_size", 14),
+        "in_channels": layer_config.get("in_channels", 1),
+        "embed_dim": embed_dim,
+        "layer_norm": layer_config.get("layer_norm", False),
+    }
 
-    return embed_layers
+    return EMBED_LAYER_REGISTRY[layer_type](**patch_kwargs)
 
 
 def named_apply(
@@ -153,7 +147,7 @@ class DinoVisionTransformer(nn.Module):
         proj_bias: bool,
         ffn_layer: str,
         num_register_tokens: int,
-        embed_configs: List[Dict],
+        embed_config: Dict,
         drop_path_rate: float = 0.0,
         drop_path_uniform: bool = True,
         init_values: Optional[float] = None,
@@ -166,8 +160,8 @@ class DinoVisionTransformer(nn.Module):
         self.num_heads = num_heads
         self.num_register_tokens = num_register_tokens
 
-        self.embed_layers = get_embedding_layers(
-            embed_configs=embed_configs,
+        self.embed_layer = get_embedding_layer(
+            embed_config=embed_config,
             embed_dim=embed_dim,
         )
 
@@ -227,20 +221,18 @@ class DinoVisionTransformer(nn.Module):
         if self.register_tokens is not None:
             nn.init.normal_(self.register_tokens, std=1e-6)
 
-        for embed_layer in self.embed_layers.values():
-            trunc_normal_(embed_layer.pos_embed, std=0.02)  # type: ignore
+        trunc_normal_(self.embed_layer.pos_embed, std=0.02)
 
         named_apply(init_weights_vit_timm, self)
 
     def _prepare_tokens(
-        self, x: torch.Tensor, embed_layer: str, masks: Optional[torch.Tensor] = None
+        self, x: torch.Tensor, masks: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         """
         Handles patch embedding, token masking, and concatenation of CLS and register tokens.
 
         Args:
             x (torch.Tensor): Input image tensor.
-            embed_layer (str): Key for which embedding layer to use.
             masks (Optional[torch.Tensor]): Optional mask tensor for patch masking.
 
         Returns:
@@ -248,7 +240,7 @@ class DinoVisionTransformer(nn.Module):
         """
         B = x.shape[0]
 
-        x = self.embed_layers[embed_layer](x)
+        x = self.embed_layer(x)
 
         if masks is not None:
             x = torch.where(
@@ -267,10 +259,9 @@ class DinoVisionTransformer(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        embed_layer: str = "patch_2d",
         masks: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
-        x = self._prepare_tokens(x, embed_layer, masks)
+        x = self._prepare_tokens(x, masks)
         for blk in self.blocks:
             x = blk(x)
         x_norm = self.norm(x)
@@ -282,11 +273,10 @@ class DinoVisionTransformer(nn.Module):
     def get_intermediate_layers(
         self,
         x: torch.Tensor,
-        embed_layer: str = "patch_2d",
         select_layers: Sequence[int] = (11,),
         norm: bool = True,
-    ) -> Dict[str, List[torch.Tensor]]:
-        x = self._prepare_tokens(x, embed_layer)
+    ) -> Dict[str, torch.Tensor]:
+        x = self._prepare_tokens(x)
 
         outputs = []
         for i, blk in enumerate(self.blocks):
@@ -319,7 +309,7 @@ def build_model(cfg, teacher_only=False):
         proj_bias=args.proj_bias,
         ffn_layer=args.ffn_layer,
         num_register_tokens=args.num_register_tokens,
-        embed_configs=args.embed_layers,
+        embed_config=args.embed_layer,
         init_values=args.layerscale,
     )
     teacher = DinoVisionTransformer(**vit_kwargs)

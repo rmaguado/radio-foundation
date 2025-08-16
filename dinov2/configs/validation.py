@@ -130,11 +130,11 @@ class CheckpointsConfig(BaseModel):
 
 
 class EmbedLayerConfig(BaseModel):
-    name: Literal["patch_2d", "patch_3d"]
+    type: Literal["patch_2d", "patch_3d"]
     patch_size: int
     img_size: int
     in_channels: Optional[int] = None
-    layer_norm: Optional[bool] = False
+    layer_norm: bool
 
     @field_validator("patch_size", "img_size", mode="before")
     @classmethod
@@ -157,7 +157,7 @@ class StudentConfig(BaseModel):
     depth: int
     num_heads: int
     mlp_ratio: int
-    embed_layers: List[EmbedLayerConfig]
+    embed_layer: EmbedLayerConfig
     drop_path_rate: float
     layerscale: float
     drop_path_uniform: bool
@@ -267,19 +267,19 @@ class OptimConfig(BaseModel):
         return v
 
 
-class ViewsConfig(BaseModel):
-    enable_3d: bool
-    enable_2d: bool
-
-
-class CropsNumberConfig(BaseModel):
-    global_2d: int
-    local_3d: int
-    local_2d: int
-    global_view_multiple: int
+class CropsConfig(BaseModel):
+    num_crops_global: int
+    num_crops_local: int
+    size_global: int
+    size_local: int
+    scale_global: List[float]
+    scale_local: List[float]
 
     @field_validator(
-        "global_view_multiple",
+        "num_crops_global",
+        "num_crops_local",
+        "size_global",
+        "size_local",
         mode="before",
     )
     @classmethod
@@ -289,45 +289,17 @@ class CropsNumberConfig(BaseModel):
         return v
 
     @field_validator(
-        "global_2d",
-        "local_3d",
-        "local_2d",
+        "scale_global",
+        "scale_local",
         mode="before",
     )
     @classmethod
-    def validate_integers(cls, v):
-        if v < 0:
-            raise ValueError("Value must be a non-negative integer")
+    def validate_scale(cls, v):
+        if not len(v) == 2:
+            raise ValueError("Value must be a list with two floats.")
+        if not (0 < v[0] < v[1] <= 1.0):
+            raise ValueError("v[0] and v[1] must be in (0, 1] with v[1] > v[0].")
         return v
-
-
-class CropSizesConfig(BaseModel):
-    global_3d: Optional[int]
-    global_2d: Optional[int]
-    local_3d: Optional[int]
-    local_2d: Optional[int]
-    channels: Optional[int]
-
-    @field_validator(
-        "global_3d",
-        "global_2d",
-        "local_3d",
-        "local_2d",
-        "channels",
-        mode="before",
-    )
-    @classmethod
-    def validate_positive_integers(cls, v):
-        if v is not None:
-            if v <= 0:
-                raise ValueError("Value must be a positive integer")
-        return v
-
-
-class CropsConfig(BaseModel):
-    views: ViewsConfig
-    crops_number: CropsNumberConfig
-    crop_sizes: CropSizesConfig
 
 
 class TransformConfig(BaseModel):

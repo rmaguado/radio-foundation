@@ -108,21 +108,11 @@ def build_schedulers(cfg):
 
 
 def setup_collate_fn(cfg, inputs_dtype):
-    mask_shapes = {}
-    if cfg.crops.views.enable_2d:
-        mask_shapes["global_2d"] = (
-            cfg.crops.crop_sizes.global_2d
-            // next(
-                x for x in cfg.student.embed_layers if x["name"] == "patch_2d"
-            ).patch_size,
-        ) * 2
-    if cfg.crops.views.enable_3d:
-        mask_shapes["global_3d"] = (
-            cfg.crops.crop_sizes.global_3d
-            // next(
-                x for x in cfg.student.embed_layers if x["name"] == "patch_3d"
-            ).patch_size,
-        ) * 3
+    mask_shape = (cfg.crops.size_global // cfg.student.embed_layer.patch_size,)
+    if cfg.student.embed_layer.type == "patch_2d":
+        mask_shape *= 2
+    elif cfg.student.embed_layer.type == "patch_3d":
+        mask_shape *= 3
 
     mask_generator = MaskingGenerator()
 
@@ -130,7 +120,7 @@ def setup_collate_fn(cfg, inputs_dtype):
         collate_data_and_cast,
         mask_ratio_range=cfg.ibot.mask_ratio_min_max,
         mask_probability=cfg.ibot.mask_sample_probability,
-        mask_shapes=mask_shapes,
+        mask_shape=mask_shape,
         mask_generator=mask_generator,
         dtype=inputs_dtype,
     )
