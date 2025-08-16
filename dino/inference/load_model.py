@@ -5,7 +5,7 @@ import torch.nn as nn
 from functools import partial
 from omegaconf import OmegaConf
 
-from dinov2.models import build_model
+from dino.models import build_model_eval
 
 
 class ModelWithIntermediateLayers(nn.Module):
@@ -61,7 +61,7 @@ def get_autocast_dtype(cfg):
 
 
 def load_model_intermediates(path_to_checkpoint, config, device, select_layers):
-    _, model = build_model(config, teacher_only=True)
+    model = build_model_eval(config)
 
     state_dict = torch.load(path_to_checkpoint, map_location="cpu")["teacher"]
     state_dict = {k: v for k, v in state_dict.items() if not k.startswith("dino_head")}
@@ -80,7 +80,7 @@ def load_model_intermediates(path_to_checkpoint, config, device, select_layers):
 
 
 def load_model(path_to_checkpoint, config, device):
-    _, model = build_model(config, teacher_only=True)
+    model = build_model_eval(config)
 
     state_dict = torch.load(path_to_checkpoint, map_location="cpu")["teacher"]
     state_dict = {

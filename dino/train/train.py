@@ -13,17 +13,17 @@ from typing import Tuple
 
 # from torch.profiler import profile, ProfilerActivity, record_function
 
-from dinov2.logging import MetricLogger, setup_logging
-from dinov2.configs import get_cfg_from_path, write_config, validate_config
-from dinov2.train.ssl_meta_arch import SSLMetaArch
-from dinov2.train.parser import get_args_parser
-from dinov2.train.setup import (
+from dino.logging import MetricLogger, setup_logging
+from dino.configs import get_cfg_from_path, write_config, validate_config
+from dino.train.ssl_meta_arch import SSLMetaArch
+from dino.train.parser import get_args_parser
+from dino.train.setup import (
     setup_training_components,
     setup_dataloader,
     fix_random_seeds,
 )
 
-import dinov2.distributed as dist
+import dino.distributed as dist
 
 
 torch.backends.cuda.matmul.allow_tf32 = True

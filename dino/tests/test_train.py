@@ -3,9 +3,9 @@ import torch
 import time
 import logging
 
-from dinov2.configs import get_cfg_from_path
-from dinov2.train.setup import setup_dataloader
-from dinov2.train.ssl_meta_arch import SSLMetaArch
+from dino.configs import get_cfg_from_path
+from dino.train.setup import setup_dataloader
+from dino.train.ssl_meta_arch import SSLMetaArch
 
 logger = logging.getLogger("test")
 logger.setLevel(logging.DEBUG)

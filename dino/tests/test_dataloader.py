@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import time
 import logging
 
-from dinov2.configs import get_cfg_from_path
-from dinov2.train.setup import setup_dataloader
+from dino.configs import get_cfg_from_path
+from dino.train.setup import setup_dataloader
 
 logger = logging.getLogger("dinov2")
 logger.setLevel(logging.DEBUG)

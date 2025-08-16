@@ -10,7 +10,7 @@ from torch.distributed import ReduceOp
 
 from einops import rearrange
 
-from dinov2.distributed import all_reduce
+from dino.distributed import all_reduce
 
 
 class DINOLoss(nn.Module):

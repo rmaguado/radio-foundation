@@ -16,7 +16,7 @@ import torch.nn as nn
 
 from einops import repeat
 
-from dinov2.layers import (
+from dino.layers import (
     Mlp,
     SwiGLUFFN,
     LayerScale,
@@ -124,7 +124,7 @@ class DinoVisionTransformer(nn.Module):
         img_size: int,
         patch_size: int,
         ndims: int,
-        in_channels: Optional[int],
+        in_channels: int,
         rope_base: float,
         rope_shift_coords: Optional[float],
         rope_jitter_coords: Optional[float],
@@ -317,7 +317,7 @@ def build_models(cfg):
     return student, teacher
 
 
-def build_teacher_only(cfg):
+def build_model_eval(cfg):
     args = cfg.student.copy()
     _ = args.pop("drop_path_rate", 0.0)
 

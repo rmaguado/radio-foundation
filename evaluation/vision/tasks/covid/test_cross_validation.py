@@ -9,7 +9,7 @@ import time
 import logging
 import json
 
-from dinov2.inference.networks import AttnPoolPredictor
+from dino.inference.networks import AttnPoolPredictor
 from dionv2.inference.extended_datasets import CachedEmbeddings
 from evaluation.tasks.covid.datasets import CCCCII
 

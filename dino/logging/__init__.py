@@ -10,7 +10,7 @@ import sys
 from typing import Optional
 
 from .helpers import MetricLogger
-import dinov2.distributed as dist
+import dino.distributed as dist
 
 
 # So that calling _configure_logger multiple times won't add many handlers

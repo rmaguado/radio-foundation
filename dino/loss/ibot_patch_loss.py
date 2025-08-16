@@ -10,7 +10,7 @@ from torch.distributed import ReduceOp
 
 import logging
 
-from dinov2.distributed import all_reduce
+from dino.distributed import all_reduce
 
 
 logger = logging.getLogger("dinov2")
@@ -26,7 +26,9 @@ class iBOTPatchLoss(nn.Module):
         self.update_counter = 0
 
     @torch.no_grad()
-    def softmax_center_teacher(self, teacher_patch_tokens, teacher_temp) -> torch.Tensor:
+    def softmax_center_teacher(
+        self, teacher_patch_tokens, teacher_temp
+    ) -> torch.Tensor:
         return F.softmax((teacher_patch_tokens - self.center) / teacher_temp, dim=-1)
 
     def forward(

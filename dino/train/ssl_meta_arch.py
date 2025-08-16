@@ -13,10 +13,10 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from einops import rearrange
 
-from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
-from dinov2.models import build_model
-from dinov2.layers import DINOHead
-from dinov2.train.param_groups import get_params_groups_with_decay
+from dino.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
+from dino.models import build_models
+from dino.layers import DINOHead
+from dino.train.param_groups import get_params_groups_with_decay
 
 
 logger = logging.getLogger("dinov2")
@@ -30,7 +30,7 @@ class SSLMetaArch(nn.Module):
         self.student = nn.ModuleDict()
         self.teacher = nn.ModuleDict()
 
-        student_backbone, teacher_backbone = build_model(cfg)
+        student_backbone, teacher_backbone = build_models(cfg)
         self.student["backbone"] = student_backbone  # type: ignore
         self.teacher["backbone"] = teacher_backbone
 

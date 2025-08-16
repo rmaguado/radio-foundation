@@ -9,7 +9,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 import torch
 from omegaconf import DictConfig
 
-from dinov2.data.transforms import *
+from dino.data.transforms import *
 
 logger = logging.getLogger("dinov2")
 

@@ -9,7 +9,7 @@ from typing import Dict, Sequence
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
 
-from dinov2.data.datasets.niftis import NiftiCtVolumesFull
+from dino.data.datasets.niftis import NiftiCtVolumesFull
 from mllm.llava.mm_utils import tokenizer_image_token
 from mllm.llava import conversation as conversation_lib
 from mllm.llava.constants import (

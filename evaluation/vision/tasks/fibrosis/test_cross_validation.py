@@ -9,8 +9,8 @@ import time
 import logging
 import json
 
-from dinov2.inference.networks import AttnPoolPredictor
-from dinov2.inference.extended_datasets import CachedEmbeddings
+from dino.inference.networks import AttnPoolPredictor
+from dino.inference.extended_datasets import CachedEmbeddings
 from evaluation.tasks.fibrosis.datasets import FibrosisDataset
 
 from evaluation.utils.dataset import (

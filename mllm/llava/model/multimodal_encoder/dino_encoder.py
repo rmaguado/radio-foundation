@@ -3,7 +3,7 @@ import torch.nn as nn
 from omegaconf import OmegaConf
 import logging
 
-from dinov2.models import build_model
+from dino.models import build_model_eval
 
 
 logger = logging.getLogger("DeepSpeed")
@@ -52,7 +52,7 @@ class DINOVisionTower(nn.Module):
             )
             return
 
-        _, self.vision_tower = build_model(self.model_config, teacher_only=True)
+        self.vision_tower = build_model_eval(self.model_config)
         state_dict = torch.load(self.path_to_checkpoint, map_location="cpu")["teacher"]
         state_dict = {
             k: v for k, v in state_dict.items() if not k.startswith("dino_head")

@@ -5,11 +5,11 @@ from typing import Tuple
 import numpy as np
 import random
 
-from dinov2.train.checkpointer import DDPCheckpointer, DDPPeriodicCheckpointer
+from dino.train.checkpointer import DDPCheckpointer, DDPPeriodicCheckpointer
 
-from dinov2.data import collate_data_and_cast, MaskingGenerator
-from dinov2.data import SamplerType, make_data_loader, make_train_dataset
-from dinov2.data.augmentations import DataAugmentationDINO
+from dino.data import collate_data_and_cast, MaskingGenerator
+from dino.data import SamplerType, make_data_loader, make_train_dataset
+from dino.data.augmentations import DataAugmentationDINO
 
 
 class CosineScheduler(object):

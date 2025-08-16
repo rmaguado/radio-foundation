@@ -6,12 +6,12 @@ from dotenv import load_dotenv
 import argparse
 import time
 
-from dinov2.inference.networks import (
+from dino.inference.networks import (
     FullScanClassPredictor,
     FullScanPatchPredictor,
     FullScanClassPatchPredictor,
 )
-from dinov2.inference.extended_datasets import CachedEmbeddings
+from dino.inference.extended_datasets import CachedEmbeddings
 from evaluation.vision.tasks.deeprdt_lung.datasets import DeepRDT_lung
 
 from evaluation.utils.dataset import (

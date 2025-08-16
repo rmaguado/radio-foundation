@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from omegaconf import OmegaConf
 
-from dinov2.configs import dinov2_default_config
+from dino.configs import default_config
 
 
 class Logs:
@@ -13,7 +13,7 @@ class Logs:
         cfg_path = os.path.join(run_path, "config.yaml")
         metrics_path = os.path.join(run_path, "training_metrics.json")
 
-        default_cfg = OmegaConf.create(dinov2_default_config)
+        default_cfg = OmegaConf.create(default_config)
         cfg = OmegaConf.load(cfg_path)
         cfg = OmegaConf.merge(default_cfg, cfg, OmegaConf.from_cli())
 
@@ -111,7 +111,7 @@ def main(runs):
 
     plt.xlabel("Epoch", fontsize=14)
     plt.ylabel("Total Loss", fontsize=14)
-    plt.legend(title="Runs", fontsize=12, title_fontsize='13')
+    plt.legend(title="Runs", fontsize=12, title_fontsize="13")
 
     plt.savefig(outpath, dpi=300)
 
