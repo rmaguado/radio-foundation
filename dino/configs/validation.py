@@ -10,6 +10,16 @@ class DinoConfig(BaseModel):
     head_nlayers: int
     head_hidden_dim: int
     koleo_loss_weight: float
+    koleo_loss_distributed: bool
+    koleo_topk: int
+    koleo_group_size: Optional[int]
+
+    @field_validator("koleo_topk", "koleo_group_size", mode="before")
+    @classmethod
+    def validate_pos_int(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Value must be a positive integer.")
+        return v
 
     @field_validator("koleo_loss_weight", mode="before")
     @classmethod

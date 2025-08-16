@@ -57,8 +57,10 @@ class SSLMetaArch(nn.Module):
         self.dino_loss = DINOLoss(self.dino_out_dim)
         if self.do_koleo:
             self.koleo_loss_weight = cfg.dino.koleo_loss_weight
-            if dist.is_enabled():
-                self.koleo_loss = KoLeoLossDistributed()
+            if cfg.dino.koleo_loss_distributed:
+                self.koleo_loss = KoLeoLossDistributed(
+                    topk=cfg.dino.koleo_topk, loss_group_size=cfg.dino.koleo_group_size
+                )
             else:
                 self.koleo_loss = KoLeoLoss()
 
