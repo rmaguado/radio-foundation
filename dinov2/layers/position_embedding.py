@@ -15,16 +15,16 @@ from einops import rearrange
 
 
 class LearnedPositionEmbedding(nn.Module):
-    def __init__(self, *, embed_dim, num_patches, num_dims=3):
+    def __init__(self, *, embed_dim, num_patches, ndim=3):
         self.embed_dim = embed_dim
         self.num_patches = num_patches
-        self.num_dims = num_dims
+        self.ndim = ndim
 
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim))
 
-        if num_dims == 2:
+        if ndim == 2:
             self.interpolate_fnc = self._get_pos_embed_2d
-        elif num_dims == 3:
+        elif ndim == 3:
             self.interpolate_fnc = self._get_pos_embed_3d
         else:
             raise ValueError(f"`num_dims` must be 2 or 3.")
@@ -66,8 +66,6 @@ class LearnedPositionEmbedding(nn.Module):
         return self.interpolate_fnc(*patch_dims)
 
 
-# RoPE positional embedding with no mixing of coordinates (axial) and no learnable weights
-# Supports two parametrizations of the rope parameters: either using `base` or `min_period` and `max_period`.
 class RopePositionEmbedding(nn.Module):
     def __init__(
         self,
@@ -88,6 +86,7 @@ class RopePositionEmbedding(nn.Module):
         ), f"embed_dim must be divisible by 2*ndim*num_heads, got {embed_dim=}, {ndim=}, {num_heads=}"
 
         D_head = embed_dim // num_heads
+        self.ndim = ndim
         self.base = base
         self.D_head = D_head
         self.shift_coords = shift_coords
@@ -103,59 +102,51 @@ class RopePositionEmbedding(nn.Module):
         )
         self._init_weights()
 
-    def forward(self, *, H: int, W: int) -> tuple[Tensor, Tensor]:
-        device = self.periods.device
-        dtype = self.dtype
+    def forward(self, *patch_dims: int) -> tuple[Tensor, Tensor]:
+        device, dtype = self.periods.device, self.dtype
         dd = {"device": device, "dtype": dtype}
 
-        coords_h = torch.arange(0.5, H, **dd) / H  # [H]
-        coords_w = torch.arange(0.5, W, **dd) / W  # [W]
+        axes = [torch.arange(0.5, s, **dd) / s for s in patch_dims]
+        coords = torch.stack(torch.meshgrid(*axes, indexing="ij"), dim=-1)
+        coords = coords.flatten(0, -2)
+        coords = 2.0 * coords - 1.0
 
-        coords = torch.stack(
-            torch.meshgrid(coords_h, coords_w, indexing="ij"), dim=-1
-        )  # [H, W, 2]
-        coords = coords.flatten(0, 1)  # [HW, 2]
-        coords = 2.0 * coords - 1.0  # Shift range [0, 1] to [-1, +1]
-
-        # Shift coords by adding a uniform value in [-shift, shift]
         if self.training and self.shift_coords is not None:
-            shift_hw = torch.empty(2, **dd).uniform_(
+            shift = torch.empty(self.ndim, **dd).uniform_(
                 -self.shift_coords, self.shift_coords
             )
-            coords += shift_hw[None, :]
+            coords += shift[None, :]
 
-        # Jitter coords by multiplying the range [-1, 1] by a log-uniform value in [1/jitter, jitter]
         if self.training and self.jitter_coords is not None:
-            jitter_max = np.log(self.jitter_coords)
-            jitter_min = -jitter_max
-            jitter_hw = torch.empty(2, **dd).uniform_(jitter_min, jitter_max).exp()
-            coords *= jitter_hw[None, :]
+            jitter = (
+                torch.empty(self.ndim, **dd)
+                .uniform_(-np.log(self.jitter_coords), np.log(self.jitter_coords))
+                .exp()
+            )
+            coords *= jitter[None, :]
 
-        # Rescale coords by multiplying the range [-1, 1] by a log-uniform value in [1/rescale, rescale]
         if self.training and self.rescale_coords is not None:
-            rescale_max = np.log(self.rescale_coords)
-            rescale_min = -rescale_max
-            rescale_hw = torch.empty(1, **dd).uniform_(rescale_min, rescale_max).exp()
-            coords *= rescale_hw
+            rescale = (
+                torch.empty(1, **dd)
+                .uniform_(-np.log(self.rescale_coords), np.log(self.rescale_coords))
+                .exp()
+            )
+            coords *= rescale
 
-        # Prepare angles and sin/cos
         angles = (
             2 * math.pi * coords[:, :, None] / self.periods[None, None, :]  # type: ignore
-        )  # [HW, 2, D//4]
-        angles = angles.flatten(1, 2)  # [HW, D//2]
-        angles = angles.tile(2)  # [HW, D]
-        cos = torch.cos(angles)  # [HW, D]
-        sin = torch.sin(angles)  # [HW, D]
-
-        return (sin, cos)  # 2 * [HW, D]
+        )  # [N, ndim, D//(2*ndim)]
+        angles = angles.flatten(1, 2)  # [N, D//2]
+        angles = angles.tile(2)  # [N, D]
+        cos, sin = torch.cos(angles), torch.sin(angles)
+        return sin, cos
 
     def _init_weights(self):
         device = self.periods.device
         dtype = self.dtype
         periods = self.base ** (
             2
-            * torch.arange(self.D_head // 4, device=device, dtype=dtype)  # type: ignore
-            / (self.D_head // 2)
-        )  # [D//4]
-
+            * torch.arange(self.D_head // (2 * self.ndim), device=device, dtype=dtype)  # type: ignore
+            / (self.D_head // self.ndim)
+        )
         self.periods.data = periods
