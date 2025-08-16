@@ -13,10 +13,11 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from einops import rearrange
 
-from dino.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
+from dino.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss, KoLeoLossDistributed
 from dino.models import build_models
 from dino.layers import DINOHead
 from dino.train.param_groups import get_params_groups_with_decay
+import dino.distributed as dist
 
 
 logger = logging.getLogger("dinov2")
@@ -56,7 +57,10 @@ class SSLMetaArch(nn.Module):
         self.dino_loss = DINOLoss(self.dino_out_dim)
         if self.do_koleo:
             self.koleo_loss_weight = cfg.dino.koleo_loss_weight
-            self.koleo_loss = KoLeoLoss()
+            if dist.is_enabled():
+                self.koleo_loss = KoLeoLossDistributed()
+            else:
+                self.koleo_loss = KoLeoLoss()
 
         if self.do_ibot:
             self.ibot_loss_weight = cfg.ibot.loss_weight
