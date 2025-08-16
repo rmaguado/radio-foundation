@@ -76,11 +76,11 @@ def build_dataset_from_cfg(cfg, dataset_config):
         "bounds": dataset_config.bounds,
     }
 
-    if dataset_storage == "dicom":
-        dataset_object = DicomVolumeDataset(**dataset_kwargs)
-    elif dataset_storage == "nifti":
-        dataset_object = NiftiVolumeDataset(**dataset_kwargs)
-    elif dataset_storage == "torch":
+    # if dataset_storage == "dicom":
+    #    dataset_object = DicomVolumeDataset(**dataset_kwargs)
+    # elif dataset_storage == "nifti":
+    #    dataset_object = NiftiVolumeDataset(**dataset_kwargs)
+    if dataset_storage == "torch":
         dataset_object = TorchVolumeDataset(**dataset_kwargs)
     else:
         raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
