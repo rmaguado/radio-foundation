@@ -30,26 +30,27 @@ checkpoints:
   save_checkpoint_iterations: 1000
   save_teacher_iterations: 10000
 student:
-  model_name: vitl14_3d
-  pretrained_weights: ''
   embed_dim: 1024
-  depth: 24
+  n_blocks: 24
   num_heads: 16
-  mlp_ratio: 4
-  embed_layer:
-    type: patch_3d
-    patch_size: 14
-    img_size: 112
-    in_channels: null
-    layer_norm: false
+  ffn_ratio: 4
+  img_size: 112
+  patch_size: 14
+  ndims: 3
+  in_channels: null
+  rope_base: 100.0
+  rope_shift_coords: null
+  rope_jitter_coords: null
+  rope_rescale_coords: null
   drop_path_rate: 0.3
-  layerscale: 1.0e-05
-  drop_path_uniform: true
+  layerscale_init: 1.0e-05
+  norm_layer: "layernorm"
   ffn_layer: "mlp"
   qkv_bias: true
   proj_bias: true
   ffn_bias: true
   num_register_tokens: 4
+  mask_k_bias: false
 teacher:
   momentum_teacher: 0.994
   final_momentum_teacher: 1.0

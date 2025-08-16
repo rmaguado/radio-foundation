@@ -1,103 +1,72 @@
 import torch
 import torch.nn as nn
-from einops import rearrange, repeat
+import math
+from typing import Tuple, Callable
+from einops import rearrange
 
 
 class PatchEmbed(nn.Module):
     def __init__(
         self,
+        *,
         img_size: int = 224,
+        ndims: int = 2,
         patch_size: int = 16,
         embed_dim: int = 768,
         in_channels: int = 1,
-        layer_norm: bool = False,
+        norm_layer: Callable | None = None,
     ) -> None:
         super().__init__()
         self.img_size = img_size
+        self.ndims = ndims
         self.patch_size = patch_size
         self.embed_dim = embed_dim
         self.in_channels = in_channels
 
+        if ndims == 3:
+            assert (
+                in_channels == 1
+            ), f"For 3d patch embed, `in_channels` must be set to 1."
+
         self.patches_resolution = img_size // patch_size
 
-        self.proj = self._get_projection_layer()
-        self.num_patches = self._calculate_num_patches()
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim))
-        self.norm = nn.LayerNorm(embed_dim, eps=1e-6) if layer_norm else nn.Identity()
+        if ndims == 2:
+            self.proj = nn.Conv2d(
+                self.in_channels,
+                self.embed_dim,
+                kernel_size=self.patch_size,
+                stride=self.patch_size,
+            )
+        elif ndims == 3:
+            self.proj = nn.Conv3d(
+                self.in_channels,
+                self.embed_dim,
+                kernel_size=self.patch_size,
+                stride=self.patch_size,
+            )
+        else:
+            raise ValueError(f"`ndims` must be 2 or 3, got {ndims}.")
 
-    def _get_projection_layer(self) -> nn.Module:
-        """Return the appropriate projection layer (e.g., nn.Conv2d, nn.Conv3d)."""
-        raise NotImplementedError
+        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
 
-    def _calculate_num_patches(self) -> int:
-        """Calculate the total number of patches based on dimensions."""
-        raise NotImplementedError
-
-    def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
-        """Rearrange the projected tensor from (B, E, Dims...) to (B, N, E)."""
-        raise NotImplementedError
-
-    def get_pos_embed(self, *patch_dims: int) -> torch.Tensor:
-        """
-        Interpolate positional embeddings to match the input's patch dimensions.
-        `patch_dims` should be (H, W) for 2D and (D, H, W) for 3D.
-        """
-        raise NotImplementedError
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Size]:
         x = self.proj(x)
-        B, E, *patch_dims = x.shape
-        x = self._rearrange_projection(x)
+
+        patch_dims = x.shape[2:]
+
+        x = rearrange(x, "b e ... -> b (...) e")
         x = self.norm(x)
 
-        pos_embed = self.get_pos_embed(*patch_dims)
+        return x, patch_dims
 
-        x = x + repeat(pos_embed, "1 n d -> b n d", b=B)
+    def reset_parameters(self):
+        if self.ndims == 2:
+            k = 1 / (self.in_channels * (self.patch_size**2))
+        elif self.ndims == 3:
+            k = 1 / (self.patch_size**3)
+        else:
+            raise ValueError(f"`ndims` must be 2 or 3, got {self.ndims}.")
 
-        return x
-
-
-class PatchEmbed2D(PatchEmbed):
-    def _get_projection_layer(self) -> nn.Module:
-        return nn.Conv2d(
-            self.in_channels,
-            self.embed_dim,
-            kernel_size=self.patch_size,
-            stride=self.patch_size,
-        )
-
-    def _calculate_num_patches(self) -> int:
-        return self.patches_resolution * self.patches_resolution
-
-    def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
-        return rearrange(x, "b e h w -> b (h w) e")
-
-
-class PatchEmbed3D(PatchEmbed):
-    def _get_projection_layer(self) -> nn.Module:
-        return nn.Conv3d(
-            self.in_channels,
-            self.embed_dim,
-            kernel_size=self.patch_size,
-            stride=self.patch_size,
-        )
-
-    def _calculate_num_patches(self) -> int:
-        return (
-            self.patches_resolution * self.patches_resolution * self.patches_resolution
-        )
-
-    def _rearrange_projection(self, x: torch.Tensor) -> torch.Tensor:
-        return rearrange(x, "b e d h w -> b (d h w) e")
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.proj(x.unsqueeze(1))
-        B, E, *patch_dims = x.shape
-        x = self._rearrange_projection(x)
-        x = self.norm(x)
-
-        pos_embed = self.get_pos_embed(*patch_dims)
-
-        x = x + repeat(pos_embed, "1 n d -> b n d", b=B)
-
-        return x
+        nn.init.uniform_(self.proj.weight, -math.sqrt(k), math.sqrt(k))
+        if self.proj.bias is not None:
+            nn.init.uniform_(self.proj.bias, -math.sqrt(k), math.sqrt(k))

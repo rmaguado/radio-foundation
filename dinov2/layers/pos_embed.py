@@ -15,16 +15,16 @@ from einops import rearrange
 
 
 class LearnedPositionEmbedding(nn.Module):
-    def __init__(self, *, embed_dim, num_patches, ndim=3):
+    def __init__(self, *, embed_dim, num_patches, ndims=3):
         self.embed_dim = embed_dim
         self.num_patches = num_patches
-        self.ndim = ndim
+        self.ndims = ndims
 
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim))
 
-        if ndim == 2:
+        if ndims == 2:
             self.interpolate_fnc = self._get_pos_embed_2d
-        elif ndim == 3:
+        elif ndims == 3:
             self.interpolate_fnc = self._get_pos_embed_3d
         else:
             raise ValueError(f"`num_dims` must be 2 or 3.")
@@ -72,7 +72,7 @@ class RopePositionEmbedding(nn.Module):
         embed_dim: int,
         *,
         num_heads: int,
-        ndim: int = 2,
+        ndims: int = 2,
         base: float = 100.0,
         shift_coords: float | None = None,
         jitter_coords: float | None = None,
@@ -82,11 +82,11 @@ class RopePositionEmbedding(nn.Module):
     ):
         super().__init__()
         assert (
-            embed_dim % (2 * ndim * num_heads) == 0
-        ), f"embed_dim must be divisible by 2*ndim*num_heads, got {embed_dim=}, {ndim=}, {num_heads=}"
+            embed_dim % (2 * ndims * num_heads) == 0
+        ), f"embed_dim must be divisible by 2*ndims*num_heads, got {embed_dim=}, {ndims=}, {num_heads=}"
 
         D_head = embed_dim // num_heads
-        self.ndim = ndim
+        self.ndims = ndims
         self.base = base
         self.D_head = D_head
         self.shift_coords = shift_coords
@@ -112,14 +112,14 @@ class RopePositionEmbedding(nn.Module):
         coords = 2.0 * coords - 1.0
 
         if self.training and self.shift_coords is not None:
-            shift = torch.empty(self.ndim, **dd).uniform_(
+            shift = torch.empty(self.ndims, **dd).uniform_(
                 -self.shift_coords, self.shift_coords
             )
             coords += shift[None, :]
 
         if self.training and self.jitter_coords is not None:
             jitter = (
-                torch.empty(self.ndim, **dd)
+                torch.empty(self.ndims, **dd)
                 .uniform_(-np.log(self.jitter_coords), np.log(self.jitter_coords))
                 .exp()
             )
@@ -135,7 +135,7 @@ class RopePositionEmbedding(nn.Module):
 
         angles = (
             2 * math.pi * coords[:, :, None] / self.periods[None, None, :]  # type: ignore
-        )  # [N, ndim, D//(2*ndim)]
+        )  # [N, ndims, D//(2*ndims)]
         angles = angles.flatten(1, 2)  # [N, D//2]
         angles = angles.tile(2)  # [N, D]
         cos, sin = torch.cos(angles), torch.sin(angles)
@@ -146,7 +146,7 @@ class RopePositionEmbedding(nn.Module):
         dtype = self.dtype
         periods = self.base ** (
             2
-            * torch.arange(self.D_head // (2 * self.ndim), device=device, dtype=dtype)  # type: ignore
-            / (self.D_head // self.ndim)
+            * torch.arange(self.D_head // (2 * self.ndims), device=device, dtype=dtype)  # type: ignore
+            / (self.D_head // self.ndims)
         )
         self.periods.data = periods

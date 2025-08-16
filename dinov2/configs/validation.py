@@ -129,46 +129,30 @@ class CheckpointsConfig(BaseModel):
         return v
 
 
-class EmbedLayerConfig(BaseModel):
-    type: Literal["patch_2d", "patch_3d"]
-    patch_size: int
-    img_size: int
-    in_channels: Optional[int] = None
-    layer_norm: bool
-
-    @field_validator("patch_size", "img_size", mode="before")
-    @classmethod
-    def validate_positive_integers(cls, v):
-        if v <= 0:
-            raise ValueError("Value must be a positive integer")
-        return v
-
-    @field_validator("in_channels", mode="before")
-    @classmethod
-    def validate_in_channels(cls, v):
-        if v is not None and v <= 0:
-            raise ValueError("in_channels must be a positive integer")
-        return v
-
-
 class StudentConfig(BaseModel):
-    model_name: str
     embed_dim: int
-    depth: int
+    n_blocks: int
     num_heads: int
-    mlp_ratio: int
-    embed_layer: EmbedLayerConfig
+    ffn_ratio: int
+    patch_size: int
+    ndims: int
+    img_size: int
+    in_channels: Optional[int]
+    rope_base: float
+    rope_shift_coords: Optional[float]
+    rope_jitter_coords: Optional[float]
+    rope_rescale_coords: Optional[float]
     drop_path_rate: float
-    layerscale: float
-    drop_path_uniform: bool
-    pretrained_weights: str
+    layerscale_init: float
+    norm_layer: Literal["layernorm", "layernormbf16", "rmsnorm"]
     ffn_layer: Literal["mlp", "swiglu"]
     qkv_bias: bool
     proj_bias: bool
     ffn_bias: bool
     num_register_tokens: int
+    mask_k_bias: bool
 
-    @field_validator("drop_path_rate", "layerscale", mode="before")
+    @field_validator("drop_path_rate", "layerscale_init", mode="before")
     @classmethod
     def validate_float_range(cls, v):
         if not 0.0 <= v <= 1.0:
@@ -177,16 +161,32 @@ class StudentConfig(BaseModel):
 
     @field_validator(
         "embed_dim",
-        "depth",
+        "n_blocks",
         "num_heads",
-        "mlp_ratio",
+        "ffn_ratio",
         "num_register_tokens",
+        "patch_size",
+        "img_size",
         mode="before",
     )
     @classmethod
     def validate_positive_integers(cls, v):
         if v <= 0:
             raise ValueError("Value must be a positive integer")
+        return v
+
+    @field_validator("ndims", mode="before")
+    @classmethod
+    def validate_ndims(cls, v):
+        if not v == 2 or v == 3:
+            raise ValueError("ndims must be 2 or 3.")
+        return v
+
+    @field_validator("in_channels", mode="before")
+    @classmethod
+    def validate_inchannels(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("in_channels must be null or a positive integer.")
         return v
 
 

@@ -13,37 +13,31 @@ from typing import Sequence, List, Dict, Tuple, Callable, Optional
 
 import torch
 import torch.nn as nn
-from torch.nn.init import trunc_normal_
 
 from einops import repeat
 
 from dinov2.layers import (
     Mlp,
-    PatchEmbed2D,
-    PatchEmbed3D,
-    SwiGLUFFNFused,
-    MemEffAttention,
-    NestedTensorBlock as Block,
+    SwiGLUFFN,
+    LayerScale,
+    PatchEmbed,
+    RMSNorm,
+    SelfAttentionBlock,
+    RopePositionEmbedding,
 )
 
 
 logger = logging.getLogger("dinov2")
 
-embed_layer_dict = {
-    "patch_2d": PatchEmbed2D,
-    "patch_3d": PatchEmbed3D,
-}
-
 ffn_layer_dict = {
     "mlp": Mlp,
-    "swiglu": SwiGLUFFNFused,
-    "swiglufused": SwiGLUFFNFused,
-    "identity": nn.Identity,
+    "swiglu": SwiGLUFFN,
 }
 
 norm_layer_dict = {
     "layernorm": partial(nn.LayerNorm, eps=1e-6),
     "layernormbf16": partial(nn.LayerNorm, eps=1e-5),
+    "rmsnorm": RMSNorm,
 }
 
 
@@ -59,17 +53,17 @@ def get_embedding_layer(embed_config: Dict, embed_dim: int):
         nn.Module: Dictionary of embedding layers keyed by type.
     """
     layer_config = embed_config.copy()
-    layer_type = layer_config["type"]
 
     patch_kwargs = {
         "img_size": layer_config.get("img_size", 224),
+        "ndims": layer_config.get("ndims", 2),
         "patch_size": layer_config.get("patch_size", 14),
         "in_channels": layer_config.get("in_channels", 1),
         "embed_dim": embed_dim,
         "layer_norm": layer_config.get("layer_norm", False),
     }
 
-    return embed_layer_dict[layer_type](**patch_kwargs)
+    return PatchEmbed(**patch_kwargs)
 
 
 def named_apply(
@@ -104,115 +98,112 @@ def named_apply(
     return module
 
 
-def init_weights_vit_timm(module: nn.Module, name: str = ""):
-    """
-    Initializes weights for Vision Transformer modules using the timm (PyTorch Image Models) scheme.
-
-    Args:
-        module (nn.Module): Module to initialize.
-        name (str, optional): Name of the module (unused).
-    """
+def init_weights_vit(module: nn.Module, name: str = ""):
     if isinstance(module, nn.Linear):
-        trunc_normal_(module.weight, std=0.02)
+        torch.nn.init.trunc_normal_(module.weight, std=0.02)
         if module.bias is not None:
             nn.init.zeros_(module.bias)
+    if isinstance(module, nn.LayerNorm):
+        module.reset_parameters()
+    if isinstance(module, LayerScale):
+        module.reset_parameters()
+    if isinstance(module, PatchEmbed):
+        module.reset_parameters()
+    if isinstance(module, RMSNorm):
+        module.reset_parameters()
 
 
 class DinoVisionTransformer(nn.Module):
-    """
-    Vision Transformer (ViT) backbone for DINO self-supervised learning.
-
-    Supports both 2D and 3D patch embedding, register tokens, masking, and flexible FFN layers.
-
-    Args:
-        embed_dim (int): Embedding dimension for transformer.
-        depth (int): Number of transformer blocks.
-        num_heads (int): Number of attention heads.
-        mlp_ratio (float): Ratio of MLP hidden dim to embed dim.
-        qkv_bias (bool): If True, add bias to QKV projections.
-        ffn_bias (bool): If True, add bias to FFN layers.
-        proj_bias (bool): If True, add bias to projection layers.
-        ffn_layer (str): Type of feed-forward network layer to use.
-        num_register_tokens (int): Number of register tokens to use.
-        embed_configs (List[Dict]): List of embedding layer configurations.
-        drop_path_rate (float): Drop path rate for stochastic depth.
-        drop_path_uniform (bool): If True, use uniform drop path rate.
-        init_values (Optional[float]): Initial value for LayerScale.
-        act_layer (Callable): Activation function constructor.
-    """
-
     def __init__(
         self,
+        *,
         embed_dim: int,
-        depth: int,
+        n_blocks: int,
         num_heads: int,
-        mlp_ratio: float,
-        qkv_bias: bool,
-        ffn_bias: bool,
-        proj_bias: bool,
+        ffn_ratio: int,
+        img_size: int,
+        patch_size: int,
+        ndims: int,
+        in_channels: Optional[int],
+        rope_base: float,
+        rope_shift_coords: Optional[float],
+        rope_jitter_coords: Optional[float],
+        rope_rescale_coords: Optional[float],
+        drop_path_rate: float,
+        layerscale_init: float,
+        norm_layer: str,
         ffn_layer: str,
+        qkv_bias: bool,
+        proj_bias: bool,
+        ffn_bias: bool,
         num_register_tokens: int,
-        embed_config: Dict,
-        drop_path_rate: float = 0.0,
-        drop_path_uniform: bool = True,
-        init_values: Optional[float] = None,
-        act_layer: Callable = nn.GELU,
+        mask_k_bias: bool,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
     ):
         super().__init__()
-        block_fn = partial(Block, attn_class=MemEffAttention)
+
+        norm_layer_cls = norm_layer_dict[norm_layer]
 
         self.embed_dim = embed_dim
+        self.n_blocks = n_blocks
         self.num_heads = num_heads
+        self.patch_size = patch_size
+
         self.num_register_tokens = num_register_tokens
 
-        self.embed_layer = get_embedding_layer(
-            embed_config=embed_config,
+        self.patch_embed = PatchEmbed(
+            img_size=img_size,
+            ndims=ndims,
+            patch_size=patch_size,
             embed_dim=embed_dim,
+            in_channels=in_channels,
         )
 
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-
+        self.cls_token = nn.Parameter(torch.empty(1, 1, embed_dim, device=device))
         self.register_tokens = (
-            nn.Parameter(torch.zeros(1, num_register_tokens, embed_dim))
+            nn.Parameter(torch.empty(1, num_register_tokens, embed_dim, device=device))
             if num_register_tokens > 0
             else None
         )
-
-        self.mask_token = nn.Parameter(torch.zeros(1, embed_dim))
-
-        dpr = (
-            [drop_path_rate] * depth
-            if drop_path_uniform
-            else [x.item() for x in torch.linspace(0, drop_path_rate, depth)]
+        self.rope_embed = RopePositionEmbedding(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            ndims=ndims,
+            base=rope_base,
+            shift_coords=rope_shift_coords,
+            jitter_coords=rope_jitter_coords,
+            rescale_coords=rope_rescale_coords,
+            dtype=dtype,
+            device=device,
         )
 
-        try:
-            ffn_layer_class = ffn_layer_dict[ffn_layer]
-        except KeyError:
-            raise NotImplementedError(f"FFN layer '{ffn_layer}' is not implemented.")
-
+        ffn_layer_cls = ffn_layer_dict[ffn_layer]
         self.blocks = nn.ModuleList(
             [
-                block_fn(
+                SelfAttentionBlock(
                     dim=embed_dim,
                     num_heads=num_heads,
-                    mlp_ratio=mlp_ratio,
+                    ffn_ratio=ffn_ratio,
                     qkv_bias=qkv_bias,
                     proj_bias=proj_bias,
                     ffn_bias=ffn_bias,
-                    drop_path=dpr[i],
-                    norm_layer=partial(nn.LayerNorm, eps=1e-6),
-                    act_layer=act_layer,
-                    ffn_layer=ffn_layer_class,
-                    init_values=init_values,
-                    attn_class=MemEffAttention,
+                    drop_path=drop_path_rate,
+                    norm_layer=norm_layer_cls,
+                    act_layer=nn.GELU,
+                    ffn_layer=ffn_layer_cls,
+                    init_values=layerscale_init,
+                    mask_k_bias=mask_k_bias,
+                    device=device,
                 )
-                for i in range(depth)
+                for i in range(n_blocks)
             ]
         )
+        self.norm = norm_layer_cls(embed_dim)
+        self.local_cls_norm = norm_layer_cls(embed_dim)
 
-        self.norm = nn.LayerNorm(embed_dim, eps=1e-6)
         self.head = nn.Identity()
+        self.mask_token = nn.Parameter(torch.empty(1, embed_dim, device=device))
 
         self.init_weights()
 
@@ -220,13 +211,13 @@ class DinoVisionTransformer(nn.Module):
         """
         Initializes all learnable parameters in the transformer, including tokens and embeddings.
         """
-        nn.init.normal_(self.cls_token, std=1e-6)
+
+        self.rope_embed._init_weights()
+        nn.init.normal_(self.cls_token, std=0.02)
         if self.register_tokens is not None:
-            nn.init.normal_(self.register_tokens, std=1e-6)
-
-        trunc_normal_(self.embed_layer.pos_embed, std=0.02)
-
-        named_apply(init_weights_vit_timm, self)
+            nn.init.normal_(self.register_tokens, std=0.02)
+        nn.init.zeros_(self.mask_token)
+        named_apply(init_weights_vit, self)
 
     def _prepare_tokens(
         self, x: torch.Tensor, masks: Optional[torch.Tensor] = None
@@ -243,7 +234,7 @@ class DinoVisionTransformer(nn.Module):
         """
         B = x.shape[0]
 
-        x = self.embed_layer(x)
+        x = self.patch_embed(x)
 
         if masks is not None:
             x = torch.where(
@@ -251,31 +242,45 @@ class DinoVisionTransformer(nn.Module):
             )
 
         cls_tokens = repeat(self.cls_token, "1 1 e -> b 1 e", b=B)
-        x = torch.cat([cls_tokens, x], dim=1)
 
         if self.register_tokens is not None:
             register_tokens = repeat(self.register_tokens, "1 n e -> b n e", b=B)
-            x = torch.cat([x[:, :1, :], register_tokens, x[:, 1:, :]], dim=1)
+            x = torch.cat([cls_tokens, register_tokens, x], dim=1)
+        else:
+            x = torch.cat(tensors=[cls_tokens, x], dim=1)
 
         return x
 
     def forward(
         self,
         x: torch.Tensor,
+        *,
         masks: Optional[torch.Tensor] = None,
+        local_cls_norm: bool = False,
     ) -> Dict[str, torch.Tensor]:
-        x = self._prepare_tokens(x, masks)
+        x, patch_dims = self._prepare_tokens(x, masks)
+
         for blk in self.blocks:
-            x = blk(x)
-        x_norm = self.norm(x)
+            rope_sincos = self.rope_embed(*patch_dims)
+            x = blk(x, rope_sincos)
+
+        if local_cls_norm:
+            x_norm_cls = self.local_cls_norm(x[:, 0])
+            x_norm_patch = self.norm(x[:, self.num_register_tokens + 1 :])
+        else:
+            x_norm = self.norm(x)
+            x_norm_cls = x_norm[:, 0]
+            x_norm_patch = x_norm[:, self.num_register_tokens + 1 :]
+
         return {
-            "clstoken": x_norm[:, 0],
-            "patchtokens": x_norm[:, self.num_register_tokens + 1 :],
+            "clstoken": x_norm_cls,
+            "patchtokens": x_norm_patch,
         }
 
     def get_intermediate_layers(
         self,
         x: torch.Tensor,
+        *,
         select_layers: Sequence[int] = (11,),
         norm: bool = True,
     ) -> Dict[str, torch.Tensor]:
@@ -300,27 +305,21 @@ class DinoVisionTransformer(nn.Module):
         }
 
 
-def build_model(cfg, teacher_only=False):
-    args = cfg.student
-    vit_kwargs = dict(
-        embed_dim=args.embed_dim,
-        depth=args.depth,
-        num_heads=args.num_heads,
-        mlp_ratio=args.mlp_ratio,
-        qkv_bias=args.qkv_bias,
-        ffn_bias=args.ffn_bias,
-        proj_bias=args.proj_bias,
-        ffn_layer=args.ffn_layer,
-        num_register_tokens=args.num_register_tokens,
-        embed_config=args.embed_layer,
-        init_values=args.layerscale,
-    )
-    teacher = DinoVisionTransformer(**vit_kwargs)
-    if teacher_only:
-        return None, teacher
+def build_models(cfg):
+    args = cfg.student.copy()
+    drop_path_rate = args.pop("drop_path_rate", 0.0)
+
+    teacher = DinoVisionTransformer(**args)
     student = DinoVisionTransformer(
-        **vit_kwargs,
-        drop_path_rate=args.drop_path_rate,
-        drop_path_uniform=args.drop_path_uniform,
+        **args,
+        drop_path_rate=drop_path_rate,
     )
     return student, teacher
+
+
+def build_teacher_only(cfg):
+    args = cfg.student.copy()
+    _ = args.pop("drop_path_rate", 0.0)
+
+    teacher = DinoVisionTransformer(**args)
+    return teacher
