@@ -26,7 +26,7 @@ class DataAugmentationDINO:
         self.config = config
         self.norm_cfg = {"mean": mean, "std": std}
 
-        self.embed_layer = config.student.embed_layer.type
+        self.ndims = config.student.ndims
 
         self.num_crops_global = config.crops.num_crops_global
         self.num_crops_local = config.crops.num_crops_local
@@ -49,9 +49,8 @@ class DataAugmentationDINO:
     def _create_transforms(self) -> Dict[str, Callable]:
         """Builds the dictionary of transformation functions based on config."""
         transforms: Dict[str, Callable] = {}
-        crop_sizes = self.config.crops.crop_sizes
 
-        if self.embed_layer == "patch_3d":
+        if self.ndims == 3:
 
             general_crop_3d = ImageTransforms()
             general_crop_3d += RandomCrop3D(
@@ -72,12 +71,12 @@ class DataAugmentationDINO:
             local_3d_augment += GaussianBlur()
             transforms["local"] = local_3d_augment
 
-        elif self.embed_layer == "patch_2d":
+        elif self.ndims == 2:
 
             global_2d_augment = ImageTransforms()
             global_2d_augment += RandomSliceCrop(
                 size=self.size_global,
-                channels=crop_sizes.channels,
+                channels=self.config.student.in_channels,
                 scale=self.scale_global,
             )
             global_2d_augment += Norm(**self.norm_cfg)
