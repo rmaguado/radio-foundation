@@ -13,11 +13,11 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from einops import rearrange
 
-from dino.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss, KoLeoLossDistributed
-from dino.models import build_models
+from dino.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss, KoLeoLossDistributed, GramLoss
+from dino.models import build_models, build_model_eval
 from dino.layers import DINOHead
 from dino.train.param_groups import get_params_groups_with_decay
-import dino.distributed as dist
+from dino.train.cosine_schedule import linear_warmup_cosine_decay
 
 
 logger = logging.getLogger("dinov2")
@@ -32,7 +32,7 @@ class SSLMetaArch(nn.Module):
         self.teacher = nn.ModuleDict()
 
         student_backbone, teacher_backbone = build_models(cfg)
-        self.student["backbone"] = student_backbone  # type: ignore
+        self.student["backbone"] = student_backbone
         self.teacher["backbone"] = teacher_backbone
 
         self.embed_dim = cfg.student.embed_dim
@@ -84,10 +84,99 @@ class SSLMetaArch(nn.Module):
                 self.student["ibot_head"] = ibot_head()
                 self.teacher["ibot_head"] = ibot_head()
 
+        self.do_gram = self.cfg.gram.use_loss
+        self.gram_ema_teacher = False
+        self.has_gram_teacher = False
+        self.gram_teacher_initialized = False
+        if self.do_gram:
+            self.gram_loss = GramLoss(
+                apply_norm=self.cfg.gram.normalized,
+                remove_only_teacher_neg=self.cfg.gram.remove_only_teacher_neg,
+                remove_neg=self.cfg.gram.remove_neg,
+            )
+
+            self.has_gram_teacher = True if not cfg.gram.ema_teacher else False
+            if self.has_gram_teacher:
+                gram_backbone = build_model_eval(cfg)
+                self.gram_teacher = nn.ModuleDict()
+                self.gram_teacher["backbone"] = gram_backbone
+                self.gram_teacher.requires_grad_(False)
+            else:
+                self.gram_teacher = None
+
+            self.gram_loss_weight = self.cfg.gram.loss_weight
+            if self.cfg.gram.get("loss_weight_schedule"):
+                epoch_len = cfg.train.iterations_per_epoch
+                total_iterations = epoch_len * cfg.optim.epochs
+                schedule_cfg = self.cfg.gram.loss_weight_schedule
+                self.gram_loss_schedule = linear_warmup_cosine_decay(
+                    start=schedule_cfg.start,
+                    peak=schedule_cfg.peak,
+                    end=schedule_cfg.end,
+                    warmup_iterations=epoch_len * schedule_cfg.warmup_epochs,
+                    total_iterations=total_iterations,
+                    cosine_iterations=(
+                        epoch_len * schedule_cfg.cosine_epochs
+                        if schedule_cfg.cosine_epochs is not None
+                        else None
+                    ),
+                )
+            else:
+                self.gram_loss_schedule = None
+
+            self.gram_ema_teacher = self.cfg.gram.ema_teacher
+            self.gram_ckpt = self.cfg.gram.ckpt
+            self.gram_img_level = self.cfg.gram.img_level
+
+            self.gram_rep_update = self.cfg.gram.rep_update
+            self.gram_update_frequency = self.cfg.gram.update_frequency
+            self.gram_it_first_update = self.cfg.gram.it_first_update
+            self.gram_it_load_ema_teacher = self.cfg.gram.it_load_ema_teacher
+            self.gram_params_lists = None
+
+            if self.gram_ema_teacher and self.gram_ckpt is not None:
+                raise ValueError(
+                    "Cannot use both `gram.ema_teacher` and `gram.ckpt` at the same time. Please set one of them to False."
+                )
+            if self.gram_ckpt is None and self.gram_it_load_ema_teacher < 0:
+                raise ValueError(
+                    "If no gram checkpoint is provided, `gram.it_load_ema_teacher` must be set to a non-negative value."
+                )
+
+            assert not (self.gram_ema_teacher and self.gram_rep_update)
+
         for p in self.teacher.parameters():
             p.requires_grad = False
 
         self.num_crops_global = cfg.crops.num_crops_global
+
+    def init_weights(self) -> None:
+        self.student["backbone"].init_weights()  # pyright: ignore[reportCallIssue]
+        self.student["dino_head"].init_weights()  # pyright: ignore[reportCallIssue]
+        self.student["ibot_head"].init_weights()  # pyright: ignore[reportCallIssue]
+        self.dino_loss.init_weights()
+        self.ibot_patch_loss.init_weights()
+
+        self.teacher.load_state_dict(self.student.state_dict())
+        if self.has_gram_teacher:
+            if self.gram_ckpt is not None:
+                assert self.gram_teacher is not None
+                logger.info(f"Loading pretrained weights from {self.gram_ckpt}")
+                gram_teacher_state_dict = torch.load(self.gram_ckpt)
+                self.gram_teacher.load_state_dict(gram_teacher_state_dict)
+
+                self.gram_teacher_initialized = True
+            else:
+                raise ValueError(f"Provide a correct path to {self.gram_ckpt}")
+            self.gram_teacher.requires_grad_(False)
+            self.gram_teacher.eval()
+        if self.cfg.student.resume_from_teacher_chkpt:
+            logger.info(
+                f"Loading pretrained weights from {self.cfg.student.resume_from_teacher_chkpt}"
+            )
+            student_state_dict = torch.load(self.cfg.student.resume_from_teacher_chkpt)
+            self.student.load_state_dict(student_state_dict)
+            self.teacher.load_state_dict(self.student.state_dict())
 
     def _process_group(
         self,

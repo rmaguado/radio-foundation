@@ -205,8 +205,6 @@ class DinoVisionTransformer(nn.Module):
         self.head = nn.Identity()
         self.mask_token = nn.Parameter(torch.empty(1, embed_dim, device=device))
 
-        self.init_weights()
-
     def init_weights(self):
         """
         Initializes all learnable parameters in the transformer, including tokens and embeddings.
