@@ -67,6 +67,8 @@ def build_dataset_from_cfg(cfg, dataset_config):
     norm = dataset_config.norm
     transforms = DataAugmentationDINO(cfg, norm.mean, norm.std)
 
+    ndims = cfg.student.ndims
+
     dataset_kwargs = {
         "config": cfg,
         "dataset_name": dataset_config.name,
@@ -76,11 +78,13 @@ def build_dataset_from_cfg(cfg, dataset_config):
         "bounds": dataset_config.bounds,
     }
 
-    # if dataset_storage == "dicom":
-    #    dataset_object = DicomVolumeDataset(**dataset_kwargs)
-    # elif dataset_storage == "nifti":
-    #    dataset_object = NiftiVolumeDataset(**dataset_kwargs)
-    if dataset_storage == "torch":
+    if dataset_storage == "dicom":
+        assert ndims == 2, f"Dicom dataset is not suitable for 3D."
+        dataset_object = DicomVolumeDataset(**dataset_kwargs)
+    elif dataset_storage == "nifti":
+        assert ndims == 2, f"Nifti dataset is not suitable for 3D."
+        dataset_object = NiftiVolumeDataset(**dataset_kwargs)
+    elif dataset_storage == "torch":
         dataset_object = TorchVolumeDataset(**dataset_kwargs)
     else:
         raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
