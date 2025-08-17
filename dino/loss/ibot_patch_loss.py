@@ -25,6 +25,9 @@ class iBOTPatchLoss(nn.Module):
         self.register_buffer("new_center", torch.zeros(1, patch_out_dim))
         self.update_counter = 0
 
+    def init_weights(self) -> None:
+        self.center.zero_()
+
     @torch.no_grad()
     def softmax_center_teacher(
         self, teacher_patch_tokens, teacher_temp

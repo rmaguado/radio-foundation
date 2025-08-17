@@ -27,6 +27,9 @@ class DINOLoss(nn.Module):
         self.register_buffer("new_center", torch.zeros(1, out_dim))
         self.update_counter = 0
 
+    def init_weights(self) -> None:
+        self.center.zero_()
+
     @torch.no_grad()
     def softmax_center_teacher(self, teacher_output, teacher_temp) -> torch.Tensor:
         return F.softmax((teacher_output - self.center) / teacher_temp, dim=-1)
