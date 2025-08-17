@@ -114,7 +114,7 @@ class SSLMetaArch(nn.Module):
         model: nn.ModuleDict,
         images: torch.Tensor,
         masks: Optional[torch.Tensor],
-        is_target: bool,
+        is_global: bool,
         apply_mask: bool,
     ) -> Dict[str, torch.Tensor]:
         """
@@ -125,7 +125,7 @@ class SSLMetaArch(nn.Module):
             images (torch.Tensor): Batch of images.
             masks (torch.Tensor): Batch of masks.
             embed_layer (int): Which embedding layer to use.
-            is_target (bool): Whether this group is a target for loss computation.
+            is_global (bool): Whether the input is a global view.
             apply_mask (bool): Whether to apply masks to the input.
 
         Returns:
@@ -135,26 +135,31 @@ class SSLMetaArch(nn.Module):
         flat_images = rearrange(images, "b v d w h -> (b v) d w h")
         flat_masks = rearrange(masks, "b v m -> (b v) m") if masks is not None else None
 
+        cls_local_norm = not is_global
+
         backbone_output = model["backbone"](
             flat_images,
             masks=flat_masks if apply_mask else None,
+            cls_local_norm=cls_local_norm,
         )
 
         cls_tokens = backbone_output["clstoken"]
         dino_tokens_flat = model["dino_head"](cls_tokens)
         dino_tokens = dino_tokens_flat.view(*view_shape, -1)
 
-        output = {"cls": dino_tokens, "cls_pre": cls_tokens}
+        output = {"cls_dino": dino_tokens, "cls_pre": cls_tokens}
 
-        if self.do_ibot and is_target and masks:
+        if self.do_ibot and is_global and masks:
             patch_tokens = backbone_output["patchtokens"]
-            patch_tokens = rearrange(patch_tokens, "a p d -> (a p) d")
-            masked_patch_tokens = patch_tokens[masks.view(-1)]
+            output["patch"] = patch_tokens
+
+            patch_tokens_flat = rearrange(patch_tokens, "a p d -> (a p) d")
+            masked_patch_tokens = patch_tokens_flat[masks.view(-1)]
 
             ibot_head = (
                 model["ibot_head"] if self.ibot_separate_head else model["dino_head"]
             )
-            output["patch"] = ibot_head(masked_patch_tokens)
+            output["patch_ibot"] = ibot_head(masked_patch_tokens)
 
             mask_weights = 1 / (masks.sum(-1).clamp(min=1.0))
             mask_weights = mask_weights.unsqueeze(-1).expand_as(masks)
@@ -200,22 +205,22 @@ class SSLMetaArch(nn.Module):
                 model=self.teacher,
                 images=collated_views["global"],
                 masks=collated_views["masks"],
-                is_target=True,
+                is_global=True,
                 apply_mask=False,
             )
-            uncentered_views["dino"] = group_output["cls"]
+            uncentered_views["dino"] = group_output["cls_dino"]
 
             dino_tokens_centered = self.dino_loss.softmax_center_teacher(
-                group_output["cls"], teacher_temp
+                group_output["cls_dino"], teacher_temp
             )
-            teacher_outputs["global_cls"] = dino_tokens_centered
+            teacher_outputs["global_cls_dino"] = dino_tokens_centered
 
             if self.do_ibot:
                 ibot_tokens_centered = self.ibot_patch_loss.softmax_center_teacher(
-                    group_output["patch"], teacher_temp
+                    group_output["patch_ibot"], teacher_temp
                 )
-                uncentered_views["ibot"] = group_output["patch"]
-                teacher_outputs["patch"] = ibot_tokens_centered
+                uncentered_views["ibot"] = group_output["patch_ibot"]
+                teacher_outputs["patch_ibot"] = ibot_tokens_centered
 
         self._update_teacher_centers(uncentered_views)
 
@@ -232,26 +237,26 @@ class SSLMetaArch(nn.Module):
             model=self.student,
             images=collated_views["global"],
             masks=collated_views["masks"],
-            is_target=True,
+            is_global=True,
             apply_mask=True,
         )
 
-        student_outputs["global_cls"] = global_output["cls"]
+        student_outputs["global_cls_dino"] = global_output["cls_dino"]
         student_outputs["global_cls_pre"] = global_output["cls_pre"]
 
         if self.do_ibot:
-            student_outputs["global_patch"] = global_output["patch"]
+            student_outputs["patch_ibot"] = global_output["patch_ibot"]
             student_outputs["mask_weights"] = global_output["mask_weights"]
 
         local_output = self._process_group(
             model=self.student,
             images=collated_views["local"],
             masks=None,
-            is_target=True,
+            is_global=False,
             apply_mask=False,
         )
 
-        student_outputs["local_cls"] = local_output["cls"]
+        student_outputs["local_cls_dino"] = local_output["cls_dino"]
 
         return student_outputs
 
@@ -263,18 +268,18 @@ class SSLMetaArch(nn.Module):
         total_loss = torch.tensor(0.0).cuda()
         n_loss_terms = 0
 
-        global_cls_student = student_output["global_cls"]
-        local_cls_student = student_output["local_cls"]
-        global_cls_teacher = teacher_output["global_cls"]
+        global_cls_dino_student = student_output["global_cls_dino"]
+        local_cls_dino_student = student_output["local_cls_dino"]
+        global_cls_dino_teacher = teacher_output["global_cls_dino"]
 
         for v0 in range(self.num_crops_global):
-            t_tokens = global_cls_teacher[:, v0, :]
+            t_tokens = global_cls_dino_teacher[:, v0, :]
 
             s_tokens = torch.cat(
                 [
-                    global_cls_student[:, :v0, :],
-                    global_cls_student[:, v0 + 1 :, :],
-                    local_cls_student,
+                    global_cls_dino_student[:, :v0, :],
+                    global_cls_dino_student[:, v0 + 1 :, :],
+                    local_cls_dino_student,
                 ],
                 dim=1,
             )
@@ -317,8 +322,8 @@ class SSLMetaArch(nn.Module):
         if not self.do_ibot:
             return torch.tensor(0.0).cuda()
 
-        student_ibot_tokens = student_output["global_patch"]
-        teacher_ibot_tokens = teacher_output["global_path"]
+        student_ibot_tokens = student_output["patch_ibot"]
+        teacher_ibot_tokens = teacher_output["patch_ibot"]
         mask_weights = student_output["mask_weights"]
 
         return self.ibot_patch_loss(
