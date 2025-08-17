@@ -18,3 +18,4 @@ tensorboard
 polars
 pydantic
 pytest
+ipympl
