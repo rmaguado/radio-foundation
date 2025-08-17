@@ -54,25 +54,39 @@ student:
   ffn_bias: true
   num_register_tokens: 4
   mask_k_bias: false
-teacher:
-  momentum_teacher: 0.994
-  final_momentum_teacher: 1.0
-  warmup_teacher_temp: 0.04
-  teacher_temp: 0.07
-  warmup_teacher_temp_epochs: 30
 optim:
   epochs: 300
-  warmup_epochs: 10
-  base_lr: 0.006
-  min_lr: 1.0e-06
-  weight_decay: 0.04
-  weight_decay_end: 0.2
   clip_grad: 3.0
-  freeze_last_layer_epochs: 1
   patch_embed_lr_mult: 0.2
   layerwise_decay: 0.9
   adamw_beta1: 0.9
   adamw_beta2: 0.999
+schedules:
+  lr:
+    start: 1e-6
+    peak: 6e-4
+    end: 1e-6
+    warmup_epochs: 10
+    freeze_last_layer_epochs: 1
+    cosine_epochs: 100
+  weight_decay:
+    start: 0.04
+    peak: 0.04
+    end: 0.04
+    warmup_epochs: 0
+    cosine_epochs: null
+  momentum:
+    start: 0.992
+    peak: 0.992
+    end: 0.992
+    warmup_epochs: 0
+    cosine_epochs: null
+  teacher_temp:
+    start: 0.04
+    peak: 0.07
+    end: 0.07
+    warmup_epochs: 30
+    cosine_epochs: 100
 crops:
   num_crops_global: 2
   num_crops_local: 8

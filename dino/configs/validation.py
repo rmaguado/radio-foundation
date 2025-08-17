@@ -1,6 +1,6 @@
 from omegaconf import OmegaConf, DictConfig
 from pydantic import BaseModel, field_validator, model_validator
-from typing import List, Dict, Optional, Literal, Tuple
+from typing import List, Optional, Literal, Tuple, Dict
 
 
 class DinoConfig(BaseModel):
@@ -200,63 +200,15 @@ class StudentConfig(BaseModel):
         return v
 
 
-class TeacherConfig(BaseModel):
-    momentum_teacher: float
-    final_momentum_teacher: float
-    warmup_teacher_temp: float
-    teacher_temp: float
-    warmup_teacher_temp_epochs: int
-
-    @field_validator("momentum_teacher", "final_momentum_teacher", mode="before")
-    @classmethod
-    def validate_momentum(cls, v):
-        if not 0.0 <= v <= 1.0:
-            raise ValueError("Momentum values must be between 0.0 and 1.0")
-        return v
-
-    @model_validator(mode="after")
-    def validate_final_momentum(self):
-        if self.final_momentum_teacher < self.momentum_teacher:
-            raise ValueError(
-                "final_momentum_teacher must be greater than or equal to momentum_teacher"
-            )
-        return self
-
-    @field_validator("warmup_teacher_temp", "teacher_temp", mode="before")
-    @classmethod
-    def validate_temperature(cls, v):
-        if not 0.0 < v <= 1.0:
-            raise ValueError("Temperature values must be between 0.0 and 1.0")
-        return v
-
-    @field_validator("warmup_teacher_temp_epochs", mode="before")
-    @classmethod
-    def validate_warmup_epochs(cls, v):
-        if v < 0:
-            raise ValueError(
-                "warmup_teacher_temp_epochs must be a non negative integer"
-            )
-        return v
-
-
 class OptimConfig(BaseModel):
-    weight_decay: float
-    weight_decay_end: float
-    base_lr: float
-    warmup_epochs: int
-    min_lr: float
     clip_grad: float
-    freeze_last_layer_epochs: int
     patch_embed_lr_mult: float
     layerwise_decay: float
     adamw_beta1: float
     adamw_beta2: float
 
     @field_validator(
-        "weight_decay",
-        "weight_decay_end",
-        "base_lr",
-        "min_lr",
+        "clip_grad",
         "patch_embed_lr_mult",
         "layerwise_decay",
         "adamw_beta1",
@@ -269,11 +221,48 @@ class OptimConfig(BaseModel):
             raise ValueError("Value must be a positive float")
         return v
 
-    @field_validator("freeze_last_layer_epochs", "warmup_epochs", mode="before")
+
+class ScheduleTemplate(BaseModel):
+    start: float
+    peak: float
+    end: float
+    warmup_epochs: int
+    freeze_last_layer_epochs: Optional[int]
+    cosine_epochs: Optional[int]
+
+    @field_validator(
+        "start",
+        "peak",
+        "end",
+        "warmup_epochs",
+        "freeze_last_layer_epochs",
+        "cosine_epochs",
+        mode="before",
+    )
     @classmethod
-    def validate_non_negative_integers(cls, v):
-        if v < 0:
-            raise ValueError("Value must be a non-negative integer")
+    def validate_positive_float(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("Value must be non-negative.")
+        return v
+
+
+class SchedulesConfig(BaseModel):
+    lr: ScheduleTemplate
+    weight_decay: ScheduleTemplate
+    momentum: ScheduleTemplate
+    teacher_temp: ScheduleTemplate
+
+    @field_validator(
+        "lr",
+        "weight_decay",
+        "momentum",
+        "teacher_temp",
+        mode="before",
+    )
+    @classmethod
+    def validate_positive_float(cls, v):
+        if not (v.start <= v.peak and v.end <= v.peak):
+            raise ValueError("Must have start <= peak and end <= peak.")
         return v
 
 
@@ -312,49 +301,6 @@ class CropsConfig(BaseModel):
         return v
 
 
-class TransformConfig(BaseModel):
-    name: str
-    p: Optional[float] = None
-    mean: Optional[float] = None
-    std: Optional[float] = None
-
-
-class TransformGroup(BaseModel):
-    name: str
-    size: int
-    num_crops: int
-    embed_layer: Literal["patch2d", "patch3d"]
-    is_target: bool = False
-    targets: Optional[List[str]] = None
-    transforms: List[TransformConfig]
-
-    @field_validator("size", "num_crops", mode="before")
-    @classmethod
-    def validate_positive_integers(cls, v):
-        if v <= 0:
-            raise ValueError("Value must be a positive integer")
-        return v
-
-
-class AugmentationsNode(BaseModel):
-    name: str
-    subgroups: Optional[List["AugmentationsNode"]] = None
-
-
-AugmentationsNode.model_rebuild()
-
-
-class PixelRangeConfig(BaseModel):
-    lower: float
-    upper: float
-
-    @model_validator(mode="after")
-    def validate_pixel_lower_upper(self):
-        if not self.lower < self.upper:
-            raise ValueError("Pixel range lower must be less than upper")
-        return self
-
-
 class NormConfig(BaseModel):
     mean: float
     std: float
@@ -365,7 +311,7 @@ class DatasetConfig(BaseModel):
     weight: Optional[float]
     index_path: str
     type: Literal["ct", "mri"]
-    storage: Literal["dicom", "nifti", "torch"]
+    storage: Literal["torch"]  # "dicom", "nifti",
     bounds: Tuple[float, float]
     norm: NormConfig
 
@@ -391,7 +337,7 @@ class MainConfig(BaseModel):
     ibot: IbotConfig
     train: TrainConfig
     student: StudentConfig
-    teacher: TeacherConfig
+    schedules: SchedulesConfig
     optim: OptimConfig
     crops: CropsConfig
     datasets: List[DatasetConfig]
@@ -405,6 +351,6 @@ def validate_config(conf: DictConfig) -> bool:
     Args:
         conf (DictConfig): The configuration dictionary to validate loaded from a YAML file using omegaconf.
     """
-    conf_dict = OmegaConf.to_container(conf, resolve=True)
-    MainConfig(**conf_dict)  # type: ignore
+    conf_dict: Dict = OmegaConf.to_container(conf, resolve=True)  # type: ignore
+    MainConfig(**conf_dict)
     return True

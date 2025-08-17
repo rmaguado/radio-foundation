@@ -55,48 +55,97 @@ def fix_random_seeds(seed=31):
     random.seed(seed)
 
 
-def build_optimizer(cfg, params_groups):
-    return torch.optim.AdamW(
-        params_groups, betas=(cfg.optim.adamw_beta1, cfg.optim.adamw_beta2)
-    )
+def linear_warmup_cosine_decay(
+    start: float,
+    peak: float,
+    end: float,
+    warmup_iterations: int,
+    total_iterations: int,
+    cosine_iterations: int | None = None,
+) -> np.ndarray:
+    """
+    Create a learning rate schedule with linear warmup, a cosine, and an optional constant part in the end.
+
+    Args:
+        start (float): Initial learning rate.
+        peak (float): Learning rate after linear warmup.
+        end (float): Final learning rate after cosine.
+        warmup_iterations (int): Number of iterations for linear warmup.
+        total_iterations (int): Total number of iterations for the schedule.
+        cosine_iterations (int | None): Number of iterations for cosine.
+            If None, cosine part will be over remaining iterations after warmup.
+    Returns:
+        np.ndarray: Learning rate schedule as a numpy array.
+    """
+    linear = np.linspace(start, peak, warmup_iterations, endpoint=False)
+    if cosine_iterations is None:
+        cosine_iterations = total_iterations - warmup_iterations
+    cosine = np.cos(np.linspace(0, np.pi, cosine_iterations))
+    cosine = (cosine + 1) / 2
+    cosine = (peak - end) * cosine + end
+    remaining_iterations = total_iterations - cosine_iterations - warmup_iterations
+    assert remaining_iterations >= 0
+    constant = np.full((remaining_iterations,), fill_value=end)
+    return np.concatenate([linear, cosine, constant])
 
 
 def build_schedulers(cfg):
     epoch_len = cfg.train.iterations_per_epoch
-    lr = dict(
-        base_value=cfg.optim["base_lr"],
-        final_value=cfg.optim["min_lr"],
-        total_iters=cfg.optim["epochs"] * epoch_len,
-        warmup_iters=cfg.optim["warmup_epochs"] * epoch_len,
-        start_warmup_value=0,
+
+    lr_peak = cfg.schedules.lr.peak
+    lr_end = cfg.schedules.lr.end
+    lr_schedule = linear_warmup_cosine_decay(
+        start=cfg.schedules.lr.start,
+        peak=lr_peak,
+        end=lr_end,
+        warmup_iterations=epoch_len * cfg.schedules.lr.warmup_epochs,
+        total_iterations=epoch_len,
+        cosine_iterations=(
+            epoch_len * cfg.schedules.lr.cosine_epochs
+            if cfg.schedules.lr.cosine_epochs is not None
+            else None
+        ),
     )
-    wd = dict(
-        base_value=cfg.optim["weight_decay"],
-        final_value=cfg.optim["weight_decay_end"],
-        total_iters=cfg.optim["epochs"] * epoch_len,
-    )
-    momentum = dict(
-        base_value=cfg.teacher["momentum_teacher"],
-        final_value=cfg.teacher["final_momentum_teacher"],
-        total_iters=cfg.optim["epochs"] * epoch_len,
-    )
-    teacher_temp = dict(
-        base_value=cfg.teacher["teacher_temp"],
-        final_value=cfg.teacher["teacher_temp"],
-        total_iters=cfg.teacher["warmup_teacher_temp_epochs"] * epoch_len,
-        warmup_iters=cfg.teacher["warmup_teacher_temp_epochs"] * epoch_len,
-        start_warmup_value=cfg.teacher["warmup_teacher_temp"],
+    last_layer_lr_schedule = lr_schedule.copy()
+    last_layer_lr_schedule[: epoch_len * cfg.schedules.lr.freeze_last_layer_epochs] = 0
+
+    wd_schedule = linear_warmup_cosine_decay(
+        start=cfg.schedules.weight_decay.start,
+        peak=cfg.schedules.weight_decay.peak,
+        end=cfg.schedules.weight_decay.end,
+        warmup_iterations=epoch_len * cfg.schedules.weight_decay.warmup_epochs,
+        total_iterations=epoch_len,
+        cosine_iterations=(
+            epoch_len * cfg.schedules.weight_decay.cosine_epochs
+            if cfg.schedules.weight_decay.cosine_epochs is not None
+            else None
+        ),
     )
 
-    lr_schedule = CosineScheduler(**lr)
-    wd_schedule = CosineScheduler(**wd)
-    momentum_schedule = CosineScheduler(**momentum)
-    teacher_temp_schedule = CosineScheduler(**teacher_temp)
-    last_layer_lr_schedule = CosineScheduler(**lr)
-
-    last_layer_lr_schedule.schedule[
-        : cfg.optim["freeze_last_layer_epochs"] * epoch_len
-    ] = 0
+    momentum_schedule = linear_warmup_cosine_decay(
+        start=cfg.schedules.momentum.start,
+        peak=cfg.schedules.momentum.peak,
+        end=cfg.schedules.momentum.end,
+        warmup_iterations=epoch_len * cfg.schedules.momentum.warmup_epochs,
+        total_iterations=epoch_len,
+        cosine_iterations=(
+            epoch_len * cfg.schedules.momentum.cosine_epochs
+            if cfg.schedules.momentum.cosine_epochs is not None
+            else None
+        ),
+    )
+    teacher_temp_schedule = linear_warmup_cosine_decay(
+        start=cfg.schedules.teacher_temp.start,
+        peak=cfg.schedules.teacher_temp.peak,
+        end=cfg.schedules.teacher_temp.end,
+        warmup_iterations=epoch_len * cfg.schedules.teacher_temp.warmup_epochs,
+        total_iterations=epoch_len,
+        cosine_iterations=(
+            epoch_len * cfg.schedules.teacher_temp.cosine_epochs
+            if cfg.schedules.teacher_temp.cosine_epochs is not None
+            else None
+        ),
+    )
 
     return {
         "lr": lr_schedule,
@@ -105,6 +154,12 @@ def build_schedulers(cfg):
         "teacher_temp": teacher_temp_schedule,
         "last_layer_lr": last_layer_lr_schedule,
     }
+
+
+def build_optimizer(cfg, params_groups):
+    return torch.optim.AdamW(
+        params_groups, betas=(cfg.optim.adamw_beta1, cfg.optim.adamw_beta2)
+    )
 
 
 def setup_collate_fn(cfg, inputs_dtype):
