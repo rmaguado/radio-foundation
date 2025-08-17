@@ -20,22 +20,6 @@ ibot:
   head_bottleneck_dim: 256
   head_nlayers: 3
   head_hidden_dim: 2048
-gram:
-  use_loss: false
-  compute_stats: false
-  loss_weight: 1.0
-  ema_teacher: false
-  ckpt: null
-  it_load_ema_teacher: -1
-  rep_update: true
-  update_frequency: 50000
-  it_first_update: 0
-  max_updates: null
-  normalized: true
-  img_level: false
-  remove_neg: false
-  remove_only_teacher_neg: false
-  tokens_used: all
 train:
   grad_accum_steps: 16
   batch_size_per_gpu: 16
@@ -70,6 +54,7 @@ student:
   ffn_bias: true
   num_register_tokens: 4
   mask_k_bias: false
+  resume_from_teacher_chkpt: ''
 optim:
   epochs: 300
   clip_grad: 3.0
