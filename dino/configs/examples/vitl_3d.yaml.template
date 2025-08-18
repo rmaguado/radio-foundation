@@ -1,0 +1,86 @@
+compute_precision: bf16
+train:
+  grad_accum_steps: 16
+  batch_size_per_gpu: 16
+  batch_size_total: 2048
+  output_dir: .
+  seed: 0
+  num_workers: 10
+  iterations_per_epoch: 1000
+checkpoints:
+  print_iterations: 1
+  save_checkpoint_iterations: 1000
+  save_teacher_iterations: 10000
+student:
+  embed_dim: 1024
+  n_blocks: 24
+  num_heads: 16
+  ffn_ratio: 4
+  img_size: 112
+  patch_size: 14
+  ndims: 3
+  in_channels: null
+  rope_base: 100.0
+  rope_shift_coords: null
+  rope_jitter_coords: null
+  rope_rescale_coords: 2
+  drop_path_rate: 0.3
+  layerscale_init: 1.0e-05
+  norm_layer: "layernormbf16"
+  ffn_layer: "swiglu"
+  qkv_bias: true
+  proj_bias: true
+  ffn_bias: true
+  num_register_tokens: 4
+  mask_k_bias: false
+  resume_from_teacher_chkpt: ''
+optim:
+  epochs: 300
+  clip_grad: 3.0
+  patch_embed_lr_mult: 0.2
+  layerwise_decay: 0.9
+  adamw_beta1: 0.9
+  adamw_beta2: 0.999
+schedules:
+  lr:
+    start: 1e-6
+    peak: 6e-4
+    end: 1e-6
+    warmup_epochs: 10
+    freeze_last_layer_epochs: 1
+    cosine_epochs: 100
+  weight_decay:
+    start: 0.04
+    peak: 0.04
+    end: 0.04
+    warmup_epochs: 0
+    cosine_epochs: null
+  momentum:
+    start: 0.992
+    peak: 0.992
+    end: 0.992
+    warmup_epochs: 0
+    cosine_epochs: null
+  teacher_temp:
+    start: 0.04
+    peak: 0.07
+    end: 0.07
+    warmup_epochs: 30
+    cosine_epochs: 100
+crops:
+  num_crops_global: 2
+  num_crops_local: 8
+  size_global: 112
+  size_local: 56
+  scale_global: [0.2, 1.0]
+  scale_local: [0.05, 0.25]
+datasets:
+  - name: default_dataset
+    weight: 1.0
+    index_path: .
+    type: ct
+    storage: dicom
+    bounds: [-1000.0, 1900.0]
+    norm:
+      mean: -573.8
+      std: 461.3
