@@ -1,61 +1,48 @@
 compute_precision: bf16
-dino:
-  loss_weight: 1.0
-  head_n_prototypes: 65536
-  head_bottleneck_dim: 256
-  head_nlayers: 3
-  head_hidden_dim: 2048
-  koleo_loss_weight: 0.1
-ibot:
-  loss_weight: 1.0
-  mask_sample_probability: 0.5
-  mask_ratio_min_max:
-  - 0.1
-  - 0.5
-  separate_head: false
-  head_n_prototypes: 65536
-  head_bottleneck_dim: 256
-  head_nlayers: 3
-  head_hidden_dim: 2048
 train:
-  grad_accum_steps: 1
-  batch_size_per_gpu: 16
-  batch_size_total: 16
+  grad_accum_steps: 2
+  batch_size_per_gpu: 2
+  batch_size_total: 4
   output_dir: .
   seed: 0
   num_workers: 10
-  iterations_per_epoch: 1000
+  iterations_per_epoch: 10
 checkpoints:
-  print_iterations: 10
-  save_checkpoint_iterations: 1000
-  save_teacher_iterations: 10000
+  print_iterations: 1
+  save_checkpoint_iterations: 2
+  save_teacher_iterations: 2
 student:
-  model_name: vitb14_3d
-  pretrained_weights: ''
-  embed_dim: 768
-  depth: 12
-  num_heads: 12
-  mlp_ratio: 4
-  embed_layer:
-    type: patch_3d
-    patch_size: 14
-    img_size: 448
-    layer_norm: false
+  embed_dim: 512
+  n_blocks: 12
+  num_heads: 8
+  ffn_ratio: 4
+  img_size: 112
+  patch_size: 14
+  ndims: 3
+  in_channels: null
+  rope_base: 100.0
+  rope_shift_coords: null
+  rope_jitter_coords: null
+  rope_rescale_coords: 2
   drop_path_rate: 0.0
-  layerscale: 1.0e-05
-  drop_path_uniform: true
+  layerscale_init: 1.0e-05
+  norm_layer: "layernorm"
   ffn_layer: "mlp"
   qkv_bias: true
   proj_bias: true
   ffn_bias: true
   num_register_tokens: 4
+  mask_k_bias: false
+  resume_from_teacher_chkpt: ''
+optim:
+  epochs: 100
 datasets:
   - name: default_dataset
     weight: 1.0
     index_path: .
     type: ct
     storage: dicom
-    bounds: [-1000.0, 1900.0] 
+    bounds: [-1000.0, 1900.0]
     norm:
       mean: -573.8
       std: 461.3
