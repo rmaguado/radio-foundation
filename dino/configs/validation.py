@@ -147,7 +147,7 @@ class StudentConfig(BaseModel):
     patch_size: int
     ndims: int
     img_size: int
-    in_channels: Optional[int] = None
+    in_channels: int
     rope_base: float
     rope_shift_coords: Optional[float] = None
     rope_jitter_coords: Optional[float] = None
