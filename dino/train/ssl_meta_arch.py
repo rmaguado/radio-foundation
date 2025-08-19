@@ -124,7 +124,6 @@ class SSLMetaArch(nn.Module):
             model (nn.Module): Model containing backbone and heads.
             images (torch.Tensor): Batch of images.
             masks (torch.Tensor): Batch of masks.
-            embed_layer (int): Which embedding layer to use.
             is_global (bool): Whether the input is a global view.
             apply_mask (bool): Whether to apply masks to the input.
 
@@ -135,12 +134,12 @@ class SSLMetaArch(nn.Module):
         flat_images = rearrange(images, "b v d w h -> (b v) d w h")
         flat_masks = rearrange(masks, "b v m -> (b v) m") if masks is not None else None
 
-        cls_local_norm = not is_global
+        local_cls_norm = not is_global
 
         backbone_output = model["backbone"](
             flat_images,
             masks=flat_masks if apply_mask else None,
-            cls_local_norm=cls_local_norm,
+            local_cls_norm=local_cls_norm,
         )
 
         cls_tokens = backbone_output["clstoken"]
