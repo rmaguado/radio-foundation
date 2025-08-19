@@ -201,13 +201,13 @@ class StudentConfig(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def check_relationships(self):
+    def check_channels_dims(self):
         if self.in_channels > 1 and self.ndims == 3:
             raise ValueError("If ndims = 3, then in_channels must be 1.")
         return self
 
     @model_validator(mode="after")
-    def check_relationships(self):
+    def check_embed_dims_multiple(self):
         if not (self.embed_dim % (2 * self.ndims * self.num_heads) == 0):
             raise ValueError("embed_dim must be divisible by (2 * ndims * num_heads).")
         return self
