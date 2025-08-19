@@ -98,11 +98,8 @@ def build_optimizer(cfg, params_groups):
 
 
 def setup_collate_fn(cfg, inputs_dtype):
-    mask_shape = (cfg.crops.size_global // cfg.student.embed_layer.patch_size,)
-    if cfg.student.embed_layer.type == "patch_2d":
-        mask_shape *= 2
-    elif cfg.student.embed_layer.type == "patch_3d":
-        mask_shape *= 3
+    mask_shape = (cfg.crops.size_global // cfg.student.patch_size,)
+    mask_shape *= cfg.student.ndims
 
     mask_generator = MaskingGenerator()
 
