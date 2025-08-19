@@ -96,7 +96,6 @@ class DINOVisionTower(nn.Module):
 
             x_tokens = self.vision_tower.get_intermediate_layers(
                 img,
-                embed_layer="patch_2d",
                 select_layers=self.select_layer,
             )
             feat = self.extract_fnc(x_tokens)
