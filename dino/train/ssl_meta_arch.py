@@ -398,7 +398,7 @@ class SSLMetaArch(nn.Module):
                 m,
                 lr_decay_rate=self.cfg.optim.layerwise_decay,
                 patch_embed_lr_mult=self.cfg.optim.patch_embed_lr_mult,
-                num_layers=self.cfg.student.depth,
+                num_layers=self.cfg.student.n_blocks,
             )
         return all_params_groups
 
