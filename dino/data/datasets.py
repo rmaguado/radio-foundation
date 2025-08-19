@@ -61,9 +61,9 @@ class VolumeDataset:
 
     def __getitem__(self, idx: int):
 
-        image, spacing = self.get_image_data(idx)
+        image = self.get_image_data(idx)
 
-        return self.transforms(image, spacing)
+        return self.transforms(image)
 
 
 class DicomVolumeDataset(VolumeDataset):
@@ -84,7 +84,6 @@ class DicomVolumeDataset(VolumeDataset):
     def get_image_data(self, idx: int):
         meta = self.df.row(idx)
         dicom_folder_path = meta[0]
-        spacing = meta[5:8]
 
         dicom_file_paths = [
             x for x in os.listdir(dicom_folder_path) if x.endswith(".dcm")
@@ -114,7 +113,7 @@ class DicomVolumeDataset(VolumeDataset):
 
         image_array = torch.clip(image_array, self.bounds[0], self.bounds[1])
 
-        return image_array, spacing
+        return image_array
 
 
 class NiftiVolumeDataset(VolumeDataset):
@@ -130,7 +129,6 @@ class NiftiVolumeDataset(VolumeDataset):
     def get_image_data(self, idx: int) -> Tuple[torch.Tensor, Tuple[float, ...]]:
         meta = self.df.row(idx)
         nifti_file_path = meta[0]
-        spacing = meta[5:8]
 
         image = nib.loadsave.load(nifti_file_path)
 
@@ -154,7 +152,7 @@ class NiftiVolumeDataset(VolumeDataset):
 
         image_array = torch.clip(image_array, self.bounds[0], self.bounds[1])
 
-        return image_array, spacing
+        return image_array
 
 
 class TorchVolumeDataset(VolumeDataset):
@@ -171,10 +169,10 @@ class TorchVolumeDataset(VolumeDataset):
         df_exists = self.df.filter(path_exists)
         len_exists = len(df_exists)
 
-        if self.config.crops.views.enable_3d:
-            min_required_size = int(self.config.crops.crop_sizes.global_3d / 2)
+        if self.config.student.ndims == 3:
+            min_required_size = int(self.config.crops.size_global / 2)
         else:
-            min_required_size = self.config.crops.crop_sizes.channels
+            min_required_size = self.config.student.in_channels
 
         def is_valid_shape(shape_str):
             try:
@@ -204,7 +202,7 @@ class TorchVolumeDataset(VolumeDataset):
     def get_image_data(self, idx: int):
         file_path = self.df[int(idx), "path"]
         image_array = torch.load(file_path, mmap=True)
-        return image_array, None
+        return image_array
 
 
 class MultiDataset:
