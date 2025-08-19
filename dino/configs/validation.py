@@ -12,7 +12,7 @@ class DinoConfig(BaseModel):
     koleo_loss_weight: float
     koleo_loss_distributed: bool
     koleo_topk: int
-    koleo_group_size: Optional[int]
+    koleo_group_size: Optional[int] = None
 
     @field_validator("koleo_topk", "koleo_group_size", mode="before")
     @classmethod
@@ -147,11 +147,11 @@ class StudentConfig(BaseModel):
     patch_size: int
     ndims: int
     img_size: int
-    in_channels: Optional[int]
+    in_channels: Optional[int] = None
     rope_base: float
-    rope_shift_coords: Optional[float]
-    rope_jitter_coords: Optional[float]
-    rope_rescale_coords: Optional[float]
+    rope_shift_coords: Optional[float] = None
+    rope_jitter_coords: Optional[float] = None
+    rope_rescale_coords: Optional[float] = None
     drop_path_rate: float
     layerscale_init: float
     norm_layer: Literal["layernorm", "layernormbf16", "rmsnorm"]
@@ -189,7 +189,7 @@ class StudentConfig(BaseModel):
     @field_validator("ndims", mode="before")
     @classmethod
     def validate_ndims(cls, v):
-        if not v == 2 or v == 3:
+        if not (v == 2 or v == 3):
             raise ValueError("ndims must be 2 or 3.")
         return v
 
@@ -228,8 +228,8 @@ class ScheduleTemplate(BaseModel):
     peak: float
     end: float
     warmup_epochs: int
-    freeze_last_layer_epochs: Optional[int]
-    cosine_epochs: Optional[int]
+    freeze_last_layer_epochs: Optional[int] = None
+    cosine_epochs: Optional[int] = None
 
     @field_validator(
         "start",
@@ -245,6 +245,12 @@ class ScheduleTemplate(BaseModel):
         if v is not None and v < 0:
             raise ValueError("Value must be non-negative.")
         return v
+
+    @model_validator(mode="after")
+    def check_relationships(self):
+        if not (self.start <= self.peak and self.end <= self.peak):
+            raise ValueError("Must have start <= peak and end <= peak.")
+        return self
 
 
 class SchedulesConfig(BaseModel):
@@ -296,7 +302,7 @@ class NormConfig(BaseModel):
 
 class DatasetConfig(BaseModel):
     name: str
-    weight: Optional[float]
+    weight: Optional[float] = None
     index_path: str
     type: Literal["ct", "mri"]
     storage: Literal["torch"]  # "dicom", "nifti",
