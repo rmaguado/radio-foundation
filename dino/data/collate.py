@@ -43,7 +43,7 @@ def collate_data_and_cast(
     shuffled_ratios = all_ratios[torch.randperm(total_maskable_views)]
 
     masks = [
-        torch.from_numpy(ndarray=mask_generator(mask_shape, ratio.item()))
+        torch.from_numpy(mask_generator(mask_shape, ratio.item()))
         for ratio in shuffled_ratios
     ]
 
