@@ -23,6 +23,9 @@ def fix_random_seeds(seed=31):
 
 def build_schedulers(cfg):
     epoch_len = cfg.train.iterations_per_epoch
+    num_epochs = cfg.optim.epochs
+
+    total_iterations = num_epochs * epoch_len
 
     lr_peak = cfg.schedules.lr.peak
     lr_end = cfg.schedules.lr.end
@@ -31,7 +34,7 @@ def build_schedulers(cfg):
         peak=lr_peak,
         end=lr_end,
         warmup_iterations=epoch_len * cfg.schedules.lr.warmup_epochs,
-        total_iterations=epoch_len,
+        total_iterations=total_iterations,
         cosine_iterations=(
             epoch_len * cfg.schedules.lr.cosine_epochs
             if cfg.schedules.lr.cosine_epochs is not None
@@ -46,7 +49,7 @@ def build_schedulers(cfg):
         peak=cfg.schedules.weight_decay.peak,
         end=cfg.schedules.weight_decay.end,
         warmup_iterations=epoch_len * cfg.schedules.weight_decay.warmup_epochs,
-        total_iterations=epoch_len,
+        total_iterations=total_iterations,
         cosine_iterations=(
             epoch_len * cfg.schedules.weight_decay.cosine_epochs
             if cfg.schedules.weight_decay.cosine_epochs is not None
@@ -59,7 +62,7 @@ def build_schedulers(cfg):
         peak=cfg.schedules.momentum.peak,
         end=cfg.schedules.momentum.end,
         warmup_iterations=epoch_len * cfg.schedules.momentum.warmup_epochs,
-        total_iterations=epoch_len,
+        total_iterations=total_iterations,
         cosine_iterations=(
             epoch_len * cfg.schedules.momentum.cosine_epochs
             if cfg.schedules.momentum.cosine_epochs is not None
@@ -71,7 +74,7 @@ def build_schedulers(cfg):
         peak=cfg.schedules.teacher_temp.peak,
         end=cfg.schedules.teacher_temp.end,
         warmup_iterations=epoch_len * cfg.schedules.teacher_temp.warmup_epochs,
-        total_iterations=epoch_len,
+        total_iterations=total_iterations,
         cosine_iterations=(
             epoch_len * cfg.schedules.teacher_temp.cosine_epochs
             if cfg.schedules.teacher_temp.cosine_epochs is not None
