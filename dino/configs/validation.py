@@ -253,19 +253,6 @@ class SchedulesConfig(BaseModel):
     momentum: ScheduleTemplate
     teacher_temp: ScheduleTemplate
 
-    @field_validator(
-        "lr",
-        "weight_decay",
-        "momentum",
-        "teacher_temp",
-        mode="before",
-    )
-    @classmethod
-    def validate_positive_float(cls, v):
-        if not (v.start <= v.peak and v.end <= v.peak):
-            raise ValueError("Must have start <= peak and end <= peak.")
-        return v
-
 
 class CropsConfig(BaseModel):
     num_crops_global: int
