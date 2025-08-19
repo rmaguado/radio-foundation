@@ -7,7 +7,7 @@ import logging
 from typing import List, Dict, Any
 
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 def _get_decay_rate(

@@ -10,7 +10,7 @@ import pydicom
 import logging
 
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 Spacing = Tuple[float, ...]

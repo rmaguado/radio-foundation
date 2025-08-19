@@ -14,7 +14,7 @@ from torch.utils.data.sampler import Sampler
 import dino.distributed as dist
 
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 def _get_torch_dtype(size: int) -> Any:

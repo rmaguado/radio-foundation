@@ -20,7 +20,7 @@ from dino.train.param_groups import get_params_groups_with_decay
 from dino.train.cosine_schedule import linear_warmup_cosine_decay
 
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 class SSLMetaArch(nn.Module):
@@ -334,7 +334,7 @@ class SSLMetaArch(nn.Module):
         self, collated_views: Dict[str, Any], teacher_temp: float
     ) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """
-        Main forward pass for DINOv2 training.
+        Main forward pass for DINO training.
         """
         for k, v in collated_views.items():
             collated_views[k] = v.cuda(non_blocking=True)

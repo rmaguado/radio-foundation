@@ -18,4 +18,4 @@ conda activate radio
 cd $HOME/projects/radio-foundation
 export PYTHONPATH=$PWD
 
-pytest dinov2/tests/${NAME}.py --tb=long --log-cli-level=INFO
+pytest dino/tests/${NAME}.py --tb=long --log-cli-level=INFO

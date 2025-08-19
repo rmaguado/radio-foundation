@@ -8,13 +8,13 @@ import logging
 from dino.configs import get_cfg_from_path
 from dino.train.setup import setup_dataloader
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 logger.setLevel(logging.DEBUG)
 
 
 @pytest.fixture
 def cfg():
-    return get_cfg_from_path("dinov2/configs/tests/minimal.yaml")
+    return get_cfg_from_path("dino/configs/tests/minimal.yaml")
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def test_dataloader_speed(cfg):
 def test_dataloader_output(dataloader):
     dataloader_iter = iter(dataloader)
     data = next(dataloader_iter)
-    output_path = "dinov2/tests/out"
+    output_path = "dino/tests/out"
 
     global_3d = data["global_3d"]["images"].float().numpy()
     _, V, D, W, H = global_3d.shape

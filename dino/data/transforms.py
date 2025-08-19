@@ -4,7 +4,7 @@ from typing import Tuple, List, Callable, Optional
 from torchvision.transforms.functional import gaussian_blur
 import logging
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 class AnisotropicCrop:

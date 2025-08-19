@@ -13,7 +13,7 @@ import logging
 from dino.distributed import all_reduce
 
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 class iBOTPatchLoss(nn.Module):

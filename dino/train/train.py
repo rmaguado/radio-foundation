@@ -27,7 +27,7 @@ import dino.distributed as dist
 
 
 torch.backends.cuda.matmul.allow_tf32 = True
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 def should_reset_grad(cfg, grad_accum_counter, accum_steps) -> bool:
@@ -241,7 +241,7 @@ def main():
 
     global logger
     setup_logging(output=args.output_path, level=logging_level)
-    logger = logging.getLogger("dinov2")
+    logger = logging.getLogger("dino")
 
     fix_random_seeds(seed + rank)
 
@@ -267,7 +267,7 @@ def main():
 
 
 if __name__ == "__main__":
-    if os.environ.get("PYTHONPATH") is not None and not os.path.exists("dinov2"):
+    if os.environ.get("PYTHONPATH") is not None and not os.path.exists("dino"):
         os.chdir(os.environ["PYTHONPATH"])
 
     main()

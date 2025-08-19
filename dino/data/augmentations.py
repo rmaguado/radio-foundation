@@ -11,7 +11,7 @@ from omegaconf import DictConfig
 
 from dino.data.transforms import *
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 class DataAugmentationDINO:

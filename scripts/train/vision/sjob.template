@@ -26,6 +26,6 @@ export MASTER_PORT=$(find_port)
 #export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 
 srun --unbuffered --ntasks=$GPUS --cpus-per-task=$WORKERS \
-    python3 dinov2/train/train.py \
+    python3 dino/train/train.py \
         --config_path="$CONF" \
         --output_path="$OUT"

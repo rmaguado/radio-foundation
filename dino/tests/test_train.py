@@ -13,7 +13,7 @@ logger.setLevel(logging.DEBUG)
 
 @pytest.fixture
 def cfg():
-    return get_cfg_from_path("dinov2/configs/tests/minimal.yaml")
+    return get_cfg_from_path("dino/configs/tests/minimal.yaml")
 
 
 @pytest.fixture

@@ -27,7 +27,7 @@ from dino.layers import (
 )
 
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 ffn_layer_dict = {
     "mlp": Mlp,

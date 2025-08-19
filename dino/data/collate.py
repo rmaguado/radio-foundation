@@ -11,7 +11,7 @@ from einops import rearrange
 
 from typing import List, Tuple, Dict, Callable, Any
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 def collate_data_and_cast(

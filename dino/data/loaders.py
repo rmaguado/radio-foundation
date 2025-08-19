@@ -23,7 +23,7 @@ from .samplers import (
 )
 from .augmentations import DataAugmentationDINO
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 class SamplerType(Enum):

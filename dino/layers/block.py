@@ -18,7 +18,7 @@ from .ffn_layers import Mlp
 from .layer_scale import LayerScale
 
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 torch._dynamo.config.automatic_dynamic_shapes = False

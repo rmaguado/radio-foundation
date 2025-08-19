@@ -8,7 +8,7 @@ import torch
 
 import dino.distributed as dist
 
-logger = logging.getLogger("dinov2")
+logger = logging.getLogger("dino")
 
 
 class MetricLogger(object):

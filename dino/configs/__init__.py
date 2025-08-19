@@ -9,7 +9,7 @@ from omegaconf import OmegaConf, DictConfig
 from dino.configs.validation import validate_config
 
 
-default_config = OmegaConf.load("dinov2/configs/ssl_default_config.yaml")
+default_config = OmegaConf.load("dino/configs/ssl_default_config.yaml")
 
 
 def write_config(cfg, output_dir: str, name: str = "config.yaml") -> None:

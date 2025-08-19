@@ -147,7 +147,7 @@ def get_max_iter(cfg):
 
 
 def setup_training_components(cfg, model):
-    logger = logging.getLogger("dinov2")
+    logger = logging.getLogger("dino")
 
     optimizer = build_optimizer(cfg, model.get_params_groups())
     logger.info("Optimizer ready.")
