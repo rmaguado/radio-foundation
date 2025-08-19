@@ -304,10 +304,15 @@ class DinoVisionTransformer(nn.Module):
 
 
 def build_models(cfg):
+    """
+    Initialize two models (student and teacher) using config.
+    Filters out `resume_from_teacher_chkpt` from config.
+    """
     args = cfg.student.copy()
     drop_path_rate = args.pop("drop_path_rate", 0.0)
+    _ = args.pop("resume_from_teacher_chkpt")
 
-    teacher = DinoVisionTransformer(**args)
+    teacher = DinoVisionTransformer(**args, drop_path_rate=0.0)
     student = DinoVisionTransformer(
         **args,
         drop_path_rate=drop_path_rate,
@@ -319,5 +324,5 @@ def build_model_eval(cfg):
     args = cfg.student.copy()
     _ = args.pop("drop_path_rate", 0.0)
 
-    teacher = DinoVisionTransformer(**args)
+    teacher = DinoVisionTransformer(**args, drop_path_rate=0.0)
     return teacher
