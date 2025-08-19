@@ -40,7 +40,7 @@ student:
   img_size: 112
   patch_size: 14
   ndims: 3
-  in_channels: null
+  in_channels: 1
   rope_base: 100.0
   rope_shift_coords: null
   rope_jitter_coords: null
