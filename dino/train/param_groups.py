@@ -24,17 +24,11 @@ def _get_decay_rate(
     Returns:
         (float): lr decay rate for the given parameter.
     """
-    if name in [
-        "pos_embed",
-        "cls_pos_embed",
-        "mask_token",
-        "cls_token",
-        "register_tokens",
-    ]:
+    if any(
+        x in name for x in ["mask_token", "cls_token", "register_tokens", "patch_embed"]
+    ):
         layer_id = 0
-    elif name.startswith("embed_layers"):
-        layer_id = 0
-    elif name.startswith("blocks"):
+    elif "blocks" in name:
         layer_id = int(name.split(".")[1]) + 1
     else:
         layer_id = num_layers + 1
@@ -54,6 +48,9 @@ def get_params_groups_with_decay(
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
+
+        name = name.removeprefix("module.")
+
         decay_rate = _get_decay_rate(name, lr_decay_rate, num_layers)
         d = {
             "params": param,
@@ -69,7 +66,7 @@ def get_params_groups_with_decay(
         if name.endswith(".bias") or "norm" in name or "gamma" in name:
             d.update({"wd_multiplier": 0.0})
 
-        if name.startswith("embed_layers"):
+        if name.startswith("patch_embed"):
             d.update({"lr_multiplier": d["lr_multiplier"] * patch_embed_lr_mult})
 
         all_param_groups.append(d)
