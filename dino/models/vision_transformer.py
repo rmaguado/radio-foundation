@@ -198,7 +198,6 @@ class DinoVisionTransformer(nn.Module):
             ]
         )
         self.norm = norm_layer_cls(embed_dim)
-        self.local_cls_norm = norm_layer_cls(embed_dim)
 
         self.head = nn.Identity()
         self.mask_token = nn.Parameter(torch.empty(1, embed_dim, device=device))
@@ -252,7 +251,6 @@ class DinoVisionTransformer(nn.Module):
         x: torch.Tensor,
         *,
         masks: Optional[torch.Tensor] = None,
-        local_cls_norm: bool = False,
     ) -> Dict[str, torch.Tensor]:
         x, patch_dims = self._prepare_tokens(x, masks)
 
@@ -260,13 +258,9 @@ class DinoVisionTransformer(nn.Module):
             rope_sincos = self.rope_embed(*patch_dims)
             x = blk(x, rope_sincos)
 
-        if local_cls_norm:
-            x_norm_cls = self.local_cls_norm(x[:, 0])
-            x_norm_patch = self.norm(x[:, self.num_register_tokens + 1 :])
-        else:
-            x_norm = self.norm(x)
-            x_norm_cls = x_norm[:, 0]
-            x_norm_patch = x_norm[:, self.num_register_tokens + 1 :]
+        x_norm = self.norm(x)
+        x_norm_cls = x_norm[:, 0]
+        x_norm_patch = x_norm[:, self.num_register_tokens + 1 :]
 
         return {
             "clstoken": x_norm_cls,

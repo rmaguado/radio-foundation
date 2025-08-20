@@ -142,7 +142,6 @@ class SSLMetaArch(nn.Module):
         backbone_output = model["backbone"](
             flat_images,
             masks=flat_masks if apply_mask else None,
-            local_cls_norm=not is_global,
         )
 
         cls_tokens = backbone_output["clstoken"]
