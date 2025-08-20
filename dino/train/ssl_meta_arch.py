@@ -151,7 +151,7 @@ class SSLMetaArch(nn.Module):
 
         output = {"cls_dino": dino_tokens, "cls_pre": cls_tokens}
 
-        if self.do_ibot and is_global and masks:
+        if self.do_ibot and is_global and masks is not None:
             patch_tokens = backbone_output["patchtokens"]
             output["patch"] = patch_tokens
 
