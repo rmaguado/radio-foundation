@@ -139,12 +139,10 @@ class SSLMetaArch(nn.Module):
             flat_images = rearrange(images, "b v c w h -> (b v) c w h")
         flat_masks = rearrange(masks, "b v m -> (b v) m") if masks is not None else None
 
-        local_cls_norm = not is_global
-
         backbone_output = model["backbone"](
             flat_images,
             masks=flat_masks if apply_mask else None,
-            local_cls_norm=local_cls_norm,
+            local_cls_norm=not is_global,
         )
 
         cls_tokens = backbone_output["clstoken"]
