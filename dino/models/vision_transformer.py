@@ -230,7 +230,7 @@ class DinoVisionTransformer(nn.Module):
         """
         B = x.shape[0]
 
-        x = self.patch_embed(x)
+        x, patch_dims = self.patch_embed(x)
 
         if masks is not None:
             x = torch.where(
@@ -245,7 +245,7 @@ class DinoVisionTransformer(nn.Module):
         else:
             x = torch.cat(tensors=[cls_tokens, x], dim=1)
 
-        return x
+        return x, patch_dims
 
     def forward(
         self,
