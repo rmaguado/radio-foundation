@@ -49,10 +49,10 @@ class iBOTPatchLoss(nn.Module):
         t = teacher_patch_tokens
         s = student_patch_tokens
 
-        loss = -torch.sum(t * F.log_softmax(s / self.student_temp, dim=-1), dim=-1)
+        loss = torch.sum(t * F.log_softmax(s / self.student_temp, dim=-1), dim=-1)
         loss = loss * mask_weights
 
-        return loss.mean()
+        return -loss.sum() / mask_weights.sum().clamp(min=1.0)
 
     @torch.no_grad()
     @torch.autocast(device_type="cuda", enabled=False)
