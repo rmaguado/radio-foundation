@@ -137,7 +137,6 @@ class DinoVisionTransformer(nn.Module):
         proj_bias: bool,
         ffn_bias: bool,
         num_register_tokens: int,
-        mask_k_bias: bool,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ):
@@ -193,7 +192,6 @@ class DinoVisionTransformer(nn.Module):
                     act_layer=nn.GELU,
                     ffn_layer=ffn_layer_cls,
                     init_values=layerscale_init,
-                    mask_k_bias=mask_k_bias,
                     device=device,
                 )
                 for i in range(n_blocks)

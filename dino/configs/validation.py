@@ -160,7 +160,6 @@ class StudentConfig(BaseModel):
     proj_bias: bool
     ffn_bias: bool
     num_register_tokens: int
-    mask_k_bias: bool
     resume_from_teacher_chkpt: str
 
     @field_validator("drop_path_rate", "layerscale_init", mode="before")

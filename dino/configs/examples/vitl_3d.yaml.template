@@ -32,7 +32,6 @@ student:
   proj_bias: true
   ffn_bias: true
   num_register_tokens: 4
-  mask_k_bias: false
   resume_from_teacher_chkpt: ''
 optim:
   epochs: 300
