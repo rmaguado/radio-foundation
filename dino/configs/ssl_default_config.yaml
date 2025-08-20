@@ -48,7 +48,7 @@ student:
   drop_path_rate: 0.3
   layerscale_init: 1.0e-05
   norm_layer: "layernorm"
-  ffn_layer: "mlp"
+  ffn_layer: "swiglu"
   qkv_bias: true
   proj_bias: true
   ffn_bias: true
