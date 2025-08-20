@@ -199,7 +199,7 @@ def do_train(cfg, model):
 
     logger.info("Starting training from iteration {}".format(start_iter))
     metric_logger = MetricLogger(
-        output_file=os.path.join(cfg.train.output_dir, "training_metrics.json"),
+        output_file=os.path.join(cfg.train.output_dir, "training_metrics.jsonl"),
     )
 
     if iteration < max_iter:

@@ -11,7 +11,7 @@ class Logs:
     def __init__(self, run_name, num_gpus=1):
         run_path = os.path.join("runs", run_name)
         cfg_path = os.path.join(run_path, "config.yaml")
-        metrics_path = os.path.join(run_path, "training_metrics.json")
+        metrics_path = os.path.join(run_path, "training_metrics.jsonl")
 
         default_cfg = OmegaConf.create(default_config)
         cfg = OmegaConf.load(cfg_path)
