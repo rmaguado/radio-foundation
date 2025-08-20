@@ -36,6 +36,7 @@ class SSLMetaArch(nn.Module):
         teacher_model_dict["backbone"] = teacher_backbone
 
         self.embed_dim = cfg.student.embed_dim
+        self.ndims = cfg.student.ndims
         self.dino_out_dim = cfg.dino.head_n_prototypes
 
         self.do_koleo = cfg.dino.koleo_loss_weight > 0
@@ -130,8 +131,12 @@ class SSLMetaArch(nn.Module):
         Returns:
             Dict[str, torch.Tensor]: Output tokens for DINO/iBOT heads and mask weights if applicable.
         """
+        B, V = images.shape[:2]
         view_shape = images.shape[:-3]
-        flat_images = rearrange(images, "b v d w h -> (b v) d w h")
+        if self.ndims == 3:
+            flat_images = rearrange(images, "b v d w h -> (b v) 1 d w h")
+        else:
+            flat_images = rearrange(images, "b v c w h -> (b v) c w h")
         flat_masks = rearrange(masks, "b v m -> (b v) m") if masks is not None else None
 
         local_cls_norm = not is_global
