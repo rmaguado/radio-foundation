@@ -65,6 +65,9 @@ class LearnedPositionEmbedding(nn.Module):
     def forward(self, *patch_dims: int):
         return self.interpolate_fnc(*patch_dims)
 
+    def _init_weights(self):
+        nn.init.trunc_normal_(self.pos_embed, std=0.02)
+
 
 class RopePositionEmbedding(nn.Module):
     def __init__(

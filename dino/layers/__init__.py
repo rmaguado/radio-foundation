@@ -10,4 +10,4 @@ from .layer_scale import LayerScale
 from .block import SelfAttentionBlock
 from .attention import SelfAttention
 from .rms_norm import RMSNorm
-from .pos_embed import RopePositionEmbedding
+from .pos_embed import LearnedPositionEmbedding, RopePositionEmbedding

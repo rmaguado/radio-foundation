@@ -148,7 +148,8 @@ class StudentConfig(BaseModel):
     ndims: int
     img_size: int
     in_channels: int
-    rope_base: float
+    pos_embed_type: Literal["rope", "learned"]
+    rope_base: Optional[float]
     rope_shift_coords: Optional[float] = None
     rope_jitter_coords: Optional[float] = None
     rope_rescale_coords: Optional[float] = None
@@ -207,8 +208,11 @@ class StudentConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_embed_dims_multiple(self):
-        if not (self.embed_dim % (2 * self.ndims * self.num_heads) == 0):
-            raise ValueError("embed_dim must be divisible by (2 * ndims * num_heads).")
+        if self.pos_embed_type == "rope":
+            if not (self.embed_dim % (2 * self.ndims * self.num_heads) == 0):
+                raise ValueError(
+                    "embed_dim must be divisible by (2 * ndims * num_heads)."
+                )
         return self
 
 

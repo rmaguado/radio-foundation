@@ -9,6 +9,7 @@
 
 import logging
 from functools import partial
+from multiprocessing import Value
 from typing import Sequence, List, Dict, Tuple, Callable, Optional
 
 import torch
@@ -23,6 +24,7 @@ from dino.layers import (
     PatchEmbed,
     RMSNorm,
     SelfAttentionBlock,
+    LearnedPositionEmbedding,
     RopePositionEmbedding,
 )
 
@@ -125,6 +127,7 @@ class DinoVisionTransformer(nn.Module):
         patch_size: int,
         ndims: int,
         in_channels: int,
+        pos_embed_type: str,
         rope_base: float,
         rope_shift_coords: Optional[float],
         rope_jitter_coords: Optional[float],
@@ -165,17 +168,27 @@ class DinoVisionTransformer(nn.Module):
             if num_register_tokens > 0
             else None
         )
-        self.rope_embed = RopePositionEmbedding(
-            embed_dim=embed_dim,
-            num_heads=num_heads,
-            ndims=ndims,
-            base=rope_base,
-            shift_coords=rope_shift_coords,
-            jitter_coords=rope_jitter_coords,
-            rescale_coords=rope_rescale_coords,
-            dtype=dtype,
-            device=device,
-        )
+        self.pos_embed_type = pos_embed_type
+        if pos_embed_type == "rope":
+            self.pos_embed = RopePositionEmbedding(
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                ndims=ndims,
+                base=rope_base,
+                shift_coords=rope_shift_coords,
+                jitter_coords=rope_jitter_coords,
+                rescale_coords=rope_rescale_coords,
+                dtype=dtype,
+                device=device,
+            )
+        elif pos_embed_type == "learned":
+            num_patches = (img_size // patch_size) ** ndims
+            self.pos_embed = LearnedPositionEmbedding(
+                embed_dim=embed_dim, num_patches=num_patches, ndims=ndims
+            )
+
+        else:
+            raise ValueError
 
         ffn_layer_cls = ffn_layer_dict[ffn_layer]
         self.blocks = nn.ModuleList(
@@ -207,7 +220,7 @@ class DinoVisionTransformer(nn.Module):
         Initializes all learnable parameters in the transformer, including tokens and embeddings.
         """
 
-        self.rope_embed._init_weights()
+        self.pos_embed._init_weights()
         nn.init.normal_(self.cls_token, std=0.02)
         if self.register_tokens is not None:
             nn.init.normal_(self.register_tokens, std=0.02)
@@ -246,6 +259,12 @@ class DinoVisionTransformer(nn.Module):
 
         return x, patch_dims
 
+    def rope_blocks(self, x, patch_dims):
+        for blk in self.blocks:
+            rope_sincos = self.pos_embed(*patch_dims)
+            x = blk(x, rope_sincos)
+        return x
+
     def forward(
         self,
         x: torch.Tensor,
@@ -254,9 +273,15 @@ class DinoVisionTransformer(nn.Module):
     ) -> Dict[str, torch.Tensor]:
         x, patch_dims = self._prepare_tokens(x, masks)
 
-        for blk in self.blocks:
-            rope_sincos = self.rope_embed(*patch_dims)
-            x = blk(x, rope_sincos)
+        if self.pos_embed_type == "rope":
+            for blk in self.blocks:
+                rope_sincos = self.pos_embed(*patch_dims)
+                x = blk(x, rope_sincos)
+
+        else:
+            x += self.pos_embed(*patch_dims)
+            for blk in self.blocks:
+                x = blk(x)
 
         x_norm = self.norm(x)
         x_norm_cls = x_norm[:, 0]
@@ -265,34 +290,6 @@ class DinoVisionTransformer(nn.Module):
         return {
             "clstoken": x_norm_cls,
             "patchtokens": x_norm_patch,
-        }
-
-    def get_intermediate_layers(
-        self,
-        x: torch.Tensor,
-        *,
-        select_layers: Sequence[int] = (11,),
-        norm: bool = True,
-    ) -> Dict[str, torch.Tensor]:
-        x, patch_dims = self._prepare_tokens(x)
-
-        outputs = []
-        for i, blk in enumerate(self.blocks):
-            rope_sincos = self.rope_embed(*patch_dims)
-            x = blk(x, rope_sincos)
-            if i in select_layers:
-                layer_output = self.norm(x) if norm else x
-                outputs.append(layer_output)
-
-        assert len(outputs) == len(
-            select_layers
-        ), f"Found {len(outputs)}/{len(select_layers)} layers."
-
-        return {
-            "clstoken": torch.stack([out[:, 0] for out in outputs]),
-            "patchtokens": torch.stack(
-                [out[:, 1 + self.num_register_tokens :] for out in outputs]
-            ),
         }
 
 

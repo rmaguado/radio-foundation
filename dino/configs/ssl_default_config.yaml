@@ -41,6 +41,7 @@ student:
   patch_size: 14
   ndims: 3
   in_channels: 1
+  pos_embed_type: "rope"
   rope_base: 100.0
   rope_shift_coords: null
   rope_jitter_coords: null
