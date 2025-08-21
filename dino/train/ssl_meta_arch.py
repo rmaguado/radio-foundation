@@ -28,8 +28,8 @@ class SSLMetaArch(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        student_model_dict = dict()
-        teacher_model_dict = dict()
+        student_model_dict: Dict[str, nn.Module] = dict()
+        teacher_model_dict: Dict[str, nn.Module] = dict()
 
         student_backbone, teacher_backbone = build_models(cfg)
         student_model_dict["backbone"] = student_backbone
@@ -94,9 +94,9 @@ class SSLMetaArch(nn.Module):
         self.num_crops_global = cfg.crops.num_crops_global
 
     def init_weights(self) -> None:
-        self.student["backbone"].init_weights()
-        self.student["dino_head"].init_weights()
-        self.student["ibot_head"].init_weights()
+        self.student["backbone"].init_weights()  # type: ignore
+        self.student["dino_head"].init_weights()  # type: ignore
+        self.student["ibot_head"].init_weights()  # type: ignore
         self.dino_loss.init_weights()
         self.ibot_patch_loss.init_weights()
 
@@ -180,7 +180,7 @@ class SSLMetaArch(nn.Module):
         self,
         collated_views: Dict[str, Any],
         teacher_temp: float,
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
         """
         Runs the teacher model on the collated batch and computes centered tokens for DINO/iBOT.
 
@@ -190,6 +190,7 @@ class SSLMetaArch(nn.Module):
 
         Returns:
             Dict[str, torch.Tensor]: Centered DINO and iBOT tokens.
+            Dict[str, torch.Tensor]: Uncentered DINO and iBOT tokens.
         """
         teacher_outputs = {}
         uncentered_views = {}
