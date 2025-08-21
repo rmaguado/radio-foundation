@@ -96,9 +96,12 @@ class SSLMetaArch(nn.Module):
     def init_weights(self) -> None:
         self.student["backbone"].init_weights()  # type: ignore
         self.student["dino_head"].init_weights()  # type: ignore
-        self.student["ibot_head"].init_weights()  # type: ignore
         self.dino_loss.init_weights()
-        self.ibot_patch_loss.init_weights()
+
+        if self.do_ibot:
+            if self.ibot_separate_head:
+                self.student["ibot_head"].init_weights()  # type: ignore
+            self.ibot_patch_loss.init_weights()
 
         self.teacher.load_state_dict(self.student.state_dict())
 
