@@ -255,6 +255,12 @@ class SSLMetaArch(nn.Module):
 
         student_outputs["local_cls_dino"] = local_output["cls_dino"]
 
+        masks = collated_views["masks"]
+        masks_weight = 1 / masks.sum(-1).clamp(min=1.0).unsqueeze(-1).expand_as(masks)
+
+        masks_weight = (masks_weight * masks).view(-1)
+        student_outputs["masks_weight"] = masks_weight
+
         return student_outputs
 
     def _calculate_dino_loss(
@@ -315,19 +321,16 @@ class SSLMetaArch(nn.Module):
         self,
         student_output: Dict[str, torch.Tensor],
         teacher_output: Dict[str, torch.Tensor],
-        masks,
     ) -> torch.Tensor:
         if not self.do_ibot:
             return torch.tensor(0.0).cuda()
 
         student_ibot_tokens = student_output["global_patch_ibot"]
         teacher_ibot_tokens = teacher_output["global_patch_ibot_centered_softmax"]
-        # mask_weights = student_output["mask_weights"]
-
-        masks_flat = rearrange(masks, "b v n -> (b v n)")
+        masks_weight = student_output["masks_weight"]
 
         return self.ibot_patch_loss(
-            student_ibot_tokens, teacher_ibot_tokens, masks_flat
+            student_ibot_tokens, teacher_ibot_tokens, masks_weight
         )
 
     def forward(self, collated_views: Dict[str, Any], teacher_temp: float):
@@ -341,9 +344,7 @@ class SSLMetaArch(nn.Module):
 
         dino_loss = self._calculate_dino_loss(student_outputs, teacher_outputs)
 
-        ibot_loss = self._calculate_ibot_loss(
-            student_outputs, teacher_outputs, collated_views["masks"]
-        )
+        ibot_loss = self._calculate_ibot_loss(student_outputs, teacher_outputs)
 
         koleo_loss = self._calculate_koleo_loss(student_outputs)
 
