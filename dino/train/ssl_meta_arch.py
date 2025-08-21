@@ -156,17 +156,11 @@ class SSLMetaArch(nn.Module):
             output["patch"] = patch_tokens
 
             patch_tokens_flat = rearrange(patch_tokens, "a p d -> (a p) d")
-            masked_patch_tokens = patch_tokens_flat[masks.view(-1)]
 
             ibot_head = (
                 model["ibot_head"] if self.ibot_separate_head else model["dino_head"]
             )
-            output["patch_ibot"] = ibot_head(masked_patch_tokens)
-
-            mask_weights = 1 / (masks.sum(-1).clamp(min=1.0))
-            mask_weights = mask_weights.unsqueeze(-1).expand_as(masks)
-            mask_weights = rearrange(mask_weights, "... -> (...)")
-            output["mask_weights"] = mask_weights[masks.view(-1)]
+            output["patch_ibot"] = ibot_head(patch_tokens_flat)
 
         return output
 
@@ -347,8 +341,7 @@ class SSLMetaArch(nn.Module):
         dino_loss = self._calculate_dino_loss(student_outputs, teacher_outputs)
 
         ibot_loss = self._calculate_ibot_loss(
-            student_outputs,
-            teacher_outputs,
+            student_outputs, teacher_outputs, collated_views["masks"]
         )
 
         koleo_loss = self._calculate_koleo_loss(student_outputs)

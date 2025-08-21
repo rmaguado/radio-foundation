@@ -38,21 +38,24 @@ class iBOTPatchLoss(nn.Module):
         self,
         student_patch_tokens: torch.Tensor,
         teacher_patch_tokens: torch.Tensor,
-        mask_weights: torch.Tensor,
+        masks_flat: torch.Tensor,
     ) -> torch.Tensor:
         """
         Cross-entropy between softmax outputs of the teacher and student networks.
         student_patch_tokens: (N, D) tensor
         teacher_patch_tokens: (N, D) tensor
-        mask_weights: (N,) tensor, weights for each sample
+        masks_flat: (N,)
         """
         t = teacher_patch_tokens
         s = student_patch_tokens
 
-        loss = torch.sum(t * F.log_softmax(s / self.student_temp, dim=-1), dim=-1)
-        loss = loss * mask_weights
+        loss = torch.sum(
+            t_softmaxed * F.log_softmax(s / self.student_temp, dim=-1), dim=-1
+        )
 
-        return -loss.sum() / mask_weights.sum().clamp(min=1.0)
+        loss = -torch.sum(loss * masks_flat.float()) / masks_flat.sum().clamp(min=1.0)
+
+        return loss
 
     @torch.no_grad()
     @torch.autocast(device_type="cuda", enabled=False)
