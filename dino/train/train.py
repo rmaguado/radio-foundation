@@ -159,7 +159,9 @@ def train(
             optimizer.zero_grad(set_to_none=True)
 
         with torch.autocast(device_type="cuda", enabled=True, dtype=dtype):
-            loss_accumulator, loss_dict = model.forward(data, teacher_temp=teacher_temp)  # type: ignore
+            loss_accumulator, loss_dict, uncentered_views = model.forward(data, teacher_temp=teacher_temp)  # type: ignore
+
+        model.update_teacher_centers(uncentered_views)
 
         loss_accumulator.backward()
 
@@ -258,6 +260,10 @@ def main():
 
     model = SSLMetaArch(cfg)
     model = model.to(torch.device("cuda"))
+
+    # torch._dynamo.config.optimize_ddp = "ddp_optimizer"
+    model = torch.compile(model)
+
     model.prepare_for_distributed_training(rank)
 
     try:

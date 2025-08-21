@@ -144,16 +144,15 @@ class SSLMetaArch(nn.Module):
             masks=flat_masks if apply_mask else None,
         )
 
-        cls_tokens = backbone_output["clstoken"]
-        dino_tokens_flat = model["dino_head"](cls_tokens)
+        cls_tokens_flat = backbone_output["clstoken"]
+        dino_tokens_flat = model["dino_head"](cls_tokens_flat)
         dino_tokens = dino_tokens_flat.view(*view_shape, -1)
-        cls_pre = cls_tokens.view(*view_shape, -1)
+        cls_tokens = cls_tokens_flat.view(*view_shape, -1)
 
-        output = {"cls_dino": dino_tokens, "cls_pre": cls_pre}
+        output = {"cls_dino": dino_tokens, "cls": cls_tokens}
 
         if self.do_ibot and is_global and masks is not None:
             patch_tokens = backbone_output["patchtokens"]
-            output["patch"] = patch_tokens
 
             patch_tokens_flat = rearrange(patch_tokens, "a p d -> (a p) d")
 
@@ -164,17 +163,17 @@ class SSLMetaArch(nn.Module):
 
         return output
 
-    def _update_teacher_centers(
-        self, uncentered_views: Dict[str, torch.Tensor]
-    ) -> None:
+    def update_teacher_centers(self, uncentered_views: Dict[str, torch.Tensor]) -> None:
         """
         Updates the teacher's DINO and iBOT token centers for centering softmax outputs.
         """
-        combined_dino_views = rearrange(uncentered_views["dino"], "b v e -> (b v) e")
+        combined_dino_views = rearrange(
+            uncentered_views["cls_dino"], "b v e -> (b v) e"
+        )
         self.dino_loss.update_center(combined_dino_views)
 
         if self.do_ibot:
-            combined_ibot_views = uncentered_views["ibot"]
+            combined_ibot_views = uncentered_views["patch_ibot"]
             self.ibot_patch_loss.update_center(combined_ibot_views)
 
     def _run_teacher_pass(
@@ -204,23 +203,25 @@ class SSLMetaArch(nn.Module):
                 is_global=True,
                 apply_mask=False,
             )
-            uncentered_views["dino"] = group_output["cls_dino"]
+            cls_dino = group_output["cls_dino"]
+            uncentered_views["cls_dino"] = cls_dino
 
             dino_tokens_centered = self.dino_loss.softmax_center_teacher(
-                group_output["cls_dino"], teacher_temp
+                cls_dino, teacher_temp
             )
-            teacher_outputs["global_cls_dino"] = dino_tokens_centered
+            teacher_outputs["global_cls_dino_centered_softmax"] = dino_tokens_centered
 
             if self.do_ibot:
+                patch_ibot = group_output["patch_ibot"]
                 ibot_tokens_centered = self.ibot_patch_loss.softmax_center_teacher(
-                    group_output["patch_ibot"], teacher_temp
+                    patch_ibot, teacher_temp
                 )
-                uncentered_views["ibot"] = group_output["patch_ibot"]
-                teacher_outputs["patch_ibot"] = ibot_tokens_centered
+                uncentered_views["patch_ibot"] = patch_ibot
+                teacher_outputs["global_patch_ibot_centered_softmax"] = (
+                    ibot_tokens_centered
+                )
 
-        self._update_teacher_centers(uncentered_views)
-
-        return teacher_outputs
+        return teacher_outputs, uncentered_views
 
     def _run_student_pass(
         self,
@@ -238,11 +239,11 @@ class SSLMetaArch(nn.Module):
         )
 
         student_outputs["global_cls_dino"] = global_output["cls_dino"]
-        student_outputs["global_cls_pre"] = global_output["cls_pre"]
+        student_outputs["global_cls"] = global_output["cls"]
 
         if self.do_ibot:
-            student_outputs["patch_ibot"] = global_output["patch_ibot"]
-            student_outputs["mask_weights"] = global_output["mask_weights"]
+            student_outputs["global_patch_ibot"] = global_output["patch_ibot"]
+            # student_outputs["mask_weights"] = global_output["mask_weights"]
 
         local_output = self._process_group(
             model=self.student,
@@ -266,7 +267,7 @@ class SSLMetaArch(nn.Module):
 
         global_cls_dino_student = student_output["global_cls_dino"]
         local_cls_dino_student = student_output["local_cls_dino"]
-        global_cls_dino_teacher = teacher_output["global_cls_dino"]
+        global_cls_dino_teacher = teacher_output["global_cls_dino_centered_softmax"]
 
         for v0 in range(self.num_crops_global):
             t_tokens = global_cls_dino_teacher[:, v0, :]
@@ -299,7 +300,7 @@ class SSLMetaArch(nn.Module):
         total_loss = torch.tensor(0.0).cuda()
         total_terms = 0
 
-        flat_s_tokens = rearrange(student_output["global_cls_pre"], "b v d -> v b d")
+        flat_s_tokens = rearrange(student_output["global_cls"], "b v d -> v b d")
 
         for i in range(flat_s_tokens.shape[0]):
             total_loss += self.koleo_loss(flat_s_tokens[i])
@@ -314,28 +315,28 @@ class SSLMetaArch(nn.Module):
         self,
         student_output: Dict[str, torch.Tensor],
         teacher_output: Dict[str, torch.Tensor],
+        masks,
     ) -> torch.Tensor:
         if not self.do_ibot:
             return torch.tensor(0.0).cuda()
 
-        student_ibot_tokens = student_output["patch_ibot"]
-        teacher_ibot_tokens = teacher_output["patch_ibot"]
-        mask_weights = student_output["mask_weights"]
+        student_ibot_tokens = student_output["global_patch_ibot"]
+        teacher_ibot_tokens = teacher_output["global_patch_ibot_centered_softmax"]
+        # mask_weights = student_output["mask_weights"]
+
+        masks_flat = rearrange(masks, "b v n -> (b v n)")
 
         return self.ibot_patch_loss(
-            student_ibot_tokens, teacher_ibot_tokens, mask_weights
+            student_ibot_tokens, teacher_ibot_tokens, masks_flat
         )
 
-    def forward(
-        self, collated_views: Dict[str, Any], teacher_temp: float
-    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        """
-        Main forward pass for DINO training.
-        """
+    def forward(self, collated_views: Dict[str, Any], teacher_temp: float):
         for k, v in collated_views.items():
             collated_views[k] = v.cuda(non_blocking=True)
 
-        teacher_outputs = self._run_teacher_pass(collated_views, teacher_temp)
+        teacher_outputs, uncentered_views = self._run_teacher_pass(
+            collated_views, teacher_temp
+        )
         student_outputs = self._run_student_pass(collated_views)
 
         dino_loss = self._calculate_dino_loss(student_outputs, teacher_outputs)
@@ -358,7 +359,7 @@ class SSLMetaArch(nn.Module):
             "koleo_loss": koleo_loss.detach(),
         }
 
-        return total_loss, loss_dict
+        return total_loss, loss_dict, uncentered_views
 
     def update_teacher(self, m) -> None:
         student_param_list = []
