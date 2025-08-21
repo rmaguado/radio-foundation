@@ -5,6 +5,9 @@
 
 import torch
 from torch import Tensor, nn
+import logging
+
+logger = logging.getLogger("dino")
 
 
 class RMSNorm(nn.Module):
@@ -15,6 +18,8 @@ class RMSNorm(nn.Module):
 
     def reset_parameters(self) -> None:
         nn.init.constant_(self.weight, 1)
+
+        logger.debug(f"Initialized rmsnorm.")
 
     def _norm(self, x: Tensor) -> Tensor:
         return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)

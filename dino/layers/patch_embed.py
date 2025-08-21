@@ -3,6 +3,9 @@ import torch.nn as nn
 import math
 from typing import Tuple, Callable
 from einops import rearrange
+import logging
+
+logger = logging.getLogger("dino")
 
 
 class PatchEmbed(nn.Module):
@@ -70,3 +73,5 @@ class PatchEmbed(nn.Module):
         nn.init.uniform_(self.proj.weight, -math.sqrt(k), math.sqrt(k))
         if self.proj.bias is not None:
             nn.init.uniform_(self.proj.bias, -math.sqrt(k), math.sqrt(k))
+
+        logger.debug(f"Initialized patch embed.")

@@ -7,6 +7,9 @@ from typing import Union
 
 import torch
 from torch import Tensor, nn
+import logging
+
+logger = logging.getLogger("dino")
 
 
 class LayerScale(nn.Module):
@@ -25,6 +28,8 @@ class LayerScale(nn.Module):
     def reset_parameters(self):
         assert isinstance(self.init_values, float)
         nn.init.constant_(self.gamma, self.init_values)
+
+        logger.debug(f"Initialized layer scale.")
 
     def forward(self, x: Tensor) -> Tensor:
         return x.mul_(self.gamma) if self.inplace else x * self.gamma
