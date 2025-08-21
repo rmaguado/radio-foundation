@@ -244,6 +244,9 @@ class DinoVisionTransformer(nn.Module):
 
         x, patch_dims = self.patch_embed(x)
 
+        if self.pos_embed_type == "learned":
+            x += self.pos_embed(*patch_dims)
+
         if masks is not None:
             x = torch.where(
                 masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x
@@ -259,11 +262,10 @@ class DinoVisionTransformer(nn.Module):
 
         return x, patch_dims
 
-    def rope_blocks(self, x, patch_dims):
-        for blk in self.blocks:
-            rope_sincos = self.pos_embed(*patch_dims)
-            x = blk(x, rope_sincos)
-        return x
+    def _get_rope(self, *patch_dims):
+        if self.pos_embed_type == "rope":
+            return self.pos_embed(*patch_dims)
+        return None
 
     def forward(
         self,
@@ -273,15 +275,9 @@ class DinoVisionTransformer(nn.Module):
     ) -> Dict[str, torch.Tensor]:
         x, patch_dims = self._prepare_tokens(x, masks)
 
-        if self.pos_embed_type == "rope":
-            for blk in self.blocks:
-                rope_sincos = self.pos_embed(*patch_dims)
-                x = blk(x, rope_sincos)
-
-        else:
-            x += self.pos_embed(*patch_dims)
-            for blk in self.blocks:
-                x = blk(x)
+        for blk in self.blocks:
+            rope_sincos = self._get_rope(*patch_dims)
+            x = blk(x, rope_sincos)
 
         x_norm = self.norm(x)
         x_norm_cls = x_norm[:, 0]
