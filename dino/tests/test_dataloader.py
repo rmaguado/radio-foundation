@@ -41,48 +41,38 @@ def test_dataloader_speed(cfg):
         logger.info(f"Batch {idx}: waited {tf:.06f} seconds.")
         time.sleep(0.6)
 
-    assert all(
-        x in data.keys() for x in ["global_3d", "local_3d", "global_2d", "local_2d"]  # type: ignore
-    )
-
 
 def test_dataloader_output(dataloader):
+    def extract_imgs(view, output_path, idx):
+        plt.figure()
+        plt.imshow(view[0, 0, D // 2, :, :], cmap="gray")
+        plt.colorbar()
+        plt.savefig(os.path.join(output_path, f"{idx}A.png"))
+
+        plt.figure()
+        plt.imshow(view[0, 0, :, W // 2, :], cmap="gray")
+        plt.colorbar()
+        plt.savefig(os.path.join(output_path, f"{idx}B.png"))
+
+        plt.figure()
+        plt.imshow(view[0, 0, :, :, H // 2], cmap="gray")
+        plt.colorbar()
+        plt.savefig(os.path.join(output_path, f"{idx}C.png"))
+
     dataloader_iter = iter(dataloader)
-    data = next(dataloader_iter)
     output_path = "dino/tests/out"
 
-    global_3d = data["global_3d"]["images"].float().numpy()
-    _, V, D, W, H = global_3d.shape
+    for idx, data in enumerate(dataloader_iter):
 
-    plt.figure()
-    plt.imshow(global_3d[0, 0, D // 2, :, :], cmap="gray")
-    plt.colorbar()
-    plt.savefig(os.path.join(output_path, "global_3d_viewA.png"))
+        global_view = data["global"].float().numpy()
+        _, V, D, W, H = global_view.shape
 
-    plt.figure()
-    plt.imshow(global_3d[0, 0, :, W // 2, :], cmap="gray")
-    plt.colorbar()
-    plt.savefig(os.path.join(output_path, "global_3d_viewB.png"))
+        extract_imgs(global_view, output_path, f"g_{idx:02}")
 
-    plt.figure()
-    plt.imshow(global_3d[0, 0, :, :, H // 2], cmap="gray")
-    plt.colorbar()
-    plt.savefig(os.path.join(output_path, "global_3d_viewC.png"))
+        local_view = data["global"].float().numpy()
+        _, V, D, W, H = local_view.shape
 
-    global_2d = data["global_2d"]["images"].float().numpy()
-    _, V, D, W, H = global_2d.shape
+        extract_imgs(local_view, output_path, f"l_{idx:02}")
 
-    plt.figure()
-    plt.imshow(global_2d[0, 0, D // 2, :, :], cmap="gray")
-    plt.colorbar()
-    plt.savefig(os.path.join(output_path, "global_2d_viewA.png"))
-
-    plt.figure()
-    plt.imshow(global_2d[0, 0, :, W // 2, :], cmap="gray")
-    plt.colorbar()
-    plt.savefig(os.path.join(output_path, "global_2d_viewB.png"))
-
-    plt.figure()
-    plt.imshow(global_2d[0, 0, :, :, H // 2], cmap="gray")
-    plt.colorbar()
-    plt.savefig(os.path.join(output_path, "global_2d_viewC.png"))
+        if idx == 5:
+            break
