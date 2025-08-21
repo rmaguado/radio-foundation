@@ -43,7 +43,7 @@ class iBOTPatchLoss(nn.Module):
         log_probs = F.log_softmax(student_patch / self.student_temp, dim=-1)  # (N, D)
         loss = (teacher_patch_center_softmaxed * log_probs).sum(dim=-1)  # (N, )
 
-        loss = patch_loss_neg * masks_weight
+        loss = loss * masks_weight
 
         return -loss.sum() / masks_weight.sum().clamp(min=1.0)
 
