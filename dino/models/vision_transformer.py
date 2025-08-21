@@ -216,7 +216,7 @@ class DinoVisionTransformer(nn.Module):
 
     def _prepare_tokens(
         self, x: torch.Tensor, masks: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Size]:
         """
         Handles patch embedding, token masking, and concatenation of CLS and register tokens.
 
@@ -274,11 +274,12 @@ class DinoVisionTransformer(nn.Module):
         select_layers: Sequence[int] = (11,),
         norm: bool = True,
     ) -> Dict[str, torch.Tensor]:
-        x = self._prepare_tokens(x)
+        x, patch_dims = self._prepare_tokens(x)
 
         outputs = []
         for i, blk in enumerate(self.blocks):
-            x = blk(x)
+            rope_sincos = self.rope_embed(*patch_dims)
+            x = blk(x, rope_sincos)
             if i in select_layers:
                 layer_output = self.norm(x) if norm else x
                 outputs.append(layer_output)
