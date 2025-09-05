@@ -261,7 +261,7 @@ def main():
     model = SSLMetaArch(cfg)
     model = model.to(torch.device("cuda"))
 
-    torch._dynamo.config.optimize_ddp = "ddp_optimizer"
+    # torch._dynamo.config.optimize_ddp = "ddp_optimizer"
     model = torch.compile(model)
 
     model.prepare_for_distributed_training(rank)
