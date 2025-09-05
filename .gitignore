@@ -9,3 +9,6 @@
 **/*.log
 /models*
 tensorboard
+index
+runs
+evaluation/vision/tsne
