@@ -1,3 +1,0 @@
-data:
-  root_path: null # REQUIRED
-  conv_template: "llama_3"

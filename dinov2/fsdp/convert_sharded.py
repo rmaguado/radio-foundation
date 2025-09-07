@@ -39,8 +39,6 @@ def load_sharded_save_unsharded(cfg, model):
 def main(args):
     cfg = setup(args)
 
-    logger.warning("Loaded config without running validation.")
-
     model = SSLMetaArch(cfg).to(torch.device("cuda"))
     model.prepare_for_distributed_training()
 

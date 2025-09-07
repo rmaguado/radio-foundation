@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pydicom
 import nibabel as nib
+import SimpleITK as sitk
 
 import torch
 import torch.nn.functional as F
@@ -87,6 +88,21 @@ def load_dicom(folder_path: str):
     image = torch.stack(data_stack)
     image = rescale_slope * image + rescale_intercept
     image = torch.clip(image, -1000, 1900)
+
+    assert is_HU(image)
+
+    return image, spacing
+
+
+def load_mhd(path):
+    image_obj = sitk.ReadImage(path)
+    image = sitk.GetArrayFromImage(image_obj)
+    spacing = image_obj.GetSpacing()
+    spacing = np.array(spacing)[::-1]
+    assert abs(spacing[2] - spacing[1]) < 0.001
+
+    image = torch.from_numpy(image).float()
+    image = image.clip(-1000, 1900)
 
     assert is_HU(image)
 
@@ -182,11 +198,22 @@ def prepare_image(img, img_size, channels, fmean, fstd, vmin=-1000):
 
 
 def generate_embeddings(
-    img, *, model, img_size, patch_size, channels, fmean, fstd, device, block_size=64
+    img,
+    *,
+    model,
+    img_size,
+    patch_size,
+    channels,
+    fmean,
+    fstd,
+    device,
+    block_size=64,
+    no_crop=False
 ):
     pdim = img_size // patch_size
 
-    img = crop_volume(img)
+    if not no_crop:
+        img = crop_volume(img)
 
     x_prep = prepare_image(img, img_size, channels, fmean, fstd)
     n_groups = x_prep.shape[0]
