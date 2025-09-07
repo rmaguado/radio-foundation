@@ -12,7 +12,7 @@ from tabulate import tabulate
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import MultiDataset, DicomCtDataset, NiftiCtDataset, MedicalImageDataset
+from .datasets import MultiDataset, TorchVolumeDataset
 from .samplers import (
     InfiniteSampler,
     WeightedInfiniteSampler,
@@ -32,21 +32,7 @@ class SamplerType(Enum):
     WEIGHTED_SHARDED_INFINITE = 3
 
 
-def make_train_dataset(
-    config: DictConfig,
-    use_full_image: bool,
-) -> Tuple[MedicalImageDataset, Optional[List[float]]]:
-    """
-    Parse the dataset from the given OmegaConf configuration.
-
-    Args:
-        config (DictConfig): The OmegaConf dictionary configuration for the dataset.
-        use_full_image (bool): Whether to set the global crop size to the full size.
-
-    Returns:
-        MedicalImageDataset: The corresponding dataset object(s).
-    """
-
+def make_train_dataset(config: DictConfig, use_full_image: bool):
     dataset_objects = []
     weights = []
 
@@ -65,9 +51,7 @@ def make_train_dataset(
     return dataset_objects[0], [1.0]
 
 
-def build_dataset_from_cfg(
-    config, use_full_image, dataset_config
-) -> Tuple[MedicalImageDataset, Optional[float]]:
+def build_dataset_from_cfg(config, use_full_image, dataset_config):
 
     def get_ct_kwargs(dataset_config):
         return {
@@ -78,7 +62,7 @@ def build_dataset_from_cfg(
 
     dataset_type = dataset_config.type
     dataset_storage = dataset_config.storage
-    transform = DataAugmentationDINO(config, dataset_config, use_full_image)
+    transform = DataAugmentationDINO(config, dataset_config)
 
     weight = dataset_config.weight if hasattr(dataset_config, "weight") else None
 
@@ -90,10 +74,8 @@ def build_dataset_from_cfg(
 
     if dataset_type == "ct":
         dataset_kwargs.update(get_ct_kwargs(dataset_config))
-        if dataset_storage == "dicom":
-            dataset_object = DicomCtDataset(**dataset_kwargs)
-        elif dataset_storage == "nifti":
-            dataset_object = NiftiCtDataset(**dataset_kwargs)
+        if dataset_storage == "torch":
+            dataset_object = TorchVolumeDataset(**dataset_kwargs)
         else:
             raise ValueError(f"Unsupported dataset storage: {dataset_storage}")
     else:
@@ -171,12 +153,12 @@ def _make_sampler(
     elif sampler_type == SamplerType.WEIGHTED_INFINITE:
         logger.info("sampler: weighted infinite")
         return WeightedInfiniteSampler(
-            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
+            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed  # type: ignore
         )
     elif sampler_type == SamplerType.WEIGHTED_SHARDED_INFINITE:
         logger.info("sampler: weighted sharded infinite")
         return WeightedShardedInfiniteSampler(
-            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed
+            dataset_names=dataset_names, sizes=dataset_sizes, weights=weights, seed=seed  # type: ignore
         )
 
     logger.info("sampler: none")

@@ -7,85 +7,58 @@ import logging
 
 import torch
 from omegaconf import DictConfig
-import copy
 
-from .transforms import ImageTransforms
+from dinov2.data.transforms import *
 
 
 logger = logging.getLogger("dinov2")
 
 
 class DataAugmentationDINO(object):
-    def __init__(
-        self, config: DictConfig, dataset_config: DictConfig, use_full_image: bool
-    ) -> None:
+    def __init__(self, config: DictConfig, dataset_config: DictConfig) -> None:
         """
         Initializes an instance of the Augmentations class.
 
         Args:
             config (DictConfig): The primary configuration object.
             dataset_config (DictConfig): The dataset configuration object.
-            use_full_image (bool): Whether to use the full image
         """
         self.dataset_config = dataset_config
-        self.augmentations_config = config.augmentations[dataset_config.augmentation]
         self.local_crops_number = config.crops.local_crops_number
         self.local_crops_size = config.crops.local_crops_size
         self.local_crops_scale = config.crops.local_crops_scale
 
-        self.global_crops_size = (
-            config.student.full_image_size
-            if use_full_image
-            else config.crops.global_crops_size
-        )
+        self.global_crops_size = config.crops.global_crops_size
         self.global_crops_scale = config.crops.global_crops_scale
 
-        self.global1, self.global2, self.local1 = self.load_transforms_from_cfg()
+        self.norm = Norm(mean=dataset_config.norm.mean, std=dataset_config.norm.std)
 
-    def build_transform_group(self, transform_key):
-        """
-        Builds a transformation group based on the given transform key.
-
-        Parameters:
-            transform_key (str): The key to identify the desired transformation group.
-
-        Returns:
-            transforms.Compose: The composed transformation group.
-        """
-        image_transforms = ImageTransforms(
-            self.dataset_config.pixel_range.lower,
-            self.dataset_config.pixel_range.upper,
-            self.dataset_config.channels,
+        self.global_base_crop = RandomCrop2D(
+            size=self.global_crops_size, scale=self.global_crops_scale
         )
-        augmentations_list = copy.deepcopy(self.augmentations_config[transform_key])
-        for tc in augmentations_list:
-            name = tc.pop("name")
-            if name == "localcrop":
-                image_transforms.add_crop(self.local_crops_size, self.local_crops_scale)
-            elif name == "globalcrop":
-                image_transforms.add_crop(
-                    self.global_crops_size, self.global_crops_scale
-                )
-            else:
-                image_transforms.add_transform(name, tc)
 
-        image_transforms.add_normalize(
-            self.dataset_config.norm.mean, self.dataset_config.norm.std
+        self.global1 = ImageTransforms()
+        self.global1 += RandomCrop2D(
+            size=self.global_crops_size, scale=self.global_crops_scale
         )
-        return image_transforms
+        self.global1 += Permute2D()
+        self.global1 += Flip2D()
+        self.global1 += Window(p=0.5)
+        self.global1 += self.norm
 
-    def load_transforms_from_cfg(self):
-        """
-        Load transforms from configuration file for each group (global1, global2, local).
+        self.global2 = ImageTransforms()
+        self.global2 += RandomCrop2D(
+            size=self.global_crops_size, scale=self.global_crops_scale
+        )
+        self.global2 += Permute2D()
+        self.global2 += Flip2D()
+        self.global2 += self.norm
 
-        Returns:
-            tuple: A tuple of transform groups.
-        """
-        transform_groups = [
-            self.build_transform_group(group)
-            for group in ["global_1", "global_2", "local"]
-        ]
-        return tuple(transform_groups)
+        self.local1 = ImageTransforms()
+        self.local1 += RandomCrop2D(
+            size=self.local_crops_size, scale=self.local_crops_scale
+        )
+        self.local1 += self.norm
 
     def __call__(self, image: torch.Tensor) -> dict[str, list[torch.Tensor]]:
         """
@@ -97,9 +70,7 @@ class DataAugmentationDINO(object):
         Returns:
             output: A dictionary containing the augmented image crops and offsets.
                 - "global_crops": A list of global crops of the image.
-                - "global_crops_teacher": A list of global crops of the image.
                 - "local_crops": A list of local crops of the image.
-                - "offsets": An empty tuple.
 
         """
         output = {}
@@ -108,11 +79,9 @@ class DataAugmentationDINO(object):
         global_crop_2 = self.global2(image)
 
         output["global_crops"] = [global_crop_1, global_crop_2]
-        output["global_crops_teacher"] = [global_crop_1, global_crop_2]
 
         local_crops = [self.local1(image) for _ in range(self.local_crops_number)]
 
         output["local_crops"] = local_crops
-        output["offsets"] = ()
 
         return output

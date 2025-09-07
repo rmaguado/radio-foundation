@@ -6,16 +6,16 @@
 import random
 import math
 import numpy as np
-from typing import Optional
+from typing import Optional, Tuple
 
 
 class MaskingGenerator:
     def __init__(
         self,
-        input_size: int,
+        input_size: Tuple[int, int],
         num_masking_patches: Optional[int] = None,
         min_num_patches: int = 4,
-        max_num_patches: int = None,
+        max_num_patches: Optional[int] = None,
         min_aspect: float = 0.3,
         max_aspect: Optional[float] = None,
     ):
@@ -31,8 +31,6 @@ class MaskingGenerator:
             min_aspect (float): The minimum aspect ratio.
             max_aspect (float): The maximum aspect ratio.
         """
-        if not isinstance(input_size, tuple):
-            input_size = (input_size,) * 2
         self.height, self.width = input_size
 
         self.num_patches = self.height * self.width
@@ -106,7 +104,7 @@ class MaskingGenerator:
         mask_count = 0
         while mask_count < num_masking_patches:
             max_mask_patches = num_masking_patches - mask_count
-            max_mask_patches = min(max_mask_patches, self.max_num_patches)
+            max_mask_patches = min(max_mask_patches, self.max_num_patches)  # type: ignore
 
             delta = self._mask(mask, max_mask_patches)
             if delta == 0:

@@ -27,7 +27,7 @@ def _generate_randperm_indices(*, size: int, generator: torch.Generator):
     # This is actually matching PyTorch's CPU implementation, see: https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/TensorFactories.cpp#L900-L921
     perm = torch.arange(size, dtype=dtype)
     for i in range(size):
-        j = torch.randint(i, size, size=(1,), generator=generator).item()
+        j: int = torch.randint(i, size, size=(1,), generator=generator).item()  # type: ignore
 
         # Always swap even if no-op
         value = perm[j].item()
@@ -213,7 +213,7 @@ class WeightedShardedInfiniteSampler(Sampler):
     def __init__(
         self,
         *,
-        dataset_names: List[int],
+        dataset_names: List[str],
         sizes: List[int],
         weights: List[float],
         seed: int = 0,
