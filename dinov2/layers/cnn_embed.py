@@ -48,7 +48,7 @@ class CnnEmbed(nn.Module):
         self.in_chans = in_chans
         self.embed_dim = embed_dim
 
-        embed_kernel_size = patch_size // 2
+        embed_kernel_size = patch_size // 2  # type: ignore
 
         self.feature_layer = nn.Conv2d(
             in_chans, conv_channels, kernel_size=5, stride=2, padding=2

@@ -108,7 +108,7 @@ class FSDPCheckpointer(Checkpointer):
         assert os.path.basename(save_file) == basename, basename
         self.logger.info("Saving checkpoint to {}".format(save_file))
         with self.path_manager.open(save_file, "wb") as f:
-            torch.save(data, f)
+            torch.save(data, f)  # type: ignore
         self.tag_last_checkpoint(basename)
 
     def load(self, *args, **kwargs):
@@ -138,7 +138,7 @@ class FSDPCheckpointer(Checkpointer):
             return ""
         # pyre-fixme[6]: For 2nd param expected `Union[PathLike[str], str]` but got
         #  `Union[bytes, str]`.
-        return os.path.join(self.save_dir, last_saved)
+        return os.path.join(self.save_dir, last_saved)  # type: ignore
 
     def tag_last_checkpoint(self, last_filename_basename: str) -> None:
         """
@@ -151,7 +151,7 @@ class FSDPCheckpointer(Checkpointer):
             torch.distributed.barrier()
         save_file = os.path.join(self.save_dir, f"last_checkpoint.{rankstr()}")
         with self.path_manager.open(save_file, "w") as f:
-            f.write(last_filename_basename)  # pyre-ignore
+            f.write(last_filename_basename)  # type: ignore
 
 
 class FlexibleFSDPCheckpointer(Checkpointer):
@@ -196,7 +196,7 @@ class FlexibleFSDPCheckpointer(Checkpointer):
         assert os.path.basename(save_file) == basename, basename
         self.logger.info("Saving checkpoint to {}".format(save_file))
         with self.path_manager.open(save_file, "wb") as f:
-            torch.save(data, f)
+            torch.save(data, f)  # type: ignore
         self.tag_last_checkpoint(basename)
 
         self.logger.debug("Checkpoint saved")
@@ -284,7 +284,7 @@ class AntiFSDPConverter(Checkpointer):
         assert os.path.basename(save_file) == basename, basename
         self.logger.info("Saving checkpoint to {}".format(save_file))
         with self.path_manager.open(save_file, "wb") as f:
-            torch.save(data, f)
+            torch.save(data, f)  # type: ignore
         self.tag_last_checkpoint(basename)
 
         self.logger.debug("Checkpoint saved")
@@ -309,12 +309,12 @@ class AntiFSDPConverter(Checkpointer):
                 last_saved = f.read().strip()
         except IOError:
             return ""
-        return os.path.join(self.save_dir, last_saved)
+        return os.path.join(self.save_dir, last_saved)  # type: ignore
 
     def tag_last_checkpoint(self, last_filename_basename: str) -> None:
         save_file = os.path.join(self.save_dir, f"last_checkpoint")
         with self.path_manager.open(save_file, "w") as f:
-            f.write(last_filename_basename)  # pyre-ignore
+            f.write(last_filename_basename)  # type: ignore
 
 
 class FlexiblePeriodicCheckpointer(PeriodicCheckpointer):

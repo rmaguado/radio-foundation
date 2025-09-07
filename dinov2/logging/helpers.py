@@ -17,7 +17,7 @@ class MetricLogger(object):
         self.delimiter = delimiter
         self.output_file = output_file
         self.dataloader = None
-        self.log_msg = None
+        self.log_msg = ""
 
     def set_dataloader(self, dataloader):
         self.dataloader = dataloader
@@ -111,11 +111,11 @@ class MetricLogger(object):
         data_time = Metric()
 
         if n_iterations is None:
-            n_iterations = len(iterable)
+            n_iterations = len(iterable)  # type: ignore
         self.log_msg = self.build_log_msg(header, n_iterations)
 
         grad_accum_counter = 0
-        for obj in iterable:
+        for obj in iterable:  # type: ignore
             data_time.update(time.time() - data_end)
             yield obj
             if (grad_accum_counter + 1) % grad_accum_steps == 0:

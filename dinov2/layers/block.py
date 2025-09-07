@@ -160,7 +160,7 @@ def add_residual(x, brange, residual, residual_scale_factor, scaling_vector=None
             x_flat, 0, brange, residual.to(dtype=x.dtype), alpha=residual_scale_factor
         )
     else:
-        x_plus_residual = scaled_index_add(
+        x_plus_residual = scaled_index_add(  # type: ignore
             x,
             brange,
             residual.to(dtype=x.dtype),
@@ -188,12 +188,12 @@ def get_attn_bias_and_cat(x_list, branges=None):
         for b, x in zip(batch_sizes, x_list):
             for _ in range(b):
                 seqlens.append(x.shape[1])
-        attn_bias = fmha.BlockDiagonalMask.from_seqlens(seqlens)
+        attn_bias = fmha.BlockDiagonalMask.from_seqlens(seqlens)  # type: ignore
         attn_bias._batch_sizes = batch_sizes
         attn_bias_cache[all_shapes] = attn_bias
 
     if branges is not None:
-        cat_tensors = index_select_cat([x.flatten(1) for x in x_list], branges).view(
+        cat_tensors = index_select_cat([x.flatten(1) for x in x_list], branges).view(  # type: ignore
             1, -1, x_list[0].shape[-1]
         )
     else:
@@ -231,7 +231,7 @@ def drop_add_residual_stochastic_depth_list(
                 x, brange, residual, residual_scale_factor, scaling_vector
             ).view_as(x)
         )
-    return outputs
+    return outputs  # type: ignore
 
 
 class NestedTensorBlock(Block):
@@ -249,7 +249,7 @@ class NestedTensorBlock(Block):
             def ffn_residual_func(x: Tensor, attn_bias=None) -> Tensor:
                 return self.mlp(self.norm2(x))
 
-            x_list = drop_add_residual_stochastic_depth_list(
+            x_list = drop_add_residual_stochastic_depth_list(  # type: ignore
                 x_list,
                 residual_func=attn_residual_func,
                 sample_drop_ratio=self.sample_drop_ratio,
@@ -257,7 +257,7 @@ class NestedTensorBlock(Block):
                     self.ls1.gamma if isinstance(self.ls1, LayerScale) else None
                 ),
             )
-            x_list = drop_add_residual_stochastic_depth_list(
+            x_list = drop_add_residual_stochastic_depth_list(  # type: ignore
                 x_list,
                 residual_func=ffn_residual_func,
                 sample_drop_ratio=self.sample_drop_ratio,
@@ -279,7 +279,7 @@ class NestedTensorBlock(Block):
             x = x + ffn_residual_func(x)
             return attn_bias.split(x)
 
-    def forward(self, x_or_x_list):
+    def forward(self, x_or_x_list):  # type: ignore
         if isinstance(x_or_x_list, Tensor):
             return super().forward(x_or_x_list)
         elif isinstance(x_or_x_list, list):

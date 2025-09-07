@@ -14,7 +14,6 @@ class DINOHead(nn.Module):
         self,
         in_dim,
         out_dim,
-        use_bn=False,
         nlayers=3,
         hidden_dim=2048,
         bottleneck_dim=256,
@@ -27,12 +26,11 @@ class DINOHead(nn.Module):
             in_dim,
             bottleneck_dim,
             hidden_dim=hidden_dim,
-            use_bn=use_bn,
             bias=mlp_bias,
         )
         self.apply(self._init_weights)
         self.last_layer = weight_norm(nn.Linear(bottleneck_dim, out_dim, bias=False))
-        self.last_layer.parametrizations.weight.original0.data.fill_(1)
+        self.last_layer.parametrizations.weight.original0.data.fill_(1)  # type: ignore
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -48,20 +46,14 @@ class DINOHead(nn.Module):
         return x
 
 
-def _build_mlp(
-    nlayers, in_dim, bottleneck_dim, hidden_dim=None, use_bn=False, bias=True
-):
+def _build_mlp(nlayers, in_dim, bottleneck_dim, hidden_dim, bias=True):
     if nlayers == 1:
         return nn.Linear(in_dim, bottleneck_dim, bias=bias)
     else:
         layers = [nn.Linear(in_dim, hidden_dim, bias=bias)]
-        if use_bn:
-            layers.append(nn.BatchNorm1d(hidden_dim))
-        layers.append(nn.GELU())
+        layers.append(nn.GELU())  # type: ignore
         for _ in range(nlayers - 2):
             layers.append(nn.Linear(hidden_dim, hidden_dim, bias=bias))
-            if use_bn:
-                layers.append(nn.BatchNorm1d(hidden_dim))
-            layers.append(nn.GELU())
+            layers.append(nn.GELU())  # type: ignore
         layers.append(nn.Linear(hidden_dim, bottleneck_dim, bias=bias))
         return nn.Sequential(*layers)

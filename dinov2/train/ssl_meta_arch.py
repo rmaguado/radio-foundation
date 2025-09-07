@@ -10,7 +10,7 @@ import torch
 from torch import nn
 
 from dinov2.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
-from dinov2.models import build_model_from_cfg
+from dinov2.models import build_model_from_cfg, DinoVisionTransformer
 from dinov2.layers import DINOHead
 from dinov2.utils.utils import has_batchnorms
 from dinov2.utils.param_groups import get_params_groups_with_decay, fuse_params_groups
@@ -33,7 +33,16 @@ except ImportError:
 logger = logging.getLogger("dinov2")
 
 
+class DinoModel(nn.ModuleDict):
+    backbone: DinoVisionTransformer
+    dino_head: DINOHead
+    ibot_head: DINOHead
+
+
 class SSLMetaArch(nn.Module):
+    student: DinoModel
+    teacher: DinoModel
+
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
@@ -94,8 +103,8 @@ class SSLMetaArch(nn.Module):
             logger.debug("OPTIONS -- DINO -- not using DINO")
 
         if self.do_dino or self.do_ibot:
-            student_model_dict["dino_head"] = dino_head()
-            teacher_model_dict["dino_head"] = dino_head()
+            student_model_dict["dino_head"] = dino_head()  # type: ignore
+            teacher_model_dict["dino_head"] = dino_head()  # type: ignore
 
         logger.debug("OPTIONS -- IBOT")
         logger.debug(f"OPTIONS -- IBOT -- loss_weight: {cfg.ibot.loss_weight}")
@@ -145,8 +154,8 @@ class SSLMetaArch(nn.Module):
 
         self.need_to_synchronize_fsdp_streams = True
 
-        self.student = nn.ModuleDict(student_model_dict)
-        self.teacher = nn.ModuleDict(teacher_model_dict)
+        self.student = DinoModel(student_model_dict)
+        self.teacher = DinoModel(teacher_model_dict)
 
         # there is no backpropagation through the teacher, so no need for gradients
         for p in self.teacher.parameters():
@@ -260,8 +269,8 @@ class SSLMetaArch(nn.Module):
                 self.dino_loss.update_center(teacher_cls_tokens_after_head)
                 if do_ibot:
                     masked_teacher_patch_tokens_after_head = (
-                        masked_teacher_patch_tokens_after_head.unsqueeze(0)
-                    )
+                        masked_teacher_patch_tokens_after_head.unsqueeze(0) # type: ignore
+                    )  # type: ignore
                     masked_teacher_ibot_softmaxed_centered = (
                         self.ibot_patch_loss.softmax_center_teacher(
                             masked_teacher_patch_tokens_after_head[
@@ -291,7 +300,7 @@ class SSLMetaArch(nn.Module):
                 if do_ibot:
                     masked_teacher_ibot_softmaxed_centered = (
                         self.ibot_patch_loss.sinkhorn_knopp_teacher(
-                            masked_teacher_patch_tokens_after_head,
+                            masked_teacher_patch_tokens_after_head,  # type: ignore
                             teacher_temp=teacher_temp,
                             n_masked_patches_tensor=n_masked_patches_tensor,
                         )
@@ -304,7 +313,7 @@ class SSLMetaArch(nn.Module):
 
             return (
                 teacher_dino_softmaxed_centered_list,
-                masked_teacher_ibot_softmaxed_centered,
+                masked_teacher_ibot_softmaxed_centered,  # type: ignore
             )
 
         teacher_dino_softmaxed_centered_list, masked_teacher_ibot_softmaxed_centered = (
@@ -365,16 +374,18 @@ class SSLMetaArch(nn.Module):
         outputs_list = _attn_bias.split(self.student.dino_head(cat_inputs))
 
         # 3a: local crops cls tokens
-        student_local_cls_tokens_after_head = outputs_list.pop(0).squeeze(0)
+        student_local_cls_tokens_after_head = outputs_list.pop(0).squeeze(0)  # type: ignore
 
         # 3b: global crops cls tokens
-        student_global_cls_tokens_after_head = outputs_list.pop(0).squeeze(0)
+        student_global_cls_tokens_after_head = outputs_list.pop(0).squeeze(0)  # type: ignore
 
         # 3c: global crops patch tokens
         if do_ibot and not self.ibot_separate_head:
-            student_global_masked_patch_tokens_after_head = outputs_list.pop(0).squeeze(
+            student_global_masked_patch_tokens_after_head = outputs_list.pop(0).squeeze(  # type: ignore
                 0
-            )[:n_masked_patches]
+            )[
+                :n_masked_patches
+            ]
 
         if n_local_crops > 0:
             dino_local_crops_loss = self.dino_loss(
@@ -426,7 +437,7 @@ class SSLMetaArch(nn.Module):
             # compute loss
             ibot_patch_loss = (
                 self.ibot_patch_loss.forward_masked(
-                    student_global_masked_patch_tokens_after_head,
+                    student_global_masked_patch_tokens_after_head,  # type: ignore
                     masked_teacher_ibot_softmaxed_centered,
                     student_masks_flat=masks,
                     n_masked_patches=n_masked_patches,
@@ -477,9 +488,10 @@ class SSLMetaArch(nn.Module):
             torch._foreach_mul_(teacher_param_list, m)
             torch._foreach_add_(teacher_param_list, student_param_list, alpha=1 - m)
 
-    def train(self):
-        super().train()
+    def train(self, mode=True):
+        super().train(mode)
         self.teacher.eval()
+        return self
 
     def get_maybe_fused_params_for_submodel(self, m):
         params_groups = get_params_groups_with_decay(
@@ -491,7 +503,7 @@ class SSLMetaArch(nn.Module):
         logger.info("fusing param groups")
 
         for g in fused_params_groups:
-            g["foreach"] = True
+            g["foreach"] = True  # type: ignore
         return fused_params_groups
 
     def get_params_groups(self):

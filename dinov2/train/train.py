@@ -72,7 +72,10 @@ def train(
         accum_steps,
     ):
         if iteration > max_iter:
-            return
+            return iteration
+
+        mom = None
+        teacher_temp = None
 
         if should_reset_grad(cfg, grad_accum_counter, accum_steps):
             mom, teacher_temp = update_schedules(optimizer, schedulers, iteration)

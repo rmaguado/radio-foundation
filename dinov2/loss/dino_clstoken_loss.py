@@ -10,6 +10,8 @@ from torch import nn
 
 
 class DINOLoss(nn.Module):
+    center: torch.Tensor
+
     def __init__(
         self,
         out_dim,
@@ -94,7 +96,7 @@ class DINOLoss(nn.Module):
 
             if self.reduce_handle is not None:
                 self.reduce_handle.wait()
-            _t = self.async_batch_center / (self.len_teacher_output * world_size)
+            _t = self.async_batch_center / (self.len_teacher_output * world_size)  # type: ignore
 
             self.center = self.center * self.center_momentum + _t * (
                 1 - self.center_momentum

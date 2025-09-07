@@ -20,7 +20,6 @@ from torch.nn.init import trunc_normal_
 from dinov2.layers import (
     Mlp,
     PatchEmbed,
-    PatchEmbed3D,
     CnnEmbed,
     SwiGLUFFNFused,
     MemEffAttention,
@@ -59,14 +58,6 @@ def get_embedding_layer(
             patch_size=patch_size,
             in_chans=in_chans,
             embed_dim=embed_dim,
-        )
-    elif embed_layer == "patch3d":
-        return PatchEmbed3D(
-            img_size=img_size,
-            patch_size=patch_size,
-            in_chans=in_chans,
-            embed_dim=embed_dim,
-            img_depth=240,
         )
     elif embed_layer == "conv":
         return CnnEmbed(
@@ -368,13 +359,13 @@ class DinoVisionTransformer(nn.Module):
 
     def _get_intermediate_layers_chunked(self, x, n=1):
         x = self.prepare_tokens_with_masks(x)
-        output, i, total_block_len = [], 0, len(self.blocks[-1])
+        output, i, total_block_len = [], 0, len(self.blocks[-1])  # type: ignore
         # If n is an int, take the n last blocks. If it's a list, take them
         blocks_to_take = (
             range(total_block_len - n, total_block_len) if isinstance(n, int) else n
         )
         for block_chunk in self.blocks:
-            for blk in block_chunk[i:]:  # Passing the nn.Identity()
+            for blk in block_chunk[i:]:  # type: ignore
                 x = blk(x)
                 if i in blocks_to_take:
                     output.append(x)
@@ -393,9 +384,9 @@ class DinoVisionTransformer(nn.Module):
         norm=True,
     ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]]]:
         if self.chunked_blocks:
-            outputs = self._get_intermediate_layers_chunked(x, n)
+            outputs = self._get_intermediate_layers_chunked(x, n)  # type: ignore
         else:
-            outputs = self._get_intermediate_layers_not_chunked(x, n)
+            outputs = self._get_intermediate_layers_not_chunked(x, n)  # type: ignore
         if norm:
             outputs = [self.norm(out) for out in outputs]
         class_tokens = [out[:, 0] for out in outputs]
@@ -409,7 +400,7 @@ class DinoVisionTransformer(nn.Module):
                 for out in outputs
             ]
         if return_class_token:
-            return tuple(zip(outputs, class_tokens))
+            return tuple(zip(outputs, class_tokens))  # type: ignore
         return tuple(outputs)
 
     def forward(self, *args, is_training=False, **kwargs):
@@ -417,7 +408,7 @@ class DinoVisionTransformer(nn.Module):
         if is_training:
             return ret
         else:
-            return self.head(ret["x_norm_clstoken"])
+            return self.head(ret["x_norm_clstoken"])  # type: ignore
 
 
 def init_weights_vit_timm(module: nn.Module, name: str = ""):
@@ -435,7 +426,7 @@ def vit_small(patch_size=16, num_register_tokens=0, **kwargs):
         depth=12,
         num_heads=6,
         mlp_ratio=4,
-        block_fn=partial(Block, attn_class=MemEffAttention),
+        block_fn=partial(Block, attn_class=MemEffAttention),  # type: ignore
         num_register_tokens=num_register_tokens,
         **kwargs,
     )
@@ -449,7 +440,7 @@ def vit_base(patch_size=16, num_register_tokens=0, **kwargs):
         depth=12,
         num_heads=12,
         mlp_ratio=4,
-        block_fn=partial(Block, attn_class=MemEffAttention),
+        block_fn=partial(Block, attn_class=MemEffAttention),  # type: ignore
         num_register_tokens=num_register_tokens,
         **kwargs,
     )
@@ -463,7 +454,7 @@ def vit_large(patch_size=16, num_register_tokens=0, **kwargs):
         depth=24,
         num_heads=16,
         mlp_ratio=4,
-        block_fn=partial(Block, attn_class=MemEffAttention),
+        block_fn=partial(Block, attn_class=MemEffAttention),  # type: ignore
         num_register_tokens=num_register_tokens,
         **kwargs,
     )
@@ -480,7 +471,7 @@ def vit_giant2(patch_size=16, num_register_tokens=0, **kwargs):
         depth=40,
         num_heads=24,
         mlp_ratio=4,
-        block_fn=partial(Block, attn_class=MemEffAttention),
+        block_fn=partial(Block, attn_class=MemEffAttention),  # type: ignore
         num_register_tokens=num_register_tokens,
         **kwargs,
     )
@@ -497,7 +488,7 @@ def vit_rate(patch_size=20, num_register_tokens=0, **kwargs):
         depth=8,
         num_heads=8,
         mlp_ratio=4,
-        block_fn=partial(Block, attn_class=MemEffAttention),
+        block_fn=partial(Block, attn_class=MemEffAttention),  # type: ignore
         num_register_tokens=num_register_tokens,
         **kwargs,
     )
