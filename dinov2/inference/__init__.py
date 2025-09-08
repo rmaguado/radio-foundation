@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from functools import partial
 import pydicom
 import nibabel as nib
 import SimpleITK as sitk
@@ -7,11 +8,22 @@ import SimpleITK as sitk
 import torch
 import torch.nn.functional as F
 
-from omegaconf import OmegaConf
 from einops import rearrange
 
 from dinov2.models import vits
 from .visualize import view_volume
+
+
+def get_autocast_dtype(config):
+    teacher_dtype_str = (
+        config.compute_precision.teacher.backbone.mixed_precision.param_dtype
+    )
+    if teacher_dtype_str == "fp16":
+        return torch.half
+    elif teacher_dtype_str == "bf16":
+        return torch.bfloat16
+    else:
+        return torch.float
 
 
 def build_model(path_to_checkpoint, config, img_size, device):
@@ -47,7 +59,12 @@ def build_model(path_to_checkpoint, config, img_size, device):
     model.eval()
     model.to(device)
 
-    return model
+    autocast_dtype = get_autocast_dtype(config)
+    autocast_ctx = partial(
+        torch.autocast, enabled=True, dtype=autocast_dtype, device_type="cuda"
+    )
+
+    return model, autocast_ctx
 
 
 def is_HU(img):
@@ -208,7 +225,8 @@ def generate_embeddings(
     fstd,
     device,
     block_size=64,
-    no_crop=False
+    no_crop=False,
+    autocast_ctx
 ):
     pdim = img_size // patch_size
 
@@ -228,8 +246,9 @@ def generate_embeddings(
     batch_features = []
     for data in batches:
         data = data.to(device=device)
-        with torch.no_grad():
-            features = model.forward_features(data)
+        with torch.inference_mode():
+            with autocast_ctx():
+                features = model.forward_features(data)
         batch_features.append(
             {k: v.cpu() for k, v in features.items() if isinstance(v, torch.Tensor)}
         )
