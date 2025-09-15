@@ -8,4 +8,9 @@ from .dataset import (
 )
 from .train import train_classifier
 from .inference import get_predictions
-from .plots import plot_train_curves, plot_confusion_matrix
+from .plots import (
+    plot_train_curves,
+    plot_confusion_matrix,
+    plot_patch_similarity,
+    plot_feature_map,
+)

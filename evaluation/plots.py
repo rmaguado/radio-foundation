@@ -84,7 +84,7 @@ def plot_patch_similarity(patch_features, ref_image, ref_x=0, ref_y=0, thresh=0.
     fig.colorbar(im1, ax=ax1)
     ax1.set_title("CT Image")
 
-    im2 = ax2.imshow(cos_similarity, cmap="plasma")
+    im2 = ax2.imshow(cos_similarity, cmap="plasma", vmin=0.0, vmax=1.0)
     fig.colorbar(im2, ax=ax2)
     ax2.set_title("Cosine Similarity")
 
@@ -115,7 +115,7 @@ def plot_feature_map(patch_features, ref_image, components=(0, 1, 2), channels=1
     ax1.set_title("CT Image")
 
     im2 = ax2.imshow(feature_map)
-    fig.colorbar(im2, ax=ax2)
+    # fig.colorbar(im2, ax=ax2)
     ax2.set_title("Colorized Feature Map")
 
     plt.tight_layout()
