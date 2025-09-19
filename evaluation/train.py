@@ -1,5 +1,5 @@
 import torch
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, mean_absolute_error
 
 
 def train_classifier(
@@ -34,7 +34,7 @@ def train_classifier(
                 masks.to(device),
             )
 
-            predictions = model(embeddings, masks)
+            predictions = model(embeddings, masks).flatten()
             loss = loss_fn(predictions, labels)
 
             optimizer.zero_grad()
@@ -47,10 +47,7 @@ def train_classifier(
 
         train_labels_cat = torch.cat(train_all_labels)
         train_predictinos_cat = torch.cat(train_all_predictions)
-        train_predictinos_cat = torch.nn.functional.softmax(
-            train_predictinos_cat, dim=1
-        )
-        train_predictinos_cat = torch.argmax(train_predictinos_cat, dim=1)
+        train_predictinos_cat = torch.nn.functional.sigmoid(train_predictinos_cat)
 
         train_rocauc_list.append(roc_auc_score(train_labels_cat, train_predictinos_cat))
 
@@ -67,7 +64,7 @@ def train_classifier(
                     masks.to(device),
                 )
 
-                predictions = model(embeddings, masks)
+                predictions = model(embeddings, masks).flatten()
                 loss = loss_fn(predictions, labels)
 
                 val_loss += loss.item()
@@ -76,8 +73,7 @@ def train_classifier(
 
         val_labels_cat = torch.cat(val_all_labels)
         val_predictinos_cat = torch.cat(val_all_predictions)
-        val_predictinos_cat = torch.nn.functional.softmax(val_predictinos_cat, dim=1)
-        val_predictinos_cat = torch.argmax(val_predictinos_cat, dim=1)
+        val_predictinos_cat = torch.nn.functional.sigmoid(val_predictinos_cat)
         val_rocauc_list.append(roc_auc_score(val_labels_cat, val_predictinos_cat))
 
         avg_train_loss = train_loss / len(train_labels_cat)

@@ -120,3 +120,22 @@ def plot_feature_map(patch_features, ref_image, components=(0, 1, 2), channels=1
 
     plt.tight_layout()
     plt.show()
+
+
+def view_object(img, relx, rely):
+    D, W, H = img.shape
+    posx = int(relx * W)
+    posy = int(rely * H)
+
+    im_axial = img[D // 2, :, :]
+
+    fig, ax = plt.subplots()
+
+    ax.imshow(im_axial, cmap="gray", aspect="equal", vmin=-1000, vmax=1000)
+
+    ax.plot([posx - 5, posx + 5], [posy, posy], color="red", linewidth=0.5)
+    ax.plot([posx, posx], [posy - 5, posy + 5], color="red", linewidth=0.5)
+
+    ax.axis("off")
+    fig.tight_layout()
+    plt.show()

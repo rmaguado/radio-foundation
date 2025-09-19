@@ -13,4 +13,5 @@ from .plots import (
     plot_confusion_matrix,
     plot_patch_similarity,
     plot_feature_map,
+    view_object,
 )

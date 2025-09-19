@@ -39,7 +39,7 @@ def collate_classification(batch):
         padded_embeddings[i, :seq_len, :] = embedding
         masks[i, :seq_len] = True
 
-    labels = torch.tensor(labels_list, dtype=torch.long)
+    labels = torch.tensor(labels_list, dtype=torch.float32)
 
     return padded_embeddings, labels, masks
 
