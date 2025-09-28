@@ -55,6 +55,17 @@ def get_class_weights(labels):
     )
 
 
+def get_pos_weights(labels):
+    unique_labels = list(set(labels))
+    unique_labels.sort()
+    assert all(isinstance(l, int) and l >= 0 for l in unique_labels)
+
+    num_classes = len(unique_labels)
+    assert num_classes == 2
+
+    return torch.tensor([labels.count(0) / labels.count(1)])
+
+
 class EmbeddingDataset(Dataset):
     def __init__(
         self, patient_ids, id_to_path, labels, add_noise=False, sigma=0.05, p=0.5
@@ -82,7 +93,7 @@ class EmbeddingDataset(Dataset):
         patient_id = self.patient_ids[idx]
         embedding_path = self.id_to_path[patient_id]
 
-        embedding_data = torch.load(embedding_path)
+        embedding_data = torch.load(embedding_path, mmap=True)
         embeddings = embedding_data["cls"]
         label = float(self.labels[patient_id])
 

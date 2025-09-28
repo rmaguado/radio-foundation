@@ -1,5 +1,5 @@
 import torch
-from sklearn.metrics import roc_auc_score, mean_absolute_error
+from sklearn.metrics import roc_auc_score
 
 
 def train_classifier(
@@ -10,12 +10,16 @@ def train_classifier(
     val_dataloader,
     num_epochs,
     device,
+    select_criteria="loss",
 ):
+    assert select_criteria in ["loss", "rocauc"]
+
     train_loss_list = []
     train_rocauc_list = []
     val_loss_list = []
     val_rocauc_list = []
 
+    best_val_rocauc = 0.0
     best_val_loss = float("inf")
     best_model_state = model.state_dict()
 
@@ -74,14 +78,21 @@ def train_classifier(
         val_labels_cat = torch.cat(val_all_labels)
         val_predictinos_cat = torch.cat(val_all_predictions)
         val_predictinos_cat = torch.nn.functional.sigmoid(val_predictinos_cat)
-        val_rocauc_list.append(roc_auc_score(val_labels_cat, val_predictinos_cat))
+        val_rocauc = roc_auc_score(val_labels_cat, val_predictinos_cat)
+        val_rocauc_list.append(val_rocauc)
 
         avg_train_loss = train_loss / len(train_labels_cat)
         avg_val_loss = val_loss / len(val_labels_cat)
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            best_model_state = model.state_dict()
+            if select_criteria == "loss":
+                best_model_state = model.state_dict()
+
+        if val_rocauc < best_val_rocauc:
+            best_val_rocauc = val_rocauc
+            if select_criteria == "rocauc":
+                best_model_state = model.state_dict()
 
         train_loss_list.append(avg_train_loss)
         val_loss_list.append(avg_val_loss)

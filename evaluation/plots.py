@@ -8,10 +8,14 @@ import matplotlib.pyplot as plt
 from einops import rearrange
 
 
-def plot_train_curves(train_items, val_values, ylabel):
+def plot_train_curves(train_items, val_values, ylabel, hline_type="min"):
     val_vmin = min(val_values)
+    val_vmax = max(val_values)
 
-    plt.axhline(y=val_vmin, color="k", linestyle=":", alpha=0.5)
+    if hline_type == "min":
+        plt.axhline(y=val_vmin, color="k", linestyle=":", alpha=0.5)
+    elif hline_type == "max":
+        plt.axhline(y=val_vmax, color="k", linestyle=":", alpha=0.5)
     plt.plot(train_items, label="Train")
     plt.plot(val_values, label="Validation")
     plt.grid(True)
