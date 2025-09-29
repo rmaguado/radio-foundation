@@ -20,10 +20,10 @@ def collate_regression(batch):
 
     labels = torch.tensor(labels_list, dtype=torch.float32).unsqueeze(1)
 
-    return padded_embeddings, labels, masks
+    return padded_embeddings, masks, labels
 
 
-def collate_classification(batch):
+def collate_classification_stack(batch):
     batch.sort(key=lambda x: x[0].shape[0], reverse=True)
 
     embeddings_list, labels_list = zip(*batch)
@@ -41,7 +41,7 @@ def collate_classification(batch):
 
     labels = torch.tensor(labels_list, dtype=torch.float32)
 
-    return padded_embeddings, labels, masks
+    return padded_embeddings, masks, labels
 
 
 def get_class_weights(labels):

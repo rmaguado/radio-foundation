@@ -25,10 +25,14 @@ def plot_train_curves(train_items, val_values, ylabel, hline_type="min"):
     plt.show()
 
 
-def plot_confusion_matrix(all_labels, all_predictions):
-    cm = confusion_matrix(all_labels, all_predictions, normalize="true")
+def plot_confusion_matrix(all_labels, all_predictions, normalize=True):
+    normalize_arg = "true" if normalize else None
+    cm = confusion_matrix(all_labels, all_predictions, normalize=normalize_arg)
     fig, ax = plt.subplots(figsize=(6, 5))
-    im = ax.imshow(cm, interpolation="nearest", cmap="Blues", vmin=0.0, vmax=1.0)
+    if normalize:
+        im = ax.imshow(cm, interpolation="nearest", cmap="Blues", vmin=0.0, vmax=1.0)
+    else:
+        im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
 
     plt.colorbar(im, ax=ax)
     ax.set(xlabel="Predicted label", ylabel="True label", title="Confusion Matrix")
