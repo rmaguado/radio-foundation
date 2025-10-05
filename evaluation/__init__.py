@@ -1,4 +1,10 @@
-from .poolers import AveragePool, GatedPool, SoftAttentionPool, AttentionPool
+from .poolers import (
+    AveragePool,
+    GatedPool,
+    SoftAttentionPool,
+    AttentionPool,
+    MultiHeadAttentionPool,
+)
 from .networks import Classifier, Regressor
 from .dataset import (
     EmbeddingDataset,

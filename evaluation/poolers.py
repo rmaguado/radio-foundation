@@ -81,3 +81,45 @@ class AttentionPool(nn.Module):
         weighted_sum = torch.sum(x * attention_weights, dim=1)
 
         return weighted_sum
+
+
+class MultiHeadAttentionPool(nn.Module):
+    def __init__(self, embed_dim: int, num_heads: int):
+        super().__init__()
+        assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        self.query = nn.Parameter(torch.zeros(1, num_heads, self.head_dim))
+
+        self.key_proj = nn.Linear(embed_dim, embed_dim)
+        self.value_proj = nn.Linear(embed_dim, embed_dim)
+
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        nn.init.xavier_uniform_(self.query)
+
+    def forward(self, x, mask=None):
+        B, N, D = x.shape
+
+        K = self.key_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.value_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+
+        Q = self.query.expand(B, -1, -1).unsqueeze(2)
+
+        attn_scores = torch.einsum("bhqd,bhnd->bhqn", Q, K) / (self.head_dim**0.5)
+
+        if mask is not None:
+            mask = mask.unsqueeze(1).unsqueeze(2)
+            attn_scores = attn_scores.masked_fill(~mask, float("-inf"))
+
+        attn_weights = torch.softmax(attn_scores, dim=-1)
+        weighted_sum = torch.einsum("bhqn,bhnd->bhqd", attn_weights, V)
+        weighted_sum = weighted_sum.squeeze(2)
+
+        weighted_sum = weighted_sum.reshape(B, self.embed_dim)
+        out = self.out_proj(weighted_sum)
+
+        return out
